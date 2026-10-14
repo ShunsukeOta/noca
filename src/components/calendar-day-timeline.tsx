@@ -181,7 +181,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
                       "min-h-8 w-full rounded-[10px] border-l-[3px] px-1.5 py-1.5 text-left text-[11px] font-bold leading-snug",
                       ownerTone[event.by]
                     )}>
-                    <span className="block break-words">{event.title}</span>
+                    <span className="block break-words text-[11px] font-bold leading-snug">{event.title}</span>
                   </button>
                 ))}
               </div>
