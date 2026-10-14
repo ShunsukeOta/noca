@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["noca-icon.svg"],
       manifest: {
-        name: "noca — ふたりの毎日を、ひとつに。",
+        name: "noca",
         short_name: "noca",
-        description: "ふたりのTODO・予定・メモをひとつに。",
+        description: "TODO・カレンダー・メモ",
         start_url: "/",
         scope: "/",
         display: "standalone",
