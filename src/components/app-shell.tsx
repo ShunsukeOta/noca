@@ -32,7 +32,7 @@ export function AppShell() {
   )
 
   useEffect(() => {
-    let rolloverTimer: ReturnType<typeof setTimeout>
+    let rolloverTimer: number
     const refreshDate = () => {
       const now = new Date()
       setToday(now)
