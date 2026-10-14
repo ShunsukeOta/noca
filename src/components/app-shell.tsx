@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
-import { CalendarDays, ListTodo, NotebookPen, Moon, Plus, Settings2, Sun } from "lucide-react"
+import { CalendarDays, ListTodo, NotebookPen, Moon, Plus, Settings, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
 import { TodoEditorSheet } from "@/components/todo-editor-sheet"
@@ -56,7 +56,7 @@ export function AppShell() {
             </button>
             <Link to="/settings" state={{ from: active?.to ?? "/todo" }} aria-label="設定を開く" aria-current={isSettings ? "page" : undefined}
               className={cn("tap-target flex items-center justify-center rounded-full transition-colors", isSettings ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary")}>
-              <Settings2 className="size-5" />
+              <Settings className="size-5" />
             </Link>
           </div>
         </div>
