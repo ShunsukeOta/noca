@@ -48,7 +48,6 @@ function readEvents(): CalendarEvent[] {
       parsed.some(event => ["e1", "e2", "e3", "e4"].includes(event.id))) {
       const sampleIds = new Set(parsed.map(event => event.id))
       const additional = mockEvents.filter(event => event.id.startsWith("demo-") && !sampleIds.has(event.id))
-      localStorage.setItem("noca.calendar.samples.v2", "done")
       return [...parsed, ...additional]
     }
     return parsed
@@ -86,6 +85,11 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
+      // Mark migration only after saving the added samples. React StrictMode can
+      // initialize state twice before effects run, so the initializer stays pure.
+      if (events.some(event => event.id.startsWith("demo-"))) {
+        localStorage.setItem("noca.calendar.samples.v2", "done")
+      }
       setStorageError(false)
     } catch {
       setStorageError(true)
