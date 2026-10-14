@@ -63,7 +63,6 @@ type DayTimelineProps = {
 
 export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, onCreate }: DayTimelineProps) {
   const reduceMotion = useReducedMotion()
-  const allDay = events.filter(event => !event.time)
   const timed = events.filter(event => Boolean(event.time))
   const timeRange = useMemo(() => {
     if (timed.length === 0) return null
