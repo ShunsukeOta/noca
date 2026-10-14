@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { addMonths, eachDayOfInterval, endOfWeek, endOfMonth, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns"
+import { addMonths, eachDayOfInterval, endOfWeek, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns"
 import { ja } from "date-fns/locale"
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, ListTodo, MapPin } from "lucide-react"
 import { mockEvents, mockTasks } from "@/app/mock-data"
