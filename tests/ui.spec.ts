@@ -383,3 +383,41 @@ test("drawer overlays the sticky header without blocking the close control", asy
   await page.getByRole("button", { name: "閉じる" }).click()
   await expect(page.getByRole("dialog")).toBeHidden()
 })
+
+
+test("header shows today's date beside noca without duplicate copy at small widths", async ({ browser }) => {
+  for (const width of [320, 375, 390, 430]) {
+    const context = await browser.newContext({
+      viewport: { width, height: 760 }, isMobile: true, hasTouch: true
+    })
+    const page = await context.newPage()
+    await page.goto("/todo")
+    const date = page.getByTestId("header-date")
+    const expected = await page.evaluate(() => {
+      const now = new Date()
+      const weekdays = ["日", "月", "火", "水", "木", "金", "土"]
+      const pad = (value: number) => String(value).padStart(2, "0")
+      return {
+        text: (now.getMonth() + 1) + "月" + now.getDate() + "日（" + weekdays[now.getDay()] + "）",
+        iso: now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate())
+      }
+    })
+    await expect(date).toBeVisible()
+    await expect(date).toHaveText(expected.text)
+    await expect(date).toHaveAttribute("datetime", expected.iso)
+    await expect(page.getByTestId("app-header").locator("time")).toHaveCount(1)
+    await expect(page.getByTestId("app-header").getByText("ふたりのスペース")).toHaveCount(0)
+    await expect(page.getByRole("link", { name: "設定を開く" })).toBeVisible()
+    const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+    expect(hasOverflow).toBe(false)
+    await context.close()
+  }
+})
+
+test("header date changes at midnight without reloading the PWA", async ({ page }) => {
+  await page.clock.install({ time: new Date(2026, 9, 14, 23, 59, 59) })
+  await page.goto("/todo")
+  await expect(page.getByTestId("header-date")).toHaveText("10月14日（水）")
+  await page.clock.fastForward(2_000)
+  await expect(page.getByTestId("header-date")).toHaveText("10月15日（木）")
+})

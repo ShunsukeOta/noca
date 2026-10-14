@@ -24,11 +24,36 @@ export function AppShell() {
   const isSettings = location.pathname === "/settings"
   const reduceMotion = useReducedMotion()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [today, setToday] = useState(() => new Date())
   const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
   const calendar = useCalendar()
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     typeof localStorage !== "undefined" && localStorage.getItem("noca.theme") === "dark" ? "dark" : "light"
   )
+
+  useEffect(() => {
+    let rolloverTimer: ReturnType<typeof setTimeout>
+    const refreshDate = () => {
+      const now = new Date()
+      setToday(now)
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      rolloverTimer = window.setTimeout(refreshDate, nextMidnight.getTime() - now.getTime() + 50)
+    }
+    const onResume = () => {
+      if (document.visibilityState === "visible") {
+        window.clearTimeout(rolloverTimer)
+        refreshDate()
+      }
+    }
+    refreshDate()
+    window.addEventListener("focus", onResume)
+    document.addEventListener("visibilitychange", onResume)
+    return () => {
+      window.clearTimeout(rolloverTimer)
+      window.removeEventListener("focus", onResume)
+      document.removeEventListener("visibilitychange", onResume)
+    }
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark")
@@ -43,12 +68,12 @@ export function AppShell() {
     <div className="app-shell relative">
       <header data-testid="app-header" className="app-header sticky top-0 z-40 border-b border-border/65 bg-background/95 px-5 pb-3 backdrop-blur-xl">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex min-w-0 items-baseline gap-2">
-              <span className="text-[23px] font-extrabold tracking-[-0.08em] text-primary">noca<span className="text-success">.</span></span>
-              <span className="hidden rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold tracking-[0.025em] text-secondary-foreground min-[390px]:inline-flex">ふたりのスペース</span>
-            </div>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">{format(new Date(), "M月d日 EEEE", { locale: ja })}</p>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-[23px] font-extrabold tracking-[-0.08em] text-primary">noca<span className="text-success">.</span></span>
+            <time data-testid="header-date" dateTime={format(today, "yyyy-MM-dd")}
+              className="shrink-0 whitespace-nowrap rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold tracking-[0.025em] text-secondary-foreground">
+              {format(today, "M月d日（E）", { locale: ja })}
+            </time>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <div className="mr-1 flex -space-x-2" aria-label="2人の共有スペース（表示用）">
