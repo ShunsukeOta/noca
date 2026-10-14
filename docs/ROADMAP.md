@@ -22,7 +22,7 @@
 | Phase | 作業内容 | 依存 | 完了条件 |
 | --- | --- | --- | --- |
 | **0** | README・仕様・ロードマップ・UIテスト計画 | なし | READMEと4つのdocs文書が整備され、Phase 1の合格基準が明確 |
-| **1A** | Vite/React/TypeScript/shadcn/ui/Tailwind、画面枠、3タブ | 0 | 実装済み、ビルド・Chromiumモバイル幅の検証待ち |
+| **1A** | Vite/React/TypeScript/shadcn/ui/Tailwind、画面枠、3タブ | 0 | 実装済み・ビルドとChromium自動テスト合格（実機確認は1E） |
 | **1B** | TODO UIとダミー操作 | 1A | 追加・編集・完了・削除/Undo、空状態まで操作できる |
 | **1C** | カレンダー UIとダミー操作 | 1B | 月移動、日付選択、予定/期限TODO表示、予定編集 |
 | **1D** | メモ UIとダミー操作 | 1C | 一覧・検索・作成・編集・空状態が操作できる |
@@ -64,12 +64,12 @@
 
 ### DoD
 
-- [ ] `npm install` / `npm run dev` / `npm run build` が正常
-- [ ] TODO/カレンダー/メモのタブ切替ができる
+- [x] `npm install` / `npm run build` がCIで正常（`npm run dev` はE2Eで起動確認）
+- [x] TODO/カレンダー/メモのタブ切替ができる
 - [ ] 画面下部タブがホームインジケーターと重ならない
-- [ ] 375px / 390px / 430px幅で横スクロールしない
+- [x] 375px / 390px / 430px幅で横スクロールしない（Chromium自動テスト）
 - [ ] 日本語入力時のズーム/キーボード重なりを回避
-- [ ] 本フェーズにFirebase SDKへの接続コードを含まない
+- [x] 本フェーズにFirebase SDKへの接続コードを含まない
 
 ## Phase 1B — TODO UI
 

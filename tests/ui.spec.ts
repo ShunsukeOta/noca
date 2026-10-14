@@ -8,19 +8,21 @@ for (const width of [375, 390, 430]) {
     const page = await context.newPage()
     await page.goto("/")
     await expect(page.getByTestId("todo-page")).toBeVisible()
+    await page.screenshot({ path: "test-results/screenshots/todo-" + width + ".png", fullPage: false })
     await expect(page.getByRole("navigation", { name: "メインメニュー" })).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     expect(overflow).toBe(false)
 
     await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
     await expect(page.getByTestId("calendar-page")).toBeVisible()
+    await page.screenshot({ path: "test-results/screenshots/calendar-" + width + ".png", fullPage: false })
     await page.getByRole("button", { name: "次の月" }).click()
     await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "メモ" }).click()
     await expect(page.getByTestId("memo-page")).toBeVisible()
     const overflowAfter = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     expect(overflowAfter).toBe(false)
 
-    await page.screenshot({ path: "test-results/screenshots/memo-" + width + ".png", fullPage: true })
+    await page.screenshot({ path: "test-results/screenshots/memo-" + width + ".png", fullPage: false })
     await context.close()
   })
 }

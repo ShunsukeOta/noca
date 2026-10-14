@@ -45,10 +45,19 @@ CI成功と**iPhone実機の表示確認は別物**。iOS Safari固有のレイ�
 | shadcn/uiスタイルのコンポーネント | 実装済み |
 | 3タブと共通シェル | 実装済み |
 | ダミーデータ | 実装済み |
-| ビルド成功 | CI実行後に記録 |
-| 375 / 390 / 430pxの表示 | CI実行後に記録 |
+| ビルド成功 | PASS — TypeScript/Vite本番ビルド |
+| 375 / 390 / 430pxの表示 | PASS — Chromiumモバイル表示、横はみ出しなし |
 | iPhone Safari実機 | Phase 1Eで検証 |
 | PWA standalone実機 | Phase 1Eで検証 |
+
+## CI確認結果
+
+- GitHub Actions: https://github.com/ShunsukeOta/noca/actions/runs/38505171729
+- Typecheck / Vite build: 成功
+- Playwright Chromiumモバイル画面: 375 / 390 / 430px 全合格
+- タブ/カレンダー月切り替え/プレビューシート/ダークテーマ/TODOチェック/メモ検索: 全合格
+- 最終CIではTODO・カレンダー・メモの各画面キャプチャを成果物として出力
+- **Safari実機やPWA standaloneは未実施**。Phase 1Eまで合格扱いにしない
 
 ## 次に進める順序
 
