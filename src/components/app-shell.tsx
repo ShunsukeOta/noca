@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
-import { CalendarDays, ListTodo, NotebookPen, Moon, Plus, Settings, Sun } from "lucide-react"
+import { CalendarDays, ListTodo, NotebookPen, Plus, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
 import { TodoEditorSheet } from "@/components/todo-editor-sheet"
@@ -49,11 +49,6 @@ export function AppShell() {
               <span className="flex size-8 items-center justify-center rounded-full border-[3px] border-background bg-[#d7e7ea] text-[10px] font-bold text-[#3e6470]" aria-hidden="true">A</span>
               <span className="flex size-8 items-center justify-center rounded-full border-[3px] border-background bg-[#f3dfda] text-[10px] font-bold text-[#90625a]" aria-hidden="true">B</span>
             </div>
-            <button type="button" className="tap-target ml-1 flex items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
-              aria-label={theme === "dark" ? "ライトモードに切り替え" : "ダークモードに切り替え"}
-              onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")}>
-              {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
-            </button>
             <Link to="/settings" state={{ from: active?.to ?? "/todo" }} aria-label="設定を開く" aria-current={isSettings ? "page" : undefined}
               className={cn("tap-target flex items-center justify-center rounded-full transition-colors", isSettings ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary")}>
               <Settings className="size-5" />

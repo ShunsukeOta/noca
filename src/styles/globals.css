@@ -108,3 +108,21 @@ a { -webkit-touch-callout: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+
+/* When iOS opens the software keyboard, the sheet docks above it. Keep the
+   action button visible and use the remaining viewport for a scrollable body. */
+.sheet-content[data-keyboard-open="true"] {
+  padding-bottom: 12px;
+  transition: none;
+}
+.sheet-content[data-keyboard-open="true"] .sheet-header {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.sheet-content[data-keyboard-open="true"] .sheet-leading-icon {
+  display: none;
+}
+.sheet-content[data-keyboard-open="true"] .sheet-footer {
+  padding-top: 10px;
+}

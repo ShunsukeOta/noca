@@ -22,7 +22,7 @@ export function PreviewCreateSheet({ open, onOpenChange, kind }: { open: boolean
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader className="pr-14">
-          <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-secondary text-primary"><Icon className="size-5" /></div>
+          <div className="sheet-leading-icon mb-3 flex size-10 items-center justify-center rounded-xl bg-secondary text-primary"><Icon className="size-5" /></div>
           <SheetTitle className="text-left text-[22px] font-bold tracking-tight">{config.title}</SheetTitle>
           <SheetDescription className="sr-only">プレビュー画面です。入力内容は保存されません。</SheetDescription>
         </SheetHeader>

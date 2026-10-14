@@ -74,8 +74,11 @@ test("TODO due date appears on calendar, completion removes it", async ({ page }
 
 test("theme switch and mock task completion", async ({ page }) => {
   await page.goto("/todo")
-  await page.getByRole("button", { name: "ダークモードに切り替え" }).click()
+  await expect(page.getByRole("button", { name: "ダークモードに切り替え" })).toHaveCount(0)
+  await page.getByRole("link", { name: "設定を開く" }).click()
+  await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
+  await page.getByRole("button", { name: "前の画面に戻る" }).click()
   await page.getByRole("button", { name: "週末のカフェを探すを完了" }).click()
   await page.getByRole("button", { name: /完了したこと/ }).click()
   await expect(page.getByRole("button", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
@@ -158,4 +161,62 @@ test("settings is reachable on small iPhone widths with no horizontal overflow",
     await expect(page.getByTestId("memo-page")).toBeVisible()
     await context.close()
   }
+})
+
+
+test("opening an editor does not immediately show the iPhone keyboard", async ({ page }) => {
+  await page.goto("/todo")
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await expect(page.getByRole("dialog")).toBeVisible()
+  await expect(page.locator("#todo-title")).not.toBeFocused()
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-keyboard-open", "false")
+  await page.getByRole("button", { name: "閉じる" }).click()
+  await expect(page.getByRole("dialog")).toBeHidden()
+})
+
+test("keyboard-sized visual viewport keeps the drawer and save action above it", async ({ page }) => {
+  await page.addInitScript(() => {
+    const viewport = Object.assign(new EventTarget(), {
+      height: window.innerHeight,
+      offsetTop: 0,
+      width: window.innerWidth
+    })
+    Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport })
+  })
+
+  await page.goto("/todo")
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await page.locator("#todo-title").focus()
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as VisualViewport & { height: number }
+    viewport.height = window.innerHeight - 330
+    viewport.dispatchEvent(new Event("resize"))
+  })
+
+  const dialog = page.getByRole("dialog")
+  await expect(dialog).toHaveAttribute("data-keyboard-open", "true")
+  const geometry = await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>('[role="dialog"]')!
+    const save = panel.querySelector<HTMLButtonElement>('button[type="submit"]')!
+    const keyboardTop = window.innerHeight - 330
+    return {
+      panelBottom: panel.getBoundingClientRect().bottom,
+      panelTop: panel.getBoundingClientRect().top,
+      buttonBottom: save.getBoundingClientRect().bottom,
+      keyboardTop,
+      maxHeight: parseFloat(getComputedStyle(panel).maxHeight)
+    }
+  })
+  expect(geometry.panelBottom).toBeLessThanOrEqual(geometry.keyboardTop + 2)
+  expect(geometry.buttonBottom).toBeLessThanOrEqual(geometry.keyboardTop + 2)
+  expect(geometry.panelTop).toBeGreaterThanOrEqual(-3)
+  expect(geometry.maxHeight).toBeLessThanOrEqual(geometry.keyboardTop)
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as VisualViewport & { height: number }
+    viewport.height = window.innerHeight
+    viewport.dispatchEvent(new Event("resize"))
+  })
+  await expect(dialog).toHaveAttribute("data-keyboard-open", "false")
 })

@@ -75,7 +75,7 @@ export function TodoEditorSheet() {
     <Sheet open onOpenChange={(next) => { if (!next) close() }}>
       <SheetContent onEscapeKeyDown={(event) => { if (dirty) { event.preventDefault(); close() } }}>
         <SheetHeader className="pr-14">
-          <div className="mb-2 flex size-11 items-center justify-center rounded-2xl bg-secondary text-primary">
+          <div className="sheet-leading-icon mb-2 flex size-11 items-center justify-center rounded-2xl bg-secondary text-primary">
             <NotebookPen className="size-5" />
           </div>
           <SheetTitle className="text-left text-[22px] font-bold tracking-tight">{editor?.mode === "edit" ? "タスクを編集" : "タスクを追加"}</SheetTitle>
@@ -85,7 +85,7 @@ export function TodoEditorSheet() {
           <SheetBody>
             <label htmlFor="todo-title" className="mb-2 block text-[13px] font-semibold">やること <span className="text-destructive">*</span></label>
             <input id="todo-title" value={title} onChange={event => setTitle(event.target.value)}
-              autoFocus maxLength={200} placeholder="例：週末の買い出し"
+              maxLength={200} placeholder="例：週末の買い出し"
               aria-invalid={Boolean(error && !title.trim())}
               className="h-12 w-full rounded-[13px] border border-input bg-background px-4 text-base text-foreground outline-none transition-shadow placeholder:text-muted-foreground/75 focus:border-ring focus:ring-[3px] focus:ring-ring/20" />
 
