@@ -22,7 +22,7 @@
 | Phase | 作業内容 | 依存 | 完了条件 |
 | --- | --- | --- | --- |
 | **0** | README・仕様・ロードマップ・UIテスト計画 | なし | READMEと4つのdocs文書が整備され、Phase 1の合格基準が明確 |
-| **1A** | Vite/React/TypeScript/shadcn/ui/Tailwind、画面枠、3タブ | 0 | iPhone幅でタブ遷移可能、デザイントークン適用 |
+| **1A** | Vite/React/TypeScript/shadcn/ui/Tailwind、画面枠、3タブ | 0 | 実装済み、ビルド・Chromiumモバイル幅の検証待ち |
 | **1B** | TODO UIとダミー操作 | 1A | 追加・編集・完了・削除/Undo、空状態まで操作できる |
 | **1C** | カレンダー UIとダミー操作 | 1B | 月移動、日付選択、予定/期限TODO表示、予定編集 |
 | **1D** | メモ UIとダミー操作 | 1C | 一覧・検索・作成・編集・空状態が操作できる |

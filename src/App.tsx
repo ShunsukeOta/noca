@@ -1,0 +1,18 @@
+import { Navigate, Route, Routes } from "react-router-dom"
+import { AppShell } from "@/components/app-shell"
+import { TodoPage } from "@/pages/todo-page"
+import { CalendarPage } from "@/pages/calendar-page"
+import { MemoPage } from "@/pages/memo-page"
+
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/todo" element={<TodoPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/memo" element={<MemoPage />} />
+        <Route path="*" element={<Navigate to="/todo" replace />} />
+      </Route>
+    </Routes>
+  )
+}

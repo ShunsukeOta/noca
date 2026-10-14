@@ -1,0 +1,8 @@
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rise-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes fall-out { from { transform: translateY(0); } to { transform: translateY(100%); } }
+  .sheet-overlay[data-state="open"] { animation: fade-in 180ms ease-out; }
+  .sheet-content[data-state="open"] { animation: rise-in 240ms cubic-bezier(.22,.9,.35,1); }
+  .sheet-content[data-state="closed"] { animation: fall-out 170ms ease-in; }
+}

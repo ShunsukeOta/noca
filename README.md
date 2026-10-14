@@ -5,8 +5,8 @@
 noca は、2人で使うことを前提とした **iPhone向け共有PWA** です。TODO・カレンダー・メモを、直感的な3タブにまとめます。
 
 > [!IMPORTANT]
-> 現在は **Phase 0: 仕様策定**。アプリ本体・Firebase・デプロイはまだ実装していません。
-> 次は **Phase 1: UI構築・iPhone表示テスト・デザイン確定** に進みます。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
+> 現在は **Phase 1A: UI基盤の実装・自動検証**。アプリの3画面とダミーUIを追加しました。Firebase・デプロイはまだ実装していません。
+> 次は **Phase 1B: TODO CRUD UI** に進む前に、Phase 1Aのビルドとスマホ幅テストを確認します。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
 
 ## コンセプト
 
@@ -45,7 +45,7 @@ noca は、2人で使うことを前提とした **iPhone向け共有PWA** で�
 | フェーズ | 目的 | 状態 |
 | --- | --- | --- |
 | 0 | 仕様・計画・受け入れ基準の文書化 | 完了（ドキュメント整備） |
-| 1A | 初期構築・デザイントークン・下部タブ | 未着手 |
+| 1A | 初期構築・デザイントークン・下部タブ | 実装済み・CI検証待ち |
 | 1B | TODO画面UI | 未着手 |
 | 1C | カレンダー画面UI | 未着手 |
 | 1D | メモ画面UI | 未着手 |
@@ -73,13 +73,28 @@ noca は、2人で使うことを前提とした **iPhone向け共有PWA** で�
 5. 変更は小さなPR単位に分割し、各フェーズの受け入れ条件を確認する。
 6. 秘密情報をコミットしない。環境変数は `.env.example` にキー名だけ掲載する。
 
-## Phase 1 着手時のセットアップ案
+## ローカル起動（Phase 1A）
 
-仕様策定時点ではまだアプリを生成していません。実装時は公式 [shadcn/ui Viteガイド](https://ui.shadcn.com/docs/installation/vite) に沿って、Vite + React + TypeScript + Tailwind v4 をこのリポジトリ直下に用意します。
+Node.js 22以上を推奨します。
 
-- UI部品は shadcn/ui を必要なものだけ導入する
-- UIテストはダミーデータで行う
-- 実機確認はiPhoneの **Safari表示** と **ホーム画面追加後のstandalone表示** の両方を対象とする
+~~~bash
+npm install
+npm run dev
+~~~
+
+画面表示を確認したら次を実行できます。
+
+~~~bash
+npm run build
+npx playwright install chromium
+npm run test:e2e
+~~~
+
+初期表示は `/todo`。下部タブで `/calendar`、`/memo` に切り替わります。右下の＋ボタンは追加シートの**表示デモ**で、保存は行いません。
+
+shadcn/uiの **Radix版** を採用し、ソースを `src/components/ui` に配置しています。カラー・角丸等は `src/styles/globals.css` で共通管理します。詳細: [Phase 1A 実装・検証記録](docs/PHASE1A_REPORT.md)。
+
+実機確認はiPhoneの **Safari表示** と **ホーム画面追加後のstandalone表示** の両方を対象とします。CIのChromiumモバイル検証だけではiOS実機合格とはしません。
 
 ## 範囲外（初期リリース）
 
