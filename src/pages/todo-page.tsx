@@ -1,14 +1,14 @@
 import { useState } from "react"
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
-import { format, isThisWeek, parseISO } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Check, ChevronDown, ChevronRight, Clock3, ListChecks, Sparkles } from "lucide-react"
 import { type Task, type TaskCategory } from "@/app/mock-data"
 import { useTodos } from "@/features/todos/todo-store"
 import { cn } from "@/lib/utils"
 
-type Filter = "すべて" | "今日" | "今週"
-const filters: Filter[] = ["すべて", "今日", "今週"]
+type Filter = "すべて" | TaskCategory
+const filters: Filter[] = ["すべて", "おでかけ", "暮らし", "ふたり", "その他"]
 const categoryColor: Record<TaskCategory, string> = {
   "暮らし": "bg-[#e7f2e9] text-[#52785d] dark:bg-[#294535] dark:text-[#add6b3]",
   "おでかけ": "bg-[#f6e9e1] text-[#956e5b] dark:bg-[#523e35] dark:text-[#f0c5ac]",
@@ -21,8 +21,7 @@ export function TodoPage() {
   const { todos: tasks, toggleTodo, openEdit, openCreate } = useTodos()
   const [showCompleted, setShowCompleted] = useState(false)
   const reduceMotion = useReducedMotion()
-  const today = format(new Date(), "yyyy-MM-dd")
-  const visible = tasks.filter((task) => filter === "すべて" ? true : filter === "今日" ? task.dueDate === today : Boolean(task.dueDate && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 })))
+  const visible = tasks.filter(task => filter === "すべて" || task.category === filter)
   const active = visible.filter((task) => !task.done)
   const completed = visible.filter((task) => task.done)
   const toggle = (task: Task) => toggleTodo(task.id)
@@ -76,7 +75,7 @@ export function TodoPage() {
             <motion.div key="empty" layout initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="flex flex-col items-center gap-2 px-4 py-11 text-center">
               <div className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-secondary text-primary"><Sparkles className="size-5" /></div>
-              <p className="text-sm font-semibold">{tasks.length === 0 ? "タスクはありません" : "すべて終わりました"}</p>
+              <p className="text-sm font-semibold">{tasks.length === 0 ? "タスクはありません" : visible.length === 0 ? "このカテゴリのタスクはありません" : "すべて終わりました"}</p>
               <button type="button" onClick={openCreate} className="mt-3 min-h-11 rounded-xl bg-secondary px-4 text-[13px] font-bold text-primary">＋ タスクを追加</button>
             </motion.div>
           ) : active.map((task, index) => (

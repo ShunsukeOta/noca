@@ -421,3 +421,38 @@ test("header date changes at midnight without reloading the PWA", async ({ page 
   await page.clock.fastForward(2_000)
   await expect(page.getByTestId("header-date")).toHaveText("10月15日（木）")
 })
+
+
+test("TODO chips filter by category, keep completed tasks, and include newly created items", async ({ page }) => {
+  await page.goto("/todo")
+  const chips = page.getByRole("group", { name: "TODOの絞り込み" })
+  const chipLabels = await chips.getByRole("button").allTextContents()
+  expect(chipLabels.map(text => text.trim())).toEqual(["すべて", "おでかけ", "暮らし", "ふたり", "その他"])
+  await expect(chips.getByRole("button", { name: "すべて" })).toHaveAttribute("aria-pressed", "true")
+  await expect(page.getByRole("button", { name: "週末のカフェを探すを編集" })).toBeVisible()
+
+  await chips.getByRole("button", { name: "おでかけ" }).click()
+  await expect(chips.getByRole("button", { name: "おでかけ" })).toHaveAttribute("aria-pressed", "true")
+  await expect(page.getByRole("button", { name: "週末のカフェを探すを編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "洗剤と柔軟剤を買うを編集" })).toHaveCount(0)
+  await page.getByRole("button", { name: /完了したこと/ }).click()
+  await expect(page.getByRole("button", { name: "次のお出かけの候補を送るを編集" })).toBeVisible()
+
+  await chips.getByRole("button", { name: "ふたり" }).click()
+  await expect(page.getByRole("button", { name: "旅行の宿泊先を決めるを編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "週末のカフェを探すを編集" })).toHaveCount(0)
+
+  await chips.getByRole("button", { name: "暮らし" }).click()
+  await expect(page.getByRole("button", { name: "洗剤と柔軟剤を買うを編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "部屋の片付けを編集" })).toBeVisible()
+
+  await chips.getByRole("button", { name: "その他" }).click()
+  await expect(page.getByText("このカテゴリのタスクはありません")).toBeVisible()
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await page.locator("#todo-title").fill("カテゴリ別のテスト")
+  await page.getByRole("button", { name: "タスクを追加" }).last().click()
+  await expect(page.getByRole("button", { name: "カテゴリ別のテストを編集" })).toBeVisible()
+  await page.reload()
+  await chips.getByRole("button", { name: "その他" }).click()
+  await expect(page.getByRole("button", { name: "カテゴリ別のテストを編集" })).toBeVisible()
+})
