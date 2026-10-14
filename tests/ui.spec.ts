@@ -138,7 +138,7 @@ test("settings icon opens the page; theme setting persists; back returns to the 
   await expect(page.locator("html")).toHaveClass(/dark/)
   await expect(page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" })).toHaveAttribute("aria-pressed", "true")
   await page.getByRole("button", { name: "前の画面に戻る" }).click()
-  await expect(page.getByTestId("todo-page")).toBeVisible()
+  await expect(page.getByTestId("calendar-page")).toBeVisible()
 })
 
 test("settings is reachable on small iPhone widths with no horizontal overflow", async ({ browser }) => {
