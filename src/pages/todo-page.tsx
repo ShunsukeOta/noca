@@ -2,7 +2,7 @@ import { useState } from "react"
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
 import { format, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
-import { Check, ChevronDown, ChevronRight, Clock3, ListChecks, Sparkles } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, Clock3, Sparkles } from "lucide-react"
 import { type Task, type TaskCategory } from "@/app/mock-data"
 import { useTodos } from "@/features/todos/todo-store"
 import { cn } from "@/lib/utils"
@@ -41,27 +41,6 @@ export function TodoPage() {
 
   return (
     <div className="space-y-6" data-testid="todo-page">
-
-      <section className="noca-shadow relative overflow-hidden rounded-[23px] bg-primary px-5 py-5 text-primary-foreground">
-        <div className="pointer-events-none absolute -right-7 -top-12 size-40 rounded-full border-[27px] border-white/8" />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <p className="text-[12px] font-semibold text-primary-foreground/70">残りのタスク</p>
-            <div className="mt-1 flex items-baseline gap-2"><span className="relative inline-flex h-9 min-w-5 items-center overflow-hidden text-[34px] font-bold leading-none">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span key={unfinishedCounts["すべて"]}
-                  initial={reduceMotion ? false : { opacity: 0, y: 9 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduceMotion ? undefined : { opacity: 0, y: -9 }}
-                  transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}>
-                  {unfinishedCounts["すべて"]}
-                </motion.span>
-              </AnimatePresence>
-            </span><span className="text-sm text-primary-foreground/70">件</span></div>
-          </div>
-          <div className="flex size-[62px] items-center justify-center rounded-[20px] bg-white/14"><ListChecks className="size-7" strokeWidth={1.75} /></div>
-        </div>
-      </section>
 
       <LayoutGroup id="todo-filters">
         <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="TODOの絞り込み">

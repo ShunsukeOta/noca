@@ -538,3 +538,14 @@ test("TODO tile counts respond immediately to creating and completing tasks", as
   await page.getByRole("button", { name: "件数のテストの完了を解除" }).click()
   await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("1件")
 })
+
+
+test("TODO starts with category tiles and has no redundant remaining-task summary card", async ({ page }) => {
+  await page.goto("/todo")
+  const todo = page.getByTestId("todo-page")
+  await expect(todo.getByText("残りのタスク", { exact: true })).toHaveCount(0)
+  await expect(todo.locator("> section.noca-shadow")).toHaveCount(0)
+  await expect(todo.locator("> [role='group'][aria-label='TODOの絞り込み']")).toBeVisible()
+  await expect(todo.getByTestId("todo-filter-count-すべて")).toHaveText("4件")
+  await expect(page.getByRole("button", { name: "TODOを追加" })).toBeVisible()
+})
