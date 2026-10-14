@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
-import { NavLink, Outlet, useLocation } from "react-router-dom"
-import { CalendarDays, ListTodo, NotebookPen, Moon, Plus, Sun } from "lucide-react"
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
+import { CalendarDays, ListTodo, NotebookPen, Moon, Plus, Settings2, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
 import { TodoEditorSheet } from "@/components/todo-editor-sheet"
@@ -17,7 +17,8 @@ const tabs: { to: string; label: string; icon: typeof ListTodo; kind: PageKind }
 
 export function AppShell() {
   const location = useLocation()
-  const active = tabs.find((tab) => location.pathname.startsWith(tab.to)) ?? tabs[0]
+  const active = tabs.find((tab) => location.pathname.startsWith(tab.to))
+  const isSettings = location.pathname === "/settings"
   const [sheetOpen, setSheetOpen] = useState(false)
   const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
   const [theme, setTheme] = useState<"light" | "dark">(() =>
@@ -37,14 +38,14 @@ export function AppShell() {
       <header className="app-header relative px-5 pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-baseline gap-2">
+            <div className="flex min-w-0 items-baseline gap-2">
               <span className="text-[23px] font-extrabold tracking-[-0.08em] text-primary">noca<span className="text-success">.</span></span>
-              <span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold tracking-[0.025em] text-secondary-foreground">ふたりのスペース</span>
+              <span className="hidden rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold tracking-[0.025em] text-secondary-foreground min-[390px]:inline-flex">ふたりのスペース</span>
             </div>
             <p className="mt-0.5 text-[12px] text-muted-foreground">{format(new Date(), "M月d日 EEEE", { locale: ja })}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex -space-x-2" aria-label="2人の共有スペース（表示用）">
+          <div className="flex shrink-0 items-center gap-1">
+            <div className="mr-1 flex -space-x-2" aria-label="2人の共有スペース（表示用）">
               <span className="flex size-8 items-center justify-center rounded-full border-[3px] border-background bg-[#d7e7ea] text-[10px] font-bold text-[#3e6470]" aria-hidden="true">A</span>
               <span className="flex size-8 items-center justify-center rounded-full border-[3px] border-background bg-[#f3dfda] text-[10px] font-bold text-[#90625a]" aria-hidden="true">B</span>
             </div>
@@ -53,15 +54,19 @@ export function AppShell() {
               onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")}>
               {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
             </button>
+            <Link to="/settings" state={{ from: active?.to ?? "/todo" }} aria-label="設定を開く" aria-current={isSettings ? "page" : undefined}
+              className={cn("tap-target flex items-center justify-center rounded-full transition-colors", isSettings ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary")}>
+              <Settings2 className="size-5" />
+            </Link>
           </div>
         </div>
       </header>
 
-      <main id="main-content" aria-label={active.label} className="app-content px-5 pt-5">
-        <Outlet />
+      <main id="main-content" aria-label={isSettings ? "設定" : active?.label ?? "TODO"} className="app-content px-5 pt-5">
+        <Outlet context={{ theme, onThemeChange: setTheme }} />
       </main>
 
-      <div className="pointer-events-none fixed bottom-0 left-1/2 z-30 h-0 w-full max-w-[540px] -translate-x-1/2">
+      {active && <div className="pointer-events-none fixed bottom-0 left-1/2 z-30 h-0 w-full max-w-[540px] -translate-x-1/2">
         <div className="pointer-events-auto fab absolute right-5">
           <Button type="button" size="icon" aria-label={active.label + "を追加"}
             onClick={() => active.kind === "todo" ? openCreate() : setSheetOpen(true)}
@@ -69,7 +74,7 @@ export function AppShell() {
             <Plus className="size-6 stroke-[2.3px]" />
           </Button>
         </div>
-      </div>
+      </div>}
 
       <nav className="bottom-nav fixed bottom-0 left-1/2 z-20 flex w-full max-w-[540px] -translate-x-1/2 items-center border-t border-border/80 bg-card/95 px-5 pt-2 backdrop-blur-xl" aria-label="メインメニュー">
         {tabs.map(({ to, label, icon: Icon }) => (
@@ -102,7 +107,7 @@ export function AppShell() {
         </div>
       )}
       {editor && <TodoEditorSheet key={editor.mode === "edit" ? editor.id : "create"} />}
-      {active.kind !== "todo" && <PreviewCreateSheet kind={active.kind} open={sheetOpen} onOpenChange={setSheetOpen} />}
+      {active && active.kind !== "todo" && <PreviewCreateSheet kind={active.kind} open={sheetOpen} onOpenChange={setSheetOpen} />}
     </div>
   )
 }

@@ -120,3 +120,42 @@ test("no decorative lead copy remains across three screens or sheets", async ({ 
   await expect(page.getByRole("heading", { name: "タスクを追加" })).toBeVisible()
   await expect(page.getByText("やることを、ひとつずつ。")).toHaveCount(0)
 })
+
+
+test("settings icon opens the page; theme setting persists; back returns to the source tab", async ({ page }) => {
+  await page.goto("/calendar")
+  await page.getByRole("link", { name: "設定を開く" }).click()
+  await expect(page).toHaveURL(/\/settings$/)
+  await expect(page.getByTestId("settings-page")).toBeVisible()
+  await expect(page.locator("main")).toHaveAttribute("aria-label", "設定")
+  await expect(page.getByRole("heading", { name: "設定" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "カレンダーを追加" })).toHaveCount(0)
+  await expect(page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link")).toHaveCount(3)
+
+  await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+  await page.reload()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+  await expect(page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" })).toHaveAttribute("aria-pressed", "true")
+  await page.getByRole("button", { name: "前の画面に戻る" }).click()
+  await expect(page.getByTestId("todo-page")).toBeVisible()
+})
+
+test("settings is reachable on small iPhone widths with no horizontal overflow", async ({ browser }) => {
+  for (const width of [320, 375, 390, 430]) {
+    const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
+    const page = await context.newPage()
+    await page.goto("/memo")
+    await page.getByRole("link", { name: "設定を開く" }).click()
+    await expect(page.getByTestId("settings-page")).toBeVisible()
+    await expect(page.getByText("相手を招待")).toBeVisible()
+    await expect(page.getByText("クラウド同期")).toBeVisible()
+    await expect(page.locator("main").getByText("準備中")).toHaveCount(7)
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+    expect(overflow).toBe(false)
+    await page.screenshot({ path: "test-results/screenshots/settings-" + width + ".png", fullPage: false })
+    await page.getByRole("button", { name: "前の画面に戻る" }).click()
+    await expect(page.getByTestId("memo-page")).toBeVisible()
+    await context.close()
+  }
+})
