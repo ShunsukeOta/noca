@@ -12,9 +12,6 @@ export function MemoPage() {
 
   return (
     <div className="space-y-6" data-testid="memo-page">
-      <div>
-        <h1 className="text-[32px] font-bold leading-[1.3] tracking-[-.045em]">メモ</h1>
-      </div>
 
       <label className="flex h-[52px] items-center gap-3 rounded-[17px] border border-border bg-card px-4 text-muted-foreground">
         <Search className="size-[19px] shrink-0" />

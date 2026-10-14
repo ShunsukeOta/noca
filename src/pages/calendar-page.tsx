@@ -29,9 +29,6 @@ export function CalendarPage() {
 
   return (
     <div className="space-y-6" data-testid="calendar-page">
-      <div>
-        <h1 className="text-[32px] font-bold leading-[1.3] tracking-[-.045em]">カレンダー</h1>
-      </div>
 
       <section className="noca-card rounded-[23px] border border-border bg-card px-3.5 pb-5 pt-4">
         <div className="mb-6 flex items-center justify-between px-2">

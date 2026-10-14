@@ -88,6 +88,19 @@ test("memo search narrows results", async ({ page }) => {
   await expect(page.getByRole("button", { name: "行きたいお店を開く" })).toHaveCount(0)
 })
 
+test("three main screens start with content, without redundant page headings", async ({ page }) => {
+  for (const [path, label, firstSelector] of [
+    ["/todo", "TODO", "section"],
+    ["/calendar", "カレンダー", "section"],
+    ["/memo", "メモ", "label"]
+  ]) {
+    await page.goto(path)
+    await expect(page.locator("main")).toHaveAttribute("aria-label", label)
+    await expect(page.locator("main h1")).toHaveCount(0)
+    await expect(page.locator("main").locator(firstSelector).first()).toBeVisible()
+  }
+})
+
 test("no decorative lead copy remains across three screens or sheets", async ({ page }) => {
   const removed = [
     "今日も、ひとつずつ片付けよう。",

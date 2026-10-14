@@ -57,7 +57,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main id="main-content" className="app-content px-5 pt-5">
+      <main id="main-content" aria-label={active.label} className="app-content px-5 pt-5">
         <Outlet />
       </main>
 

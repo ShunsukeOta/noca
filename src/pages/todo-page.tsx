@@ -27,9 +27,6 @@ export function TodoPage() {
 
   return (
     <div className="space-y-6" data-testid="todo-page">
-      <div>
-        <h1 className="text-[32px] font-bold leading-[1.3] tracking-[-.045em]">やること</h1>
-      </div>
 
       <section className="noca-shadow relative overflow-hidden rounded-[23px] bg-primary px-5 py-5 text-primary-foreground">
         <div className="pointer-events-none absolute -right-7 -top-12 size-40 rounded-full border-[27px] border-white/8" />
