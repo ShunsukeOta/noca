@@ -549,3 +549,86 @@ test("TODO starts with category tiles and has no redundant remaining-task summar
   await expect(todo.getByTestId("todo-filter-count-すべて")).toHaveText("4件")
   await expect(page.getByRole("button", { name: "TODOを追加" })).toBeVisible()
 })
+
+
+test("floating navigation dock fits narrow iPhones and has a distinct right-side add action", async ({ browser }) => {
+  for (const width of [320, 375, 390, 430]) {
+    const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
+    const page = await context.newPage()
+    await page.goto("/todo")
+    const nav = page.getByRole("navigation", { name: "メインメニュー" })
+    const dock = page.getByTestId("bottom-dock")
+    const add = nav.getByRole("button", { name: "TODOを追加" })
+    await expect(nav.getByRole("link")).toHaveCount(3)
+    await expect(add).toBeVisible()
+    await expect(page.locator(".fab")).toHaveCount(0)
+    const geometry = await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>('[data-testid="bottom-dock"]')!
+      const memo = el.querySelector<HTMLAnchorElement>('a[href="/memo"]')!
+      const add = el.querySelector<HTMLButtonElement>('[data-testid="dock-add-button"]')!
+      const box = el.getBoundingClientRect()
+      const memoBox = memo.getBoundingClientRect()
+      const addBox = add.getBoundingClientRect()
+      return {
+        x: box.left,
+        right: box.right,
+        bottomGap: window.innerHeight - box.bottom,
+        buttonLeft: addBox.left,
+        memoRight: memoBox.right,
+        addWidth: addBox.width,
+        addHeight: addBox.height,
+        shadow: getComputedStyle(el).boxShadow,
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1
+      }
+    })
+    expect(geometry.x).toBeGreaterThanOrEqual(10)
+    expect(geometry.right).toBeLessThanOrEqual(width - 10)
+    expect(geometry.bottomGap).toBeGreaterThanOrEqual(8)
+    expect(geometry.buttonLeft).toBeGreaterThan(geometry.memoRight)
+    expect(geometry.addWidth).toBeGreaterThanOrEqual(44)
+    expect(geometry.addHeight).toBeGreaterThanOrEqual(44)
+    expect(geometry.shadow).not.toBe("none")
+    expect(geometry.overflow).toBe(false)
+    await page.screenshot({ path: "test-results/screenshots/floating-dock-" + width + ".png", fullPage: false })
+    await context.close()
+  }
+})
+
+test("the same dock plus button opens the correct editor for each main tab", async ({ page }) => {
+  for (const { route, tab, addLabel, editorTitle } of [
+    { route: "/todo", tab: "TODO", addLabel: "TODOを追加", editorTitle: "タスクを追加" },
+    { route: "/calendar", tab: "カレンダー", addLabel: "カレンダーを追加", editorTitle: "予定を追加" },
+    { route: "/memo", tab: "メモ", addLabel: "メモを追加", editorTitle: "メモを追加" }
+  ]) {
+    await page.goto(route)
+    const dock = page.getByTestId("bottom-dock")
+    await expect(dock.getByRole("link")).toHaveCount(3)
+    await expect(dock.getByRole("link", { name: tab })).toHaveAttribute("aria-current", "page")
+    await dock.getByRole("button", { name: addLabel }).click()
+    await expect(page.getByRole("dialog")).toBeVisible()
+    await expect(page.getByRole("heading", { name: editorTitle })).toBeVisible()
+    await page.getByRole("button", { name: "閉じる", exact: true }).first().click()
+    await expect(page.getByRole("dialog")).toBeHidden()
+  }
+  await page.goto("/settings")
+  await expect(page.getByTestId("bottom-dock").getByRole("button")).toHaveCount(0)
+  await expect(page.getByTestId("bottom-dock").getByRole("link")).toHaveCount(3)
+})
+
+test("floating dock maintains create action and contrast in dark mode", async ({ page }) => {
+  await page.goto("/settings")
+  await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click()
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+  const add = page.getByTestId("dock-add-button")
+  await expect(add).toBeVisible()
+  const appearance = await add.evaluate(button => {
+    const style = getComputedStyle(button)
+    return { bg: style.backgroundColor, foreground: style.color, shadow: style.boxShadow }
+  })
+  expect(appearance.bg).not.toBe("rgba(0, 0, 0, 0)")
+  expect(appearance.foreground).not.toBe(appearance.bg)
+  expect(appearance.shadow).not.toBe("none")
+  await add.click()
+  await expect(page.getByRole("heading", { name: "予定を追加" })).toBeVisible()
+})

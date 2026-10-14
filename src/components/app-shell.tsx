@@ -100,41 +100,53 @@ export function AppShell() {
         </AnimatePresence>
       </main>
 
-      {active && <div className="pointer-events-none fixed bottom-0 left-1/2 z-30 h-0 w-full max-w-[540px] -translate-x-1/2">
-        <motion.div className="pointer-events-auto fab absolute right-5"
-          whileTap={reduceMotion ? undefined : { scale: 0.91 }}
-          transition={{ type: "spring", stiffness: 510, damping: 28 }}>
-          <Button type="button" size="icon" aria-label={active.label + "を追加"}
-            onClick={() => { if (active.kind === "todo") openCreate(); else if (active.kind === "calendar") calendar.openCreate(); else setSheetOpen(true) }}
-            className="noca-shadow size-[58px] rounded-[21px] shadow-lg">
-            <Plus className="size-6 stroke-[2.3px]" />
-          </Button>
-        </motion.div>
-      </div>}
-
-      <nav className="bottom-nav fixed bottom-0 left-1/2 z-20 flex w-full max-w-[540px] -translate-x-1/2 items-center border-t border-border/80 bg-card/95 px-5 pt-2 backdrop-blur-xl" aria-label="メインメニュー">
-        <LayoutGroup id="global-bottom-tabs">
-        {tabs.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} className={({ isActive }) => cn("flex min-h-[57px] flex-1 flex-col items-center justify-center gap-1 rounded-xl text-muted-foreground transition-colors", isActive && "text-primary")} aria-label={label}>
-            {({ isActive }) => (
-              <>
-                <span className="relative flex h-[27px] w-[56px] items-center justify-center rounded-full">
-                  {isActive && <motion.span layoutId="nav-indicator" aria-hidden="true" className="absolute inset-0 rounded-full bg-secondary"
-                    transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 470, damping: 38 }} />}
-                  <motion.span className="relative z-10 flex items-center justify-center"
-                    animate={reduceMotion ? undefined : { scale: isActive ? 1.06 : 1, y: isActive ? -1 : 0 }}
-                    transition={{ duration: 0.17 }}>
-                    <Icon className="size-[21px]" strokeWidth={isActive ? 2.5 : 1.9} />
-                  </motion.span>
-                </span>
-                <span className={cn("text-[11px] font-medium", isActive && "font-bold")}>{label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-        </LayoutGroup>
+      <nav data-testid="bottom-dock"
+        className="bottom-nav fixed left-1/2 z-30 flex w-[calc(100%-32px)] max-w-[508px] -translate-x-1/2 items-center gap-1.5 rounded-[25px] border border-border/80 bg-card/95 p-[7px] backdrop-blur-2xl"
+        aria-label="メインメニュー">
+        <div className="flex min-w-0 flex-1 items-center">
+          <LayoutGroup id="global-bottom-tabs">
+            {tabs.map(({ to, label, icon: Icon }) => (
+              <NavLink key={to} to={to}
+                className={({ isActive }) => cn(
+                  "flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[16px] text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isActive && "text-primary"
+                )} aria-label={label}>
+                {({ isActive }) => (
+                  <>
+                    <span className="relative flex h-[27px] w-full max-w-[54px] items-center justify-center rounded-full">
+                      {isActive && <motion.span layoutId="nav-indicator" aria-hidden="true" className="absolute inset-0 rounded-full bg-secondary"
+                        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 470, damping: 38 }} />}
+                      <motion.span className="relative z-10 flex items-center justify-center"
+                        animate={reduceMotion ? undefined : { scale: isActive ? 1.06 : 1, y: isActive ? -1 : 0 }}
+                        transition={{ duration: 0.17 }}>
+                        <Icon className="size-[21px]" strokeWidth={isActive ? 2.5 : 1.9} />
+                      </motion.span>
+                    </span>
+                    <span className={cn("text-[10px] font-medium leading-tight", isActive && "font-bold")}>{label}</span>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </LayoutGroup>
+        </div>
+        {active && (
+          <>
+            <span aria-hidden="true" className="mx-0.5 h-8 w-px shrink-0 bg-border/80" />
+            <motion.div className="shrink-0"
+              whileTap={reduceMotion ? undefined : { scale: 0.90 }}
+              transition={{ type: "spring", stiffness: 510, damping: 29 }}>
+              <Button type="button" size="icon" aria-label={active.label + "を追加"}
+                data-testid="dock-add-button"
+                onClick={() => { if (active.kind === "todo") openCreate(); else if (active.kind === "calendar") calendar.openCreate(); else setSheetOpen(true) }}
+                className="dock-create relative size-[54px] overflow-hidden rounded-[19px] bg-primary text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                <span className="pointer-events-none absolute inset-x-3 top-[3px] h-px rounded-full bg-white/25" aria-hidden="true" />
+                <Plus className="relative size-[25px] stroke-[2.5px]" />
+              </Button>
+            </motion.div>
+          </>
+        )}
       </nav>
-      <div className="pointer-events-none fixed bottom-[calc(153px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
+      <div className="pointer-events-none fixed bottom-[calc(105px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
         <AnimatePresence initial={false}>
           {deleted && (
             <motion.div key={deleted.task.id} role="status" aria-live="polite"
@@ -152,7 +164,7 @@ export function AppShell() {
           )}
         </AnimatePresence>
       </div>
-      <div className="pointer-events-none fixed bottom-[calc(153px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
+      <div className="pointer-events-none fixed bottom-[calc(105px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
         <AnimatePresence initial={false}>
           {calendar.deleted && (
             <motion.div key={calendar.deleted.event.id} role="status" aria-live="polite"

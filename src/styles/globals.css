@@ -100,8 +100,19 @@ a { -webkit-touch-callout: none; }
   backdrop-filter: blur(20px);
 }
 .app-content { padding-bottom: calc(116px + env(safe-area-inset-bottom)); }
-.bottom-nav { padding-bottom: max(env(safe-area-inset-bottom), 8px); }
-.fab { bottom: calc(84px + env(safe-area-inset-bottom)); }
+.bottom-nav {
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  box-shadow: 0 13px 36px rgba(35, 58, 92, .14), 0 3px 10px rgba(35, 58, 92, .045);
+}
+.dark .bottom-nav {
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .36), 0 3px 12px rgba(0, 0, 0, .16);
+}
+.dock-create {
+  box-shadow: 0 7px 18px rgba(35, 58, 92, .26), inset 0 1px 0 rgba(255,255,255,.16);
+}
+.dark .dock-create {
+  box-shadow: 0 7px 18px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255,255,255,.2);
+}
 .sheet-panel { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
 .tap-target { min-width: 44px; min-height: 44px; }
 .noca-shadow { box-shadow: 0 12px 40px rgba(35, 58, 92, .065); }
