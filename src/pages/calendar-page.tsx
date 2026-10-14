@@ -2,7 +2,8 @@ import { useMemo, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns"
 import { ja } from "date-fns/locale"
-import { CalendarDays, CalendarClock, ChevronLeft, ChevronRight, Clock3, ListTodo, MapPin } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarDayTimeline } from "@/components/calendar-day-timeline"
 import { useTodos } from "@/features/todos/todo-store"
 import { useCalendar } from "@/features/calendar/calendar-store"
 import { cn } from "@/lib/utils"
@@ -113,10 +114,12 @@ export function CalendarPage() {
         </AnimatePresence>
       </section>
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
+      <section aria-label="選択日の予定">
+        <div className="mb-3 flex items-center justify-between px-0.5">
           <h2 className="text-[18px] font-bold">{format(selectedDay, "M月d日（E）", { locale: ja })}</h2>
-          <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">{dayEvents.length + dayTasks.length} 件</span>
+          <span className="rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold tabular-nums text-secondary-foreground">
+            予定 {dayEvents.length}件
+          </span>
         </div>
         <AnimatePresence initial={false} mode="wait">
           {dayEvents.length + dayTasks.length === 0 ? (
@@ -129,52 +132,11 @@ export function CalendarPage() {
                 className="mt-3 min-h-11 rounded-xl bg-secondary px-4 text-[13px] font-bold text-primary">＋ 予定を追加</button>
             </motion.div>
           ) : (
-            <motion.div key="agenda" initial={reduceMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.16 }}
-              className="noca-card overflow-hidden rounded-[20px] border border-border bg-card">
-              <AnimatePresence initial={false} mode="popLayout">
-                {dayEvents.map(event => (
-                  <motion.div key={"event-" + event.id} layout
-                    initial={reduceMotion ? false : { opacity: 0, height: 0, x: 10 }}
-                    animate={{ opacity: 1, height: "auto", x: 0 }}
-                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, x: -10 }}
-                    transition={{ duration: reduceMotion ? 0 : 0.2 }} className="overflow-hidden">
-                    <button type="button" onClick={() => openEdit(event.id)} aria-label={event.title + "を編集"}
-                      data-calendar-event={event.id}
-                      className="flex min-h-[76px] w-full items-center gap-3 border-b border-border/60 px-4 py-4 text-left">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#e6eee8] text-[#648874] dark:bg-[#2c443a] dark:text-[#a4d1ae]">
-                        <CalendarClock className="size-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="break-words text-sm font-semibold">{event.title}</p>
-                        <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-                          <Clock3 className="size-3" />
-                          {event.time ? (event.endTime ? event.time + "–" + event.endTime : event.time) : "終日"}
-                          <span>· {event.category}</span>
-                        </p>
-                        {event.address && <p className="mt-1 flex items-center gap-1 break-words text-[11px] text-muted-foreground">
-                          <MapPin className="size-3 shrink-0" />{event.address}
-                        </p>}
-                      </div>
-                      <span className="shrink-0 rounded-md bg-[#e6eee8] px-2 py-1 text-[10px] font-semibold text-[#648874] dark:bg-[#2c443a] dark:text-[#a4d1ae]">予定</span>
-                    </button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              {dayTasks.map(task => (
-                <button type="button" key={"todo-" + task.id} onClick={() => editTodo(task.id)}
-                  aria-label={task.title + "を編集"}
-                  className="flex min-h-[72px] w-full items-center gap-3 border-b border-border/60 px-4 py-4 text-left last:border-b-0">
-                  <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-secondary text-primary">
-                    <ListTodo className="size-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="break-words text-sm font-semibold">{task.title}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">TODO · {task.category}</p>
-                  </div>
-                  <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-[10px] font-semibold text-primary">TODO</span>
-                </button>
-              ))}
+            <motion.div key={selectedDate} initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}>
+              <CalendarDayTimeline events={dayEvents} todos={dayTasks}
+                onEditEvent={openEdit} onEditTodo={editTodo} onCreate={() => openCreate(selectedDate)} />
             </motion.div>
           )}
         </AnimatePresence>

@@ -650,3 +650,100 @@ test("floating dock maintains create action and contrast in dark mode", async ({
   await add.click()
   await expect(page.getByRole("heading", { name: "予定を追加" })).toBeVisible()
 })
+
+
+test("calendar shows two separate people with all-day and time-proportional blocks", async ({ page }) => {
+  await page.goto("/calendar")
+  await expect(page.getByTestId("two-person-schedule")).toBeVisible()
+  await expect(page.getByTestId("person-header-A")).toContainText("Aの予定")
+  await expect(page.getByTestId("person-header-B")).toContainText("Bの予定")
+  await expect(page.getByTestId("all-day-A").getByRole("button", { name: "給料日を編集" })).toBeVisible()
+  await expect(page.getByTestId("all-day-B").getByRole("button", { name: "お休みを編集" })).toBeVisible()
+  const morning = page.getByTestId("timeline-lane-A").getByRole("button", { name: "午前の用事を編集" })
+  const hair = page.getByTestId("timeline-lane-B").getByRole("button", { name: "美容室を編集" })
+  await expect(morning).toHaveAttribute("data-start", "09:00")
+  await expect(morning).toHaveAttribute("data-end", "14:00")
+  await expect(hair).toHaveAttribute("data-start", "11:00")
+  await expect(hair).toHaveAttribute("data-end", "14:40")
+  const boxes = await Promise.all([morning, hair].map(item => item.evaluate(el => {
+    const rect = el.getBoundingClientRect()
+    return { top: rect.top, height: rect.height, left: rect.left, right: rect.right }
+  })))
+  expect(boxes[0].top).toBeLessThan(boxes[1].top)
+  expect(boxes[0].height).toBeGreaterThan(boxes[1].height)
+  expect(boxes[0].right).toBeLessThan(boxes[1].left)
+  await expect(page.getByRole("button", { name: "週末のカフェを探すを編集" })).toBeVisible()
+})
+
+test("calendar can create and edit a B person's event including an all-day switch", async ({ page }) => {
+  await page.goto("/calendar")
+  await page.getByRole("button", { name: "カレンダーを追加" }).click()
+  await page.locator("#event-title").fill("Bの新しい予定")
+  await page.getByRole("group", { name: "予定の担当" }).getByRole("button", { name: "Bの予定" }).click()
+  await page.getByRole("switch", { name: "終日" }).click()
+  await page.locator("#event-start").fill("16:00")
+  await page.locator("#event-end").fill("17:30")
+  await page.getByRole("button", { name: "予定を追加" }).last().click()
+  const created = page.getByTestId("timeline-lane-B").getByRole("button", { name: "Bの新しい予定を編集" })
+  await expect(created).toBeVisible()
+  await expect(created).toHaveAttribute("data-end", "17:30")
+  await page.reload()
+  await expect(page.getByTestId("timeline-lane-B").getByRole("button", { name: "Bの新しい予定を編集" })).toBeVisible()
+  await page.getByRole("button", { name: "Bの新しい予定を編集" }).click()
+  await expect(page.getByRole("group", { name: "予定の担当" }).getByRole("button", { name: "Bの予定" })).toHaveAttribute("aria-pressed", "true")
+  await page.getByRole("switch", { name: "終日" }).click()
+  await page.getByRole("button", { name: "変更を保存" }).click()
+  await expect(page.getByTestId("all-day-B").getByRole("button", { name: "Bの新しい予定を編集" })).toBeVisible()
+  await expect(page.getByTestId("timeline-lane-B").getByRole("button", { name: "Bの新しい予定を編集" })).toHaveCount(0)
+})
+
+test("calendar upgrades existing preview samples once and preserves edited entries", async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("seed-test")) return
+    sessionStorage.setItem("seed-test", "yes")
+    const date = new Date()
+    const pad = (x: number) => String(x).padStart(2, "0")
+    const d = date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate())
+    localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+      { id: "e1", title: "夜ごはん（変更済み）", date: d, category: "ふたり", by: "A", time: "19:00" }
+    ]))
+    localStorage.removeItem("noca.calendar.samples.v2")
+  })
+  await page.goto("/calendar")
+  await expect(page.getByRole("button", { name: "夜ごはん（変更済み）を編集" })).toBeVisible()
+  await expect(page.getByTestId("all-day-A").getByRole("button", { name: "給料日を編集" })).toBeVisible()
+  await page.getByRole("button", { name: "給料日を編集" }).click()
+  await page.getByRole("button", { name: "この予定を削除" }).click()
+  await expect(page.getByRole("button", { name: "給料日を編集" })).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole("button", { name: "給料日を編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "夜ごはん（変更済み）を編集" })).toBeVisible()
+})
+
+test("two-person timeline fits 320px iPhone without horizontal overflow", async ({ browser }) => {
+  for (const width of [320, 375, 390, 430]) {
+    const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
+    const page = await context.newPage()
+    await page.goto("/calendar")
+    await expect(page.getByTestId("timeline-lane-A")).toBeVisible()
+    await expect(page.getByTestId("timeline-lane-B")).toBeVisible()
+    const result = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('[data-testid="two-person-schedule"]')!
+      const rect = root.getBoundingClientRect()
+      const a = root.querySelector<HTMLElement>('[data-testid="timeline-lane-A"]')!.getBoundingClientRect()
+      const b = root.querySelector<HTMLElement>('[data-testid="timeline-lane-B"]')!.getBoundingClientRect()
+      return {
+        pageOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+        rootInside: rect.left >= -1 && rect.right <= innerWidth + 1,
+        columnsOrdered: a.right <= b.left + 1,
+        minColumn: Math.min(a.width, b.width)
+      }
+    })
+    expect(result.pageOverflow).toBe(false)
+    expect(result.rootInside).toBe(true)
+    expect(result.columnsOrdered).toBe(true)
+    expect(result.minColumn).toBeGreaterThan(100)
+    await page.screenshot({ path: "test-results/screenshots/two-person-calendar-" + width + ".png", fullPage: false })
+    await context.close()
+  }
+})

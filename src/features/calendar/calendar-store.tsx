@@ -13,6 +13,7 @@ export type EventDraft = {
   time?: string
   endTime?: string
   category: TaskCategory
+  by: "A" | "B"
   address?: string
   memo?: string
 }
@@ -42,6 +43,14 @@ function readEvents(): CalendarEvent[] {
     if (raw === null) return mockEvents
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.every(isCalendarEvent)) return mockEvents
+    // 初回だけ旧デモ版へ新しい2人用サンプルを追加。編集済みの予定や削除操作は上書きしない
+    if (localStorage.getItem("noca.calendar.samples.v2") !== "done" &&
+      parsed.some(event => ["e1", "e2", "e3", "e4"].includes(event.id))) {
+      const sampleIds = new Set(parsed.map(event => event.id))
+      const additional = mockEvents.filter(event => event.id.startsWith("demo-") && !sampleIds.has(event.id))
+      localStorage.setItem("noca.calendar.samples.v2", "done")
+      return [...parsed, ...additional]
+    }
     return parsed
   } catch {
     return mockEvents
@@ -107,7 +116,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const closeEditor = useCallback(() => setEditor(null), [])
 
   const addEvent = useCallback((draft: EventDraft) => {
-    setEvents(previous => [{ ...draft, id: crypto.randomUUID(), by: "A" }, ...previous])
+    setEvents(previous => [{ ...draft, id: crypto.randomUUID() }, ...previous])
     setSelectedDateState(draft.date)
   }, [])
   const updateEvent = useCallback((id: string, draft: EventDraft) => {

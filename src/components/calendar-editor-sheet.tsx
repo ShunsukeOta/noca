@@ -18,6 +18,7 @@ export function CalendarEditorSheet() {
   const [time, setTime] = useState(original?.time ?? "09:00")
   const [endTime, setEndTime] = useState(original?.endTime ?? "")
   const [category, setCategory] = useState<TaskCategory>(original?.category ?? "その他")
+  const [by, setBy] = useState<"A" | "B">(original?.by ?? "A")
   const [address, setAddress] = useState(original?.address ?? "")
   const [memo, setMemo] = useState(original?.memo ?? "")
   const [error, setError] = useState("")
@@ -27,7 +28,7 @@ export function CalendarEditorSheet() {
     date !== initialDate || allDay !== !original?.time ||
     (!allDay && time !== (original?.time ?? "09:00")) ||
     (!allDay && endTime !== (original?.endTime ?? "")) ||
-    category !== (original?.category ?? "その他") ||
+    category !== (original?.category ?? "その他") || by !== (original?.by ?? "A") ||
     address !== (original?.address ?? "") || memo !== (original?.memo ?? "")
 
   useEffect(() => setError(""), [title, date, time, endTime, allDay])
@@ -48,7 +49,7 @@ export function CalendarEditorSheet() {
     }
     const draft: EventDraft = {
       title: title.trim(),
-      date, category,
+      date, category, by,
       time: allDay ? undefined : time,
       endTime: allDay ? undefined : endTime || undefined,
       address: address.trim() || undefined,
@@ -85,6 +86,23 @@ export function CalendarEditorSheet() {
             <input id="event-title" maxLength={200} value={title} onChange={event => setTitle(event.target.value)}
               placeholder="予定のタイトル" aria-invalid={!!error && !title.trim()}
               className="h-12 w-full rounded-[13px] border border-input bg-background px-4 text-base text-foreground outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/20" />
+
+            <div className="mt-5">
+              <p className="mb-2 text-[13px] font-semibold">誰の予定？</p>
+              <div role="group" aria-label="予定の担当" className="grid grid-cols-2 gap-2">
+                {(["A", "B"] as const).map(person => (
+                  <button key={person} type="button" aria-pressed={by === person} onClick={() => setBy(person)}
+                    className={cn("flex min-h-11 items-center justify-center gap-2 rounded-[12px] border px-3 text-[13px] font-semibold transition-colors",
+                      by === person
+                        ? person === "A" ? "border-[#73a2a4] bg-[#e5f1ef] text-[#356d6a] dark:bg-[#244145] dark:text-[#a2d7d5]" : "border-[#d59677] bg-[#faeee8] text-[#9a6654] dark:bg-[#48332f] dark:text-[#f3cbb9]"
+                        : "border-border bg-card text-muted-foreground")}>
+                    <span className={cn("flex size-6 items-center justify-center rounded-full text-[10px] font-bold",
+                      person === "A" ? "bg-[#d7e7ea] text-[#3e6470]" : "bg-[#f3dfda] text-[#90625a]")}>{person}</span>
+                    {person}の予定
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="mt-6 flex items-center gap-2 text-primary">
               <CalendarDays className="size-[17px]" /><label htmlFor="event-date" className="text-[13px] font-semibold">日付</label>
