@@ -100,8 +100,8 @@ a { -webkit-touch-callout: none; }
   backdrop-filter: blur(20px);
 }
 .app-content { padding-bottom: calc(116px + env(safe-area-inset-bottom)); }
+.bottom-dock { bottom: calc(12px + env(safe-area-inset-bottom)); }
 .bottom-nav {
-  bottom: calc(12px + env(safe-area-inset-bottom));
   box-shadow: 0 13px 36px rgba(35, 58, 92, .14), 0 3px 10px rgba(35, 58, 92, .045);
 }
 .dark .bottom-nav {

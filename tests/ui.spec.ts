@@ -558,26 +558,37 @@ test("floating navigation dock fits narrow iPhones and has a distinct right-side
     await page.goto("/todo")
     const nav = page.getByRole("navigation", { name: "メインメニュー" })
     const dock = page.getByTestId("bottom-dock")
-    const add = nav.getByRole("button", { name: "TODOを追加" })
+    const add = dock.getByRole("button", { name: "TODOを追加" })
     await expect(nav.getByRole("link")).toHaveCount(3)
+    await expect(nav.getByRole("button")).toHaveCount(0)
     await expect(add).toBeVisible()
     await expect(page.locator(".fab")).toHaveCount(0)
     const geometry = await page.evaluate(() => {
       const el = document.querySelector<HTMLElement>('[data-testid="bottom-dock"]')!
       const memo = el.querySelector<HTMLAnchorElement>('a[href="/memo"]')!
       const add = el.querySelector<HTMLButtonElement>('[data-testid="dock-add-button"]')!
+      const nav = el.querySelector<HTMLElement>("nav")!
       const box = el.getBoundingClientRect()
+      const navBox = nav.getBoundingClientRect()
       const memoBox = memo.getBoundingClientRect()
       const addBox = add.getBoundingClientRect()
       return {
         x: box.left,
         right: box.right,
         bottomGap: window.innerHeight - box.bottom,
+        gap: addBox.left - navBox.right,
+        navRight: navBox.right,
+        navHeight: navBox.height,
+        addCenter: addBox.top + addBox.height / 2,
+        navCenter: navBox.top + navBox.height / 2,
         buttonLeft: addBox.left,
         memoRight: memoBox.right,
         addWidth: addBox.width,
         addHeight: addBox.height,
-        shadow: getComputedStyle(el).boxShadow,
+        navShadow: getComputedStyle(nav).boxShadow,
+        navBackground: getComputedStyle(nav).backgroundColor,
+        outerBackground: getComputedStyle(el).backgroundColor,
+        plusInsideNav: nav.contains(add),
         overflow: document.documentElement.scrollWidth > window.innerWidth + 1
       }
     })
@@ -586,8 +597,15 @@ test("floating navigation dock fits narrow iPhones and has a distinct right-side
     expect(geometry.bottomGap).toBeGreaterThanOrEqual(8)
     expect(geometry.buttonLeft).toBeGreaterThan(geometry.memoRight)
     expect(geometry.addWidth).toBeGreaterThanOrEqual(44)
-    expect(geometry.addHeight).toBeGreaterThanOrEqual(44)
-    expect(geometry.shadow).not.toBe("none")
+    expect(geometry.addHeight).toBeGreaterThanOrEqual(54)
+    expect(geometry.navHeight).toBeGreaterThanOrEqual(54)
+    expect(geometry.gap).toBeGreaterThanOrEqual(15.5)
+    expect(geometry.gap).toBeLessThanOrEqual(16.5)
+    expect(Math.abs(geometry.addCenter - geometry.navCenter)).toBeLessThan(2)
+    expect(geometry.navShadow).not.toBe("none")
+    expect(geometry.navBackground).not.toBe("rgba(0, 0, 0, 0)")
+    expect(geometry.outerBackground).toBe("rgba(0, 0, 0, 0)")
+    expect(geometry.plusInsideNav).toBe(false)
     expect(geometry.overflow).toBe(false)
     await page.screenshot({ path: "test-results/screenshots/floating-dock-" + width + ".png", fullPage: false })
     await context.close()
@@ -612,7 +630,7 @@ test("the same dock plus button opens the correct editor for each main tab", asy
   }
   await page.goto("/settings")
   await expect(page.getByTestId("bottom-dock").getByRole("button")).toHaveCount(0)
-  await expect(page.getByTestId("bottom-dock").getByRole("link")).toHaveCount(3)
+  await expect(page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link")).toHaveCount(3)
 })
 
 test("floating dock maintains create action and contrast in dark mode", async ({ page }) => {
