@@ -53,11 +53,11 @@ export function CalendarPage() {
   return (
     <div className="space-y-6" data-testid="calendar-page">
       <section className="noca-card rounded-[23px] border border-border bg-card px-3.5 pb-5 pt-4">
-        <div className="mb-6 flex items-center justify-between px-2">
-          <h2 className="text-[19px] font-bold tracking-tight">{format(month, "yyyy年 M月")}</h2>
-          <div className="flex items-center gap-1">
+        <div className="mb-6 flex items-center justify-between gap-1 px-1">
+          <h2 className="shrink-0 whitespace-nowrap text-[17px] font-bold tracking-tight sm:text-[19px]">{format(month, "yyyy年 M月")}</h2>
+          <div className="flex shrink-0 items-center gap-0.5">
             <button type="button" onClick={() => { setDirection(today < month ? -1 : 1); setSelectedDate(format(today, "yyyy-MM-dd")) }}
-              className="tap-target rounded-xl px-2 text-xs font-semibold text-primary hover:bg-secondary">今日</button>
+              className="tap-target whitespace-nowrap rounded-xl px-1 text-xs font-semibold text-primary hover:bg-secondary">今日</button>
             <button type="button" aria-label="前の月" onClick={() => changeMonth(-1)}
               className="tap-target flex items-center justify-center rounded-full hover:bg-secondary"><ChevronLeft className="size-5" /></button>
             <button type="button" aria-label="次の月" onClick={() => changeMonth(1)}

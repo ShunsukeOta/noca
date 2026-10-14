@@ -743,7 +743,18 @@ test("two-person timeline fits 320px iPhone without horizontal overflow", async 
     expect(result.rootInside).toBe(true)
     expect(result.columnsOrdered).toBe(true)
     expect(result.minColumn).toBeGreaterThan(100)
+    const monthHeader = await page.getByRole("heading", { level: 2, name: /年.*月/ }).first().evaluate(el => ({
+      height: el.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(el).lineHeight)
+    }))
+    expect(monthHeader.height).toBeLessThanOrEqual(monthHeader.lineHeight + 2)
     await page.screenshot({ path: "test-results/screenshots/two-person-calendar-" + width + ".png", fullPage: false })
+    await page.evaluate(() => {
+      const timeline = document.querySelector<HTMLElement>('[data-testid="timeline-grid"]')
+      if (timeline) window.scrollTo({ top: timeline.getBoundingClientRect().top + window.scrollY - 165, behavior: "instant" })
+    })
+    await page.waitForTimeout(270)
+    await page.screenshot({ path: "test-results/screenshots/two-person-timeline-" + width + ".png", fullPage: false })
     await context.close()
   }
 })
