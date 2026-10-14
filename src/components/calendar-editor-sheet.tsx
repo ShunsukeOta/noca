@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 import { CalendarDays, ChevronDown, Clock3, MapPin, NotebookPen, Trash2 } from "lucide-react"
 import { type TaskCategory } from "@/app/mock-data"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ export function CalendarEditorSheet() {
   const [address, setAddress] = useState(original?.address ?? "")
   const [memo, setMemo] = useState(original?.memo ?? "")
   const [error, setError] = useState("")
+  const detailsRef = useRef<HTMLDetailsElement>(null)
 
   const hasChanges = title !== (original?.title ?? "") ||
     date !== initialDate || allDay !== !original?.time ||
@@ -30,6 +31,7 @@ export function CalendarEditorSheet() {
     address !== (original?.address ?? "") || memo !== (original?.memo ?? "")
 
   useEffect(() => setError(""), [title, date, time, endTime, allDay])
+  useEffect(() => { if (detailsRef.current && (original?.address || original?.memo)) detailsRef.current.open = true }, [])
 
   const close = () => {
     if (hasChanges && !window.confirm("入力内容を破棄しますか？")) return
@@ -113,7 +115,7 @@ export function CalendarEditorSheet() {
               </div>
             )}
 
-            <details defaultOpen={Boolean(original?.address || original?.memo)}
+            <details ref={detailsRef}
               className="group mt-6 rounded-[15px] border border-border bg-background/65 px-4 py-1">
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[13px] font-semibold [&::-webkit-details-marker]:hidden">
                 詳細を追加（任意）<ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
