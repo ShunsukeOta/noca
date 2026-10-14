@@ -36,7 +36,14 @@
 - 日付選択から追加すると選択日が初期値になること
 - 320 / 375 / 390 / 430pxの編集シート表示・横はみ出し確認
 
-テスト結果はGitHub Actions実行完了後に記録する。
+## CI実行結果
+
+- [GitHub Actions — Phase 1C](https://github.com/ShunsukeOta/noca/actions/runs/38515036175)
+- TypeScript / Vite本番ビルド: **PASS**
+- Playwright Chromium: **19 / 19 PASS**
+- 320/375/390/430pxで編集シートの表示・横幅: **PASS**
+- 予定CRUD・Undo・永続化・選択日・閏日: **PASS**
+- iPhone Safari / ホーム画面PWAでの**実機動作は未確認**（Phase 1E）
 
 ## 次の作業
 
