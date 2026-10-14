@@ -23,16 +23,16 @@
 
 | Token | Light | 用途 |
 | --- | --- | --- |
-| primary | §#2F4C7E§ | 主操作・選択状態 |
-| background | §#FAFBFD§ | アプリ背景 |
-| surface | §#FFFFFF§ | カード・シート背景 |
-| foreground | §#1F2937§ | 主要文字 |
-| muted-foreground | §#64748B§ | 日付・補助文字 |
-| border | §#E5E7EB§ | 区切り |
-| success | §#6B8F7A§ | 完了など |
-| peach | §#F7C9A3§ | 控えめなアクセント |
-| lavender | §#D9E1F7§ | カテゴリなど |
-| destructive | §#B91C1C§ | 削除や重要エラー |
+| primary | `#2F4C7E` | 主操作・選択状態 |
+| background | `#FAFBFD` | アプリ背景 |
+| surface | `#FFFFFF` | カード・シート背景 |
+| foreground | `#1F2937` | 主要文字 |
+| muted-foreground | `#64748B` | 日付・補助文字 |
+| border | `#E5E7EB` | 区切り |
+| success | `#6B8F7A` | 完了など |
+| peach | `#F7C9A3` | 控えめなアクセント |
+| lavender | `#D9E1F7` | カテゴリなど |
+| destructive | `#B91C1C` | 削除や重要エラー |
 
 DarkはLightから機械的に反転せず、可読性と意味色を維持して別途定義する。ダークモードで淡い文字/背景が重ならないようにする。色だけで完了・選択を表さず、チェック・ラベル・形状で補完する。
 
@@ -40,7 +40,7 @@ shadcn/uiのCSS変数を単一のテーマ定義で管理。局所的なHEX直�
 
 ## 3. タイポグラフィ（暫定）
 
-- Font stack: §-apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif§
+- Font stack: `-apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif`
 - H1 / 画面タイトル: 28px / 700 / line-height 1.3
 - H2 / セクションタイトル: 20px / 600 / 1.4
 - List title: 16px / 500–600 / 1.45
@@ -66,10 +66,10 @@ shadcn/uiのCSS変数を単一のテーマ定義で管理。局所的なHEX直�
 
 ### Safe Area / Viewport
 
-- §<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">§ を基本にする
-- §padding-bottom: env(safe-area-inset-bottom)§ などのsafe areaを使用
-- §100dvh§ / §100svh§ などを用途に応じて使い分け、アドレスバー表示変動を検証
-- §maximum-scale=1§ や §user-scalable=no§ を使って拡大操作を禁止しない
+- `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">` を基本にする
+- `padding-bottom: env(safe-area-inset-bottom)` などのsafe areaを使用
+- `100dvh` / `100svh` などを用途に応じて使い分け、アドレスバー表示変動を検証
+- `maximum-scale=1` や `user-scalable=no` を使って拡大操作を禁止しない
 - iPhone Safari とstandaloneモードで見え方を両方確認する
 
 ## 5. ナビゲーション・共通要素
@@ -109,7 +109,7 @@ shadcn/uiのCSS変数を単一のテーマ定義で管理。局所的なHEX直�
 
 ### 基本画面
 
-- 上部: §TODO§ タイトル。必要な最小限のフィルター（「すべて」「今日」など）
+- 上部: `TODO` タイトル。必要な最小限のフィルター（「すべて」「今日」など）
 - 未完了タスク: 行ベースのリスト表示（不必要に個別カード化しない）
 - 行の左: 44pxタップ領域内のチェック操作
 - 中央: タイトル（最大2行を基本、詳細では全文）と控えめなカテゴリ/期限
@@ -138,7 +138,7 @@ shadcn/uiのCSS変数を単一のテーマ定義で管理。局所的なHEX直�
 
 ## 8. メモ画面
 
-- 上部: §メモ§ タイトルと検索入口
+- 上部: `メモ` タイトルと検索入口
 - 一覧: タイトル + 本文冒頭2行 + 更新日
 - 更新日時順、将来的にピン留めを検討
 - 新規作成: タイトルとプレーンテキスト本文
@@ -151,7 +151,7 @@ shadcn/uiのCSS変数を単一のテーマ定義で管理。局所的なHEX直�
 - 画面切替: 軽微なフェード/スライド、目安 160–220ms
 - Drawer: 自然なイージング。操作が遅く見える長すぎる演出を避ける
 - チェック操作: 色・チェックの短いフィードバック。過度な振動/紙吹雪は不要
-- §prefers-reduced-motion§ 対応
+- `prefers-reduced-motion` 対応
 - 性能を優先し、必要な場所だけMotionを使う
 
 ## 10. UIコンポーネント採用方針
