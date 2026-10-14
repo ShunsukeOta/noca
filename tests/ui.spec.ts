@@ -780,9 +780,11 @@ test("calendar all-day labels are compact, match timed typography, and have no r
   expect(appearance).toEqual({ bg: "rgba(0, 0, 0, 0)", borderTop: "0px", borderLeft: "0px", shadow: "none" })
 })
 
-test("shared events span both personal lanes with a dedicated all-day column", async ({ page }) => {
+test("shared events span both personal lanes without a third all-day header", async ({ page }) => {
   await page.goto("/calendar")
-  await expect(page.getByTestId("person-header-both")).toContainText("ふたりの予定")
+  await expect(page.getByTestId("person-header-A")).toContainText("Aの予定")
+  await expect(page.getByTestId("person-header-B")).toContainText("Bの予定")
+  await expect(page.getByTestId("person-header-both")).toHaveCount(0)
   await expect(page.getByTestId("all-day-both").getByRole("button", { name: "記念日を編集" })).toBeVisible()
   const shared = page.getByTestId("timeline-lane-both").getByRole("button", { name: "ふたりで買い物を編集" })
   await expect(shared).toHaveAttribute("data-owner", "both")
@@ -838,12 +840,12 @@ test("shared appointment can be created and persists with owner both", async ({ 
   await expect(page.getByTestId("all-day-both").getByRole("button", { name: "記念日を編集" })).toBeVisible()
 })
 
-test("three-column all-day layout and compact time lines fit narrow phones", async ({ browser }) => {
+test("two-column all-day layout and shared spanning strip fit narrow phones", async ({ browser }) => {
   for (const width of [320, 375, 390, 430]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
     const page = await context.newPage()
     await page.goto("/calendar")
-    await expect(page.getByTestId("person-header-both")).toBeVisible()
+    await expect(page.getByTestId("person-header-both")).toHaveCount(0)
     const dims = await page.evaluate(() => {
       const strip = document.querySelector<HTMLElement>('[data-testid="all-day-strip"]')!
       const timeline = document.querySelector<HTMLElement>('[data-testid="timeline-grid"]')!
@@ -857,9 +859,11 @@ test("three-column all-day layout and compact time lines fit narrow phones", asy
       }
     })
     expect(dims.overflow).toBe(false)
-    expect(dims.parts[0].width).toBeGreaterThan(55)
+    expect(dims.parts[0].width).toBeGreaterThan(90)
     expect(dims.parts[0].right).toBeLessThanOrEqual(dims.parts[1].left + 1)
-    expect(dims.parts[1].right).toBeLessThanOrEqual(dims.parts[2].left + 1)
+    expect(dims.parts[2].left).toBeGreaterThanOrEqual(dims.parts[0].left - 1)
+    expect(dims.parts[2].right).toBeGreaterThanOrEqual(dims.parts[1].right - 1)
+    expect(dims.parts[2].width).toBeGreaterThan(dims.parts[0].width * 1.85)
     expect(dims.lines[1] - dims.lines[0]).toBe(54)
     await page.evaluate(() => {
       const timeline = document.querySelector<HTMLElement>('[data-testid="timeline-grid"]')!
@@ -869,4 +873,82 @@ test("three-column all-day layout and compact time lines fit narrow phones", asy
     await page.screenshot({ path: "test-results/screenshots/shared-calendar-v2-" + width + ".png", fullPage: false })
     await context.close()
   }
+})
+
+
+test("a long appointment label moves into a free gap when another appointment covers its start", async ({ page }) => {
+  await page.goto("/calendar")
+  await page.evaluate(() => {
+    const date = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const day = date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate())
+    localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+      { id: "long", title: "仕事", date: day, time: "09:00", endTime: "14:00", category: "暮らし", by: "A" },
+      { id: "short", title: "朝の打ち合わせ", date: day, time: "09:05", endTime: "10:15", category: "暮らし", by: "A" }
+    ]))
+  })
+  await page.reload()
+  const lane = page.getByTestId("timeline-lane-A")
+  const long = lane.getByRole("button", { name: "仕事を編集" })
+  const short = lane.getByRole("button", { name: "朝の打ち合わせを編集" })
+  const longLabel = page.getByTestId("event-label-long")
+  await expect(long).toHaveAttribute("data-depth", "0")
+  await expect(short).toHaveAttribute("data-depth", "1")
+  const boxes = await Promise.all([long,short,longLabel].map(el => el.evaluate(node => {
+    const r = node.getBoundingClientRect()
+    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }
+  })))
+  expect(boxes[2].top).toBeGreaterThan(boxes[1].bottom + 1)
+  expect(boxes[2].bottom).toBeLessThanOrEqual(boxes[0].bottom)
+  await longLabel.click()
+  await expect(page.getByRole("heading", { name: "予定を編集" })).toBeVisible()
+})
+
+test("5-minute and 15-minute events always display their titles inside readable compact cards", async ({ page }) => {
+  await page.goto("/calendar")
+  await page.evaluate(() => {
+    const date = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const day = date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate())
+    localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+      { id: "five", title: "電話", date: day, time: "09:00", endTime: "09:05", category: "その他", by: "A" },
+      { id: "fifteen", title: "予定確認", date: day, time: "10:00", endTime: "10:15", category: "その他", by: "B" }
+    ]))
+  })
+  await page.reload()
+  for (const [id,title] of [["five","電話"],["fifteen","予定確認"]]) {
+    const button = page.locator('[data-calendar-event="' + id + '"]')
+    const label = page.getByTestId("event-label-" + id)
+    await expect(button).toHaveAttribute("data-compact", "true")
+    await expect(label).toContainText(title)
+    const r = await Promise.all([button,label].map(el => el.evaluate(n => {
+      const rect = n.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom, width: rect.width }
+    })))
+    expect(r[0].bottom - r[0].top).toBeGreaterThanOrEqual(35)
+    expect(r[1].top).toBeGreaterThan(r[0].top)
+    expect(r[1].bottom).toBeLessThan(r[0].bottom)
+    expect(r[1].width).toBeGreaterThan(40)
+    await button.click()
+    await expect(page.getByRole("heading", { name: "予定を編集" })).toBeVisible()
+    await page.getByRole("button", { name: "閉じる" }).first().click()
+  }
+})
+
+test("shared all-day events are a single full-width bar and remain editable", async ({ page }) => {
+  await page.goto("/calendar")
+  const strip = page.getByTestId("all-day-strip")
+  await expect(page.getByTestId("person-header-both")).toHaveCount(0)
+  const full = strip.getByTestId("all-day-both").getByRole("button", { name: "記念日を編集" })
+  const a = strip.getByTestId("all-day-A")
+  const b = strip.getByTestId("all-day-B")
+  const bounds = await Promise.all([full,a,b].map(x => x.evaluate(el => {
+    const r = el.getBoundingClientRect()
+    return { left: r.left, right: r.right, width: r.width }
+  })))
+  expect(bounds[0].width).toBeGreaterThan(bounds[1].width * 1.75)
+  expect(bounds[0].left).toBeGreaterThanOrEqual(bounds[1].left)
+  expect(bounds[0].right).toBeLessThanOrEqual(bounds[2].right)
+  await full.click()
+  await expect(page.getByRole("group", { name: "予定の担当" }).getByRole("button", { name: "ふたりの予定" })).toHaveAttribute("aria-pressed", "true")
 })

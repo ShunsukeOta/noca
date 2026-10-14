@@ -5,16 +5,16 @@ import { type CalendarEvent, type Task } from "@/app/mock-data"
 import { cn } from "@/lib/utils"
 
 type EventOwner = CalendarEvent["by"]
-const PEOPLE: { id: EventOwner; label: string; avatar: string }[] = [
+const PEOPLE = [
   { id: "A", label: "Aの予定", avatar: "A" },
-  { id: "B", label: "Bの予定", avatar: "B" },
-  { id: "both", label: "ふたりの予定", avatar: "2" }
-]
+  { id: "B", label: "Bの予定", avatar: "B" }
+] as const
 
 const HOUR_HEIGHT = 54
 const MINUTE_HEIGHT = HOUR_HEIGHT / 60
 const timeGrid = "grid-cols-[42px_minmax(0,1fr)_minmax(0,1fr)]"
-const allDayGrid = "grid-cols-[42px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]"
+const allDayGrid = timeGrid
+const MIN_BLOCK_PX = 36
 
 function minutes(time: string) {
   const [hour, minute] = time.split(":").map(Number)
@@ -26,6 +26,8 @@ type TimedBlock = {
   start: number
   end: number
   depth: number
+  labelTop: number
+  labelSpace: number
 }
 
 /** Within overlapping groups, paint longer appointments first, shorter ones
@@ -33,7 +35,7 @@ type TimedBlock = {
 function layoutBlocks(events: CalendarEvent[]): TimedBlock[] {
   const items = events.filter(event => event.time).map(event => {
     const start = minutes(event.time!)
-    return { event, start, end: event.endTime ? minutes(event.endTime) : Math.min(start + 60, 1440), depth: 0 }
+    return { event, start, end: event.endTime ? minutes(event.endTime) : Math.min(start + 60, 1440), depth: 0, labelTop: 5, labelSpace: 999 }
   }).sort((a, b) => a.start - b.start || b.end - a.end)
 
   const groups: TimedBlock[][] = []
@@ -63,6 +65,30 @@ function layoutBlocks(events: CalendarEvent[]): TimedBlock[] {
       ).reduce((depth, other) => Math.max(depth, other.depth + 1), 0))
       placed.push(block)
     })
+    // Keep the title of a long appointment outside intervals covered by
+    // smaller, foreground appointments. Use rendered heights (not just actual
+    // duration) because 5-minute appointments have a readable min-height.
+    for (const block of ordered) {
+      const boundaries = placed.filter(item =>
+        item.depth > block.depth && item.start < block.end && block.start < item.end
+      ).map(item => ({
+        start: Math.max(block.start, item.start),
+        end: Math.min(block.end, item.start + Math.max(item.end - item.start, MIN_BLOCK_PX / MINUTE_HEIGHT))
+      })).sort((a, b) => a.start - b.start)
+      let cursor = block.start
+      let best = { start: block.start, end: block.start }
+      for (const covered of boundaries) {
+        if (covered.start > cursor && covered.start - cursor > best.end - best.start) {
+          best = { start: cursor, end: covered.start }
+        }
+        cursor = Math.max(cursor, covered.end)
+      }
+      if (block.end - cursor > best.end - best.start) best = { start: cursor, end: block.end }
+      block.labelTop = Math.max(5, (best.start - block.start) * MINUTE_HEIGHT + 5)
+      block.labelSpace = (best.end - best.start) * MINUTE_HEIGHT
+      // Very short appointments still have a readable single-line chip.
+      if (block.end - block.start < 45) block.labelTop = 5
+    }
     return ordered
   })
 }
@@ -102,11 +128,12 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
   const eventsFor = (owner: EventOwner, timedOnly = false) =>
     events.filter(event => event.by === owner && (timedOnly ? Boolean(event.time) : !event.time))
 
-  const timedBlock = ({ event, start, end, depth }: TimedBlock, owner: EventOwner, shared = false) => {
+  const timedBlock = ({ event, start, end, depth, labelTop, labelSpace }: TimedBlock, owner: EventOwner, shared = false) => {
     if (!timeRange) return null
     const top = (start - timeRange.firstHour * 60) * MINUTE_HEIGHT
-    const height = Math.min(Math.max(34, (end - start) * MINUTE_HEIGHT - 3), timeRange.height - top - 2)
+    const height = Math.min(Math.max(MIN_BLOCK_PX, (end - start) * MINUTE_HEIGHT - 3), timeRange.height - top - 2)
     const inset = 3 + depth * 8
+    const short = height < 49 || labelSpace < 43
     const style: CSSProperties = {
       top,
       height,
@@ -114,12 +141,17 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
       right: 3 + depth * 5,
       zIndex: 10 + depth
     }
+    const displayedTop = Math.min(labelTop, Math.max(4, height - (short ? 22 : 39)))
     return (
       <motion.button key={event.id} type="button" onClick={() => onEditEvent(event.id)}
         aria-label={event.title + "を編集"}
+        title={event.title + " " + event.time + (event.endTime ? "–" + event.endTime : "")}
         data-calendar-event={event.id}
         data-owner={owner}
         data-depth={depth}
+        data-label-top={displayedTop}
+        data-label-space={Math.round(labelSpace)}
+        data-compact={short}
         data-start={event.time} data-end={event.endTime ?? ""}
         initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -127,19 +159,28 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
         transition={{ duration: reduceMotion ? 0 : 0.19 }}
         style={style}
         className={cn(
-          "pointer-events-auto absolute flex min-w-0 flex-col overflow-hidden rounded-[11px] border-l-[3px] px-1.5 py-2 text-left shadow-[0_2px_6px_rgba(30,50,70,.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "pointer-events-auto absolute block min-w-0 overflow-hidden rounded-[11px] border-l-[3px] text-left shadow-[0_2px_6px_rgba(30,50,70,.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           ownerTone[owner],
           shared && "shadow-[0_4px_12px_rgba(76,61,113,.17)]"
         )}>
-        <span className="line-clamp-3 break-words text-[11px] font-bold leading-snug">{event.title}</span>
-        <span className="mt-1 block w-full truncate text-[9px] font-semibold tabular-nums opacity-80">
-          {event.time}{event.endTime ? "–" + event.endTime : ""}
-        </span>
-        {event.address && height > 80 && (
-          <span className="mt-2 flex items-start gap-0.5 text-[9px] leading-tight opacity-80">
-            <MapPin className="mt-0.5 size-2.5 shrink-0" /><span className="line-clamp-2">{event.address}</span>
+        <span data-testid={"event-label-" + event.id}
+          className="absolute inset-x-1.5 flex min-w-0 flex-col text-[11px] font-bold"
+          style={{ top: displayedTop }}>
+          <span className={cn("block min-w-0 break-words text-[11px] font-bold leading-[14px]",
+            short ? "truncate" : "line-clamp-3")}>
+            {event.title}
           </span>
-        )}
+          {!short && (
+            <span className="mt-0.5 block w-full truncate text-[9px] font-semibold tabular-nums opacity-80">
+              {event.time}{event.endTime ? "–" + event.endTime : ""}
+            </span>
+          )}
+          {!short && event.address && height > 100 && labelSpace > 80 && (
+            <span className="mt-1.5 flex items-start gap-0.5 text-[9px] leading-tight opacity-80">
+              <MapPin className="mt-0.5 size-2.5 shrink-0" /><span className="line-clamp-2">{event.address}</span>
+            </span>
+          )}
+        </span>
       </motion.button>
     )
   }
@@ -153,7 +194,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
             <div key={person.id} data-testid={"person-header-" + person.id}
               className="flex min-h-[53px] min-w-0 flex-col items-center justify-center gap-0.5 border-l border-border/50 px-0.5">
               <span className="flex min-w-0 items-center justify-center gap-1">
-                <span className={cn("size-[17px] shrink-0 items-center justify-center rounded-full text-[9px] font-bold", person.id === "both" ? "hidden min-[375px]:flex" : "flex", ownerAvatar[person.id])}>
+                <span className={cn("flex size-[17px] shrink-0 items-center justify-center rounded-full text-[9px] font-bold", ownerAvatar[person.id])}>
                   {person.avatar}
                 </span>
                 <span className="truncate text-[10px] font-bold">{person.label}</span>
@@ -166,7 +207,8 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
         </div>
 
         <div className={cn("grid border-b border-border/70", allDayGrid)} data-testid="all-day-strip">
-          <span className="self-start pt-3 text-center text-[10px] font-semibold text-muted-foreground">終日</span>
+          <span className={cn("self-start pt-3 text-center text-[10px] font-semibold text-muted-foreground",
+            eventsFor("both").length > 0 && "row-span-2")}>終日</span>
           {PEOPLE.map(person => {
             const allDayEvents = eventsFor(person.id)
             return (
@@ -187,6 +229,22 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
               </div>
             )
           })}
+          <div data-testid="all-day-both"
+            className={cn("col-start-2 col-span-2 min-w-0 border-l border-t border-border/50 px-1 py-1.5",
+              eventsFor("both").length === 0 && "hidden")}>
+            <div className="flex flex-col gap-1">
+              {eventsFor("both").map(event => (
+                <button key={event.id} type="button" onClick={() => onEditEvent(event.id)}
+                  aria-label={event.title + "を編集"} data-calendar-event={event.id} data-owner={event.by}
+                  className={cn(
+                    "min-h-8 w-full rounded-[10px] border-l-[3px] px-2 py-1.5 text-left text-[11px] font-bold leading-snug",
+                    ownerTone.both
+                  )}>
+                  <span className="block break-words text-[11px] font-bold leading-snug">{event.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {timeRange ? (
