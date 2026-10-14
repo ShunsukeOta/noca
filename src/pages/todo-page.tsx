@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
 import { format, isThisWeek, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Check, ChevronDown, ChevronRight, Clock3, ListChecks, Sparkles } from "lucide-react"
@@ -19,6 +20,7 @@ export function TodoPage() {
   const [filter, setFilter] = useState<Filter>("すべて")
   const { todos: tasks, toggleTodo, openEdit, openCreate } = useTodos()
   const [showCompleted, setShowCompleted] = useState(false)
+  const reduceMotion = useReducedMotion()
   const today = format(new Date(), "yyyy-MM-dd")
   const visible = tasks.filter((task) => filter === "すべて" ? true : filter === "今日" ? task.dueDate === today : Boolean(task.dueDate && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 })))
   const active = visible.filter((task) => !task.done)
@@ -33,35 +35,58 @@ export function TodoPage() {
         <div className="relative flex items-center justify-between">
           <div>
             <p className="text-[12px] font-semibold text-primary-foreground/70">残りのタスク</p>
-            <div className="mt-1 flex items-baseline gap-2"><span className="text-[34px] font-bold leading-none">{tasks.filter((t) => !t.done).length}</span><span className="text-sm text-primary-foreground/70">件</span></div>
+            <div className="mt-1 flex items-baseline gap-2"><span className="relative inline-flex h-9 min-w-5 items-center overflow-hidden text-[34px] font-bold leading-none">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span key={tasks.filter(t => !t.done).length}
+                  initial={reduceMotion ? false : { opacity: 0, y: 9 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -9 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}>
+                  {tasks.filter(t => !t.done).length}
+                </motion.span>
+              </AnimatePresence>
+            </span><span className="text-sm text-primary-foreground/70">件</span></div>
           </div>
           <div className="flex size-[62px] items-center justify-center rounded-[20px] bg-white/14"><ListChecks className="size-7" strokeWidth={1.75} /></div>
         </div>
       </section>
 
-      <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="TODOの絞り込み">
-        {filters.map((item) => (
-          <button key={item} type="button" onClick={() => setFilter(item)} aria-pressed={filter === item}
-            className={cn("h-11 shrink-0 rounded-full px-5 text-[13px] font-semibold transition-colors", filter === item ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground")}>
-            {item}
-          </button>
-        ))}
-      </div>
+      <LayoutGroup id="todo-filters">
+        <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="TODOの絞り込み">
+          {filters.map((item) => (
+            <button key={item} type="button" onClick={() => setFilter(item)} aria-pressed={filter === item}
+              className={cn("relative h-11 shrink-0 overflow-hidden rounded-full border px-5 text-[13px] font-semibold", filter === item ? "border-primary text-primary-foreground" : "border-border bg-card text-muted-foreground")}>
+              {filter === item && <motion.span layoutId="filter-indicator" aria-hidden="true" className="absolute inset-0 rounded-full bg-primary"
+                transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 440, damping: 38 }} />}
+              <span className="relative z-10">{item}</span>
+            </button>
+          ))}
+        </div>
+      </LayoutGroup>
 
       <section>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-bold tracking-tight">これからすること</h2>
           <span className="text-xs font-medium text-muted-foreground">{active.length} 件</span>
         </div>
-        <div className="noca-card overflow-hidden rounded-[20px] border border-border bg-card">
+        <LayoutGroup id="todo-items">
+          <div className="noca-card overflow-hidden rounded-[20px] border border-border bg-card">
+            <AnimatePresence initial={false} mode="popLayout">
           {active.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 px-4 py-11 text-center">
+            <motion.div key="empty" layout initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="flex flex-col items-center gap-2 px-4 py-11 text-center">
               <div className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-secondary text-primary"><Sparkles className="size-5" /></div>
               <p className="text-sm font-semibold">{tasks.length === 0 ? "タスクはありません" : "すべて終わりました"}</p>
               <button type="button" onClick={openCreate} className="mt-3 min-h-11 rounded-xl bg-secondary px-4 text-[13px] font-bold text-primary">＋ タスクを追加</button>
-            </div>
+            </motion.div>
           ) : active.map((task, index) => (
-            <div key={task.id} className={cn("flex min-h-[85px] items-center gap-2.5 px-3.5 py-3", index > 0 && "border-t border-border/70")}>
+            <motion.div key={task.id} layout data-todo-row={task.id}
+              initial={reduceMotion ? false : { opacity: 0, height: 0, x: 12 }}
+              animate={{ opacity: 1, height: "auto", x: 0 }}
+              exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, height: 0, x: -14 }}
+              transition={reduceMotion ? { duration: 0 } : { opacity: { duration: 0.18 }, height: { duration: 0.23, ease: "easeOut" }, x: { duration: 0.18 }, layout: { type: "spring", stiffness: 460, damping: 40 } }}
+              className="overflow-hidden">
+            <div className={cn("flex min-h-[85px] items-center gap-2.5 px-3.5 py-3", index > 0 && "border-t border-border/70")}>
               <button type="button" aria-label={task.title + "を完了"} onClick={() => toggle(task)}
                 className="tap-target flex shrink-0 items-center justify-center rounded-full text-muted-foreground">
                 <span className="size-[23px] rounded-full border-[1.7px] border-[#b5c1d0]" />
@@ -76,8 +101,11 @@ export function TodoPage() {
               <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold", task.by === "A" ? "bg-[#d7e7ea] text-[#3e6470]" : "bg-[#f3dfda] text-[#90625a]")} aria-label={"作成者 " + task.by}>{task.by}</span>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
             </div>
+            </motion.div>
           ))}
-        </div>
+            </AnimatePresence>
+          </div>
+        </LayoutGroup>
       </section>
 
       {completed.length > 0 && (
@@ -87,9 +115,17 @@ export function TodoPage() {
             <span className="text-sm font-semibold text-muted-foreground">完了したこと <span className="ml-1 text-xs">({completed.length})</span></span>
             <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showCompleted && "rotate-180")} />
           </button>
-          {showCompleted && <div id="completed-tasks" className="overflow-hidden rounded-[18px] border border-border/75 bg-card/60">
+          <AnimatePresence initial={false}>
+          {showCompleted && <motion.div id="completed-tasks" initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }} exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
+            className="overflow-hidden rounded-[18px] border border-border/75 bg-card/60">
+            <AnimatePresence initial={false} mode="popLayout">
             {completed.map((task) => (
-              <div key={task.id} className="flex items-center gap-2 px-3.5 py-2.5">
+              <motion.div key={task.id} layout initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.2 }} className="overflow-hidden">
+              <div className="flex items-center gap-2 px-3.5 py-2.5">
                 <button type="button" aria-label={task.title + "の完了を解除"} onClick={() => toggle(task)}
                   className="tap-target flex shrink-0 items-center justify-center rounded-full text-success">
                   <span className="flex size-[23px] items-center justify-center rounded-full bg-success text-white"><Check className="size-3.5" /></span>
@@ -97,8 +133,11 @@ export function TodoPage() {
                 <button type="button" onClick={() => openEdit(task.id)} aria-label={task.title + "を編集"}
                   className="min-h-11 min-w-0 flex-1 break-words text-left text-[13px] text-muted-foreground line-through">{task.title}</button>
               </div>
+              </motion.div>
             ))}
-          </div>}
+            </AnimatePresence>
+          </motion.div>}
+          </AnimatePresence>
         </section>
       )}
     </div>

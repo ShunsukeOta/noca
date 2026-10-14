@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { addMonths, eachDayOfInterval, endOfWeek, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns"
 import { ja } from "date-fns/locale"
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, ListTodo, MapPin } from "lucide-react"
@@ -12,6 +13,8 @@ export function CalendarPage() {
   const { todos, openEdit } = useTodos()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [month, setMonth] = useState(startOfMonth(new Date()))
+  const [direction, setDirection] = useState(1)
+  const reduceMotion = useReducedMotion()
   const today = new Date()
   const dates = useMemo(() => eachDayOfInterval({
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 0 }),
@@ -22,6 +25,7 @@ export function CalendarPage() {
   const tasks = todos.filter((task) => task.dueDate === key && !task.done)
 
   const changeMonth = (direction: number) => {
+    setDirection(direction)
     const next = addMonths(month, direction)
     setMonth(next)
     setSelectedDate(startOfMonth(next))
@@ -34,16 +38,24 @@ export function CalendarPage() {
         <div className="mb-6 flex items-center justify-between px-2">
           <h2 className="text-[19px] font-bold tracking-tight">{format(month, "yyyy年 M月")}</h2>
           <div className="flex items-center gap-1">
-            <button type="button" onClick={() => { setMonth(startOfMonth(today)); setSelectedDate(today) }}
+            <button type="button" onClick={() => { setDirection(today < month ? -1 : 1); setMonth(startOfMonth(today)); setSelectedDate(today) }}
               className="tap-target rounded-xl px-2 text-xs font-semibold text-primary hover:bg-secondary">今日</button>
             <button type="button" aria-label="前の月" onClick={() => changeMonth(-1)} className="tap-target flex items-center justify-center rounded-full hover:bg-secondary"><ChevronLeft className="size-5" /></button>
             <button type="button" aria-label="次の月" onClick={() => changeMonth(1)} className="tap-target flex items-center justify-center rounded-full hover:bg-secondary"><ChevronRight className="size-5" /></button>
           </div>
         </div>
-        <div className="grid grid-cols-7 gap-y-1">
+        <div className="grid grid-cols-7">
           {daysOfWeek.map((item, i) => (
             <div key={item} className={cn("pb-3 text-center text-xs font-semibold", i === 0 ? "text-[#c28086]" : i === 6 ? "text-[#7798be]" : "text-muted-foreground")}>{item}</div>
           ))}
+        </div>
+        <AnimatePresence initial={false} mode="wait" custom={direction}>
+          <motion.div key={format(month, "yyyy-MM")} custom={direction}
+            initial={reduceMotion ? false : { opacity: 0, x: direction * 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: -direction * 12 }}
+            transition={{ duration: reduceMotion ? 0 : 0.19, ease: "easeOut" }}
+            className="grid grid-cols-7 gap-y-1">
           {dates.map((date) => {
             const dateKey = format(date, "yyyy-MM-dd")
             const count = mockEvents.filter((event) => event.date === dateKey).length + todos.filter((task) => task.dueDate === dateKey && !task.done).length
@@ -53,7 +65,7 @@ export function CalendarPage() {
               <button key={dateKey} type="button"
                 aria-label={format(date, "M月d日", { locale: ja }) + (count ? "、予定" + count + "件" : "")}
                 aria-pressed={selected}
-                onClick={() => { setSelectedDate(date); if (!isSameMonth(date, month)) setMonth(startOfMonth(date)) }}
+                onClick={() => { setSelectedDate(date); if (!isSameMonth(date, month)) { setDirection(date < month ? -1 : 1); setMonth(startOfMonth(date)) } }}
                 className="tap-target flex w-full flex-col items-center justify-center gap-1 rounded-xl px-0 py-1">
                 <span className={cn("flex size-[34px] items-center justify-center rounded-full text-[13px] font-semibold", !isSameMonth(date, month) && "text-muted-foreground/40", isToday && !selected && "ring-1 ring-primary text-primary", selected && "bg-primary text-primary-foreground")}>
                   {format(date, "d")}
@@ -64,7 +76,8 @@ export function CalendarPage() {
               </button>
             )
           })}
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </section>
 
       <section>

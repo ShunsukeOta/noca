@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
+import { Link, NavLink, useLocation, useOutlet } from "react-router-dom"
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
 import { CalendarDays, ListTodo, NotebookPen, Plus, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
@@ -19,6 +20,7 @@ export function AppShell() {
   const location = useLocation()
   const active = tabs.find((tab) => location.pathname.startsWith(tab.to))
   const isSettings = location.pathname === "/settings"
+  const reduceMotion = useReducedMotion()
   const [sheetOpen, setSheetOpen] = useState(false)
   const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
   const [theme, setTheme] = useState<"light" | "dark">(() =>
@@ -32,6 +34,7 @@ export function AppShell() {
   }, [theme])
 
   useEffect(() => { setSheetOpen(false); closeEditor() }, [location.pathname, closeEditor])
+  const page = useOutlet({ theme, onThemeChange: setTheme })
 
   return (
     <div className="app-shell relative">
@@ -58,44 +61,69 @@ export function AppShell() {
       </header>
 
       <main id="main-content" aria-label={isSettings ? "設定" : active?.label ?? "TODO"} className="app-content px-5 pt-5">
-        <Outlet context={{ theme, onThemeChange: setTheme }} />
+        <AnimatePresence initial={false} mode="wait">
+          <motion.div key={location.pathname} data-page-transition={location.pathname}
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -7 }}
+            transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}>
+            {page}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {active && <div className="pointer-events-none fixed bottom-0 left-1/2 z-30 h-0 w-full max-w-[540px] -translate-x-1/2">
-        <div className="pointer-events-auto fab absolute right-5">
+        <motion.div className="pointer-events-auto fab absolute right-5"
+          whileTap={reduceMotion ? undefined : { scale: 0.91 }}
+          transition={{ type: "spring", stiffness: 510, damping: 28 }}>
           <Button type="button" size="icon" aria-label={active.label + "を追加"}
             onClick={() => active.kind === "todo" ? openCreate() : setSheetOpen(true)}
-            className="noca-shadow size-[58px] rounded-[21px] shadow-lg active:scale-95">
+            className="noca-shadow size-[58px] rounded-[21px] shadow-lg">
             <Plus className="size-6 stroke-[2.3px]" />
           </Button>
-        </div>
+        </motion.div>
       </div>}
 
       <nav className="bottom-nav fixed bottom-0 left-1/2 z-20 flex w-full max-w-[540px] -translate-x-1/2 items-center border-t border-border/80 bg-card/95 px-5 pt-2 backdrop-blur-xl" aria-label="メインメニュー">
+        <LayoutGroup id="global-bottom-tabs">
         {tabs.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} className={({ isActive }) => cn("flex min-h-[57px] flex-1 flex-col items-center justify-center gap-1 rounded-xl text-muted-foreground transition-colors", isActive && "text-primary")} aria-label={label}>
             {({ isActive }) => (
               <>
-                <span className={cn("flex h-[27px] w-[56px] items-center justify-center rounded-full transition-colors", isActive && "bg-secondary")}>
-                  <Icon className="size-[21px]" strokeWidth={isActive ? 2.5 : 1.9} />
+                <span className="relative flex h-[27px] w-[56px] items-center justify-center rounded-full">
+                  {isActive && <motion.span layoutId="nav-indicator" aria-hidden="true" className="absolute inset-0 rounded-full bg-secondary"
+                    transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 470, damping: 38 }} />}
+                  <motion.span className="relative z-10 flex items-center justify-center"
+                    animate={reduceMotion ? undefined : { scale: isActive ? 1.06 : 1, y: isActive ? -1 : 0 }}
+                    transition={{ duration: 0.17 }}>
+                    <Icon className="size-[21px]" strokeWidth={isActive ? 2.5 : 1.9} />
+                  </motion.span>
                 </span>
                 <span className={cn("text-[11px] font-medium", isActive && "font-bold")}>{label}</span>
               </>
             )}
           </NavLink>
         ))}
+        </LayoutGroup>
       </nav>
-      {deleted && (
-        <div className="pointer-events-none fixed bottom-[calc(153px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
-          <div role="status" aria-live="polite" className="pointer-events-auto flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-[13px] shadow-xl">
-            <span className="font-medium">タスクを削除しました</span>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={undoDelete} className="tap-target px-2 font-bold text-primary">元に戻す</button>
-              <button type="button" onClick={dismissDeleted} className="tap-target px-2 text-muted-foreground" aria-label="通知を閉じる">×</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="pointer-events-none fixed bottom-[calc(153px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
+        <AnimatePresence initial={false}>
+          {deleted && (
+            <motion.div key={deleted.task.id} role="status" aria-live="polite"
+              initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
+              className="pointer-events-auto flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-[13px] shadow-xl">
+              <span className="font-medium">タスクを削除しました</span>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={undoDelete} className="tap-target px-2 font-bold text-primary">元に戻す</button>
+                <button type="button" onClick={dismissDeleted} className="tap-target px-2 text-muted-foreground" aria-label="通知を閉じる">×</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
       {storageError && (
         <div role="alert" className="fixed left-1/2 top-[calc(60px+env(safe-area-inset-top))] z-40 w-[calc(100%-40px)] max-w-[480px] -translate-x-1/2 rounded-xl bg-destructive px-4 py-3 text-sm font-medium text-white shadow-lg">
           この端末に保存できません。ブラウザの設定を確認してください。

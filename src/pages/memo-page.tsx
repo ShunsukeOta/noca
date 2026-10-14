@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight, NotebookPen, Pin, Search, X } from "lucide-react"
 import { mockNotes, type SharedNote } from "@/app/mock-data"
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -6,6 +7,7 @@ import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTit
 export function MemoPage() {
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<SharedNote | null>(null)
+  const reduceMotion = useReducedMotion()
   const visible = useMemo(() => mockNotes.filter((note) =>
     (note.title + " " + note.body).toLocaleLowerCase("ja").includes(search.trim().toLocaleLowerCase("ja"))
   ), [search])
@@ -26,15 +28,25 @@ export function MemoPage() {
           <h2 className="text-base font-bold tracking-tight">すべてのメモ</h2>
           <span className="text-xs font-medium text-muted-foreground">{visible.length} 件</span>
         </div>
+        <AnimatePresence initial={false} mode="wait">
         {visible.length === 0 ? (
-          <div className="rounded-[20px] border border-dashed border-border bg-card/60 px-4 py-11 text-center">
+          <motion.div key="empty" initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.18 }}
+            className="rounded-[20px] border border-dashed border-border bg-card/60 px-4 py-11 text-center">
             <NotebookPen className="mx-auto mb-3 size-7 text-muted-foreground/50" />
             <p className="text-sm font-semibold">該当するメモがありません</p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-3">
+          <motion.div key="results" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.16 }} className="space-y-3">
+            <AnimatePresence initial={false} mode="popLayout">
             {visible.map((note) => (
-              <button type="button" key={note.id} onClick={() => setSelected(note)}
+              <motion.div key={note.id} layout className="relative overflow-hidden"
+                initial={reduceMotion ? false : { opacity: 0, height: 0, y: 8 }}
+                animate={{ opacity: 1, height: "auto", y: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -5 }}
+                transition={{ duration: reduceMotion ? 0 : 0.19 }}>
+              <button type="button" onClick={() => setSelected(note)}
                 className="noca-card w-full rounded-[20px] border border-border bg-card p-4 text-left transition-colors hover:bg-accent/45 active:bg-secondary" aria-label={note.title + "を開く"}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="min-w-0 text-[15px] font-bold">{note.title}</h3>
@@ -46,9 +58,12 @@ export function MemoPage() {
                   <ArrowUpRight className="size-[17px] text-muted-foreground/60" />
                 </div>
               </button>
+              </motion.div>
             ))}
-          </div>
+            </AnimatePresence>
+          </motion.div>
         )}
+        </AnimatePresence>
       </section>
 
 

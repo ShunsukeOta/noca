@@ -220,3 +220,33 @@ test("keyboard-sized visual viewport keeps the drawer and save action above it",
   })
   await expect(dialog).toHaveAttribute("data-keyboard-open", "false")
 })
+
+
+test("task rows animate out instead of disappearing instantly", async ({ page }) => {
+  await page.goto("/todo")
+  const row = page.locator('[data-todo-row="t1"]')
+  await expect(row).toBeVisible()
+  await page.getByRole("button", { name: "週末のカフェを探すを完了" }).click()
+  // AnimatePresence retains the removed item briefly for its exit animation.
+  await expect(row).toHaveCount(1)
+  await expect(row).toHaveCount(0)
+  await page.getByRole("button", { name: /完了したこと/ }).click()
+  await expect(page.getByRole("button", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
+})
+
+test("tab and settings routes transition and remain usable with reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await page.goto("/todo")
+  await expect(page.locator('[data-page-transition="/todo"]')).toBeVisible()
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
+  await expect(page.locator('[data-page-transition="/calendar"]')).toBeVisible()
+  await page.getByRole("button", { name: "次の月" }).click()
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "メモ" }).click()
+  await expect(page.locator('[data-page-transition="/memo"]')).toBeVisible()
+  await page.getByRole("textbox", { name: "メモを検索" }).fill("旅行")
+  await expect(page.getByRole("button", { name: "次の旅行のことを開く" })).toBeVisible()
+  await page.getByRole("link", { name: "設定を開く" }).click()
+  await expect(page.locator('[data-page-transition="/settings"]')).toBeVisible()
+  await page.getByRole("button", { name: "前の画面に戻る" }).click()
+  await expect(page.getByTestId("memo-page")).toBeVisible()
+})

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { motion, useReducedMotion } from "motion/react"
 import { useLocation, useNavigate, useOutletContext } from "react-router-dom"
 import {
   ArrowLeft, Bell, CalendarClock, Check, Cloud, Database, Info,
@@ -15,12 +16,16 @@ function SoonBadge() {
   return <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">準備中</span>
 }
 
-function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+function SettingsGroup({ title, children, index }: { title: string; children: ReactNode; index: number }) {
+  const reduceMotion = useReducedMotion()
   return (
-    <section aria-label={title} className="space-y-3">
+    <motion.section aria-label={title} className="space-y-3"
+      initial={reduceMotion ? false : { opacity: 0, y: 9 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.22, delay: reduceMotion ? 0 : index * 0.035, ease: "easeOut" }}>
       <h2 className="px-1 text-[13px] font-bold tracking-wide text-muted-foreground">{title}</h2>
       <div className="noca-card overflow-hidden rounded-[21px] border border-border bg-card">{children}</div>
-    </section>
+    </motion.section>
   )
 }
 
@@ -66,7 +71,7 @@ export function SettingsPage() {
         <h1 className="text-[23px] font-bold tracking-[-.035em]">設定</h1>
       </div>
 
-      <SettingsGroup title="外観">
+      <SettingsGroup title="外観" index={0}>
         <div className="space-y-4 px-4 py-4">
           <div className="flex items-center gap-3">
             <IconBox><Palette className="size-[19px]" /></IconBox>
@@ -97,19 +102,19 @@ export function SettingsPage() {
         </div>
       </SettingsGroup>
 
-      <SettingsGroup title="ふたりの共有">
+      <SettingsGroup title="ふたりの共有" index={1}>
         <ComingSoonRow icon={UsersRound} title="共有スペース" description="メンバー管理" />
         <ComingSoonRow icon={UserRoundPlus} title="相手を招待" description="招待リンク・コード" />
         <ComingSoonRow icon={LockKeyhole} title="アカウント" description="Googleログイン・プロフィール" />
       </SettingsGroup>
 
-      <SettingsGroup title="通知">
+      <SettingsGroup title="通知" index={2}>
         <ComingSoonRow icon={CalendarClock} title="予定のリマインダー" />
         <ComingSoonRow icon={ListTodo} title="TODOの期限通知" />
         <ComingSoonRow icon={Bell} title="共有内容の更新通知" />
       </SettingsGroup>
 
-      <SettingsGroup title="データ">
+      <SettingsGroup title="データ" index={3}>
         <div className="flex min-h-[76px] items-center gap-3 border-b border-border/70 px-4 py-3">
           <IconBox tone="green"><Database className="size-[19px]" /></IconBox>
           <div className="min-w-0 flex-1">
@@ -121,7 +126,7 @@ export function SettingsPage() {
         <ComingSoonRow icon={Cloud} title="クラウド同期" description="2人のデータをリアルタイムで同期" />
       </SettingsGroup>
 
-      <SettingsGroup title="アプリについて">
+      <SettingsGroup title="アプリについて" index={4}>
         <div className="flex min-h-[72px] items-center gap-3 px-4 py-3">
           <IconBox tone="peach"><Info className="size-[19px]" /></IconBox>
           <div className="min-w-0 flex-1">
