@@ -27,14 +27,49 @@ for (const width of [375, 390, 430]) {
   })
 }
 
-test("FAB opens preview sheet and closes without claiming persistence", async ({ page }) => {
+test("TODO create, edit, delete, undo and persistence", async ({ page }) => {
   await page.goto("/todo")
   await page.getByRole("button", { name: "TODOを追加" }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
-  await expect(page.getByText("保存機能は次のフェーズで実装します。")).toBeVisible()
-  await page.getByRole("textbox", { name: "タイトル" }).fill("確認用のタスク")
-  await page.getByRole("button", { name: "閉じる" }).last().click()
+  await page.locator("#todo-title").fill("確認用のタスク")
+  await page.getByRole("button", { name: "ふたり" }).click()
+  await page.getByRole("button", { name: "タスクを追加" }).last().click()
   await expect(page.getByRole("dialog")).toBeHidden()
+  await expect(page.getByRole("button", { name: "確認用のタスクを編集" })).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByRole("button", { name: "確認用のタスクを編集" })).toBeVisible()
+  await page.getByRole("button", { name: "確認用のタスクを編集" }).click()
+  await expect(page.locator("#todo-title")).toHaveValue("確認用のタスク")
+  await page.locator("#todo-title").fill("編集済みのタスク")
+  await page.getByRole("button", { name: "変更を保存" }).click()
+  await expect(page.getByRole("button", { name: "編集済みのタスクを編集" })).toBeVisible()
+
+  await page.getByRole("button", { name: "編集済みのタスクを編集" }).click()
+  await page.getByRole("button", { name: "このタスクを削除" }).click()
+  await expect(page.getByRole("button", { name: "編集済みのタスクを編集" })).toHaveCount(0)
+  await page.getByRole("button", { name: "元に戻す" }).click()
+  await expect(page.getByRole("button", { name: "編集済みのタスクを編集" })).toBeVisible()
+})
+
+test("TODO due date appears on calendar, completion removes it", async ({ page }) => {
+  await page.goto("/todo")
+  const today = await page.evaluate(() => {
+    const d = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate())
+  })
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await page.locator("#todo-title").fill("旅行の準備をする")
+  await page.locator("#todo-date").fill(today)
+  await page.getByRole("button", { name: "タスクを追加" }).last().click()
+
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
+  await expect(page.getByRole("button", { name: "旅行の準備をするを編集" })).toBeVisible()
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "TODO" }).click()
+  await page.getByRole("button", { name: "旅行の準備をするを完了" }).click()
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
+  await expect(page.getByRole("button", { name: "旅行の準備をするを編集" })).toHaveCount(0)
 })
 
 test("theme switch and mock task completion", async ({ page }) => {
@@ -42,6 +77,7 @@ test("theme switch and mock task completion", async ({ page }) => {
   await page.getByRole("button", { name: "ダークモードに切り替え" }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await page.getByRole("button", { name: "週末のカフェを探すを完了" }).click()
+  await page.getByRole("button", { name: /完了したこと/ }).click()
   await expect(page.getByRole("button", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
 })
 

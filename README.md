@@ -5,8 +5,8 @@
 noca は、2人で使うことを前提とした **iPhone向け共有PWA** です。TODO・カレンダー・メモを、直感的な3タブにまとめます。
 
 > [!IMPORTANT]
-> 現在は **Phase 1A: UI基盤実装・Chromium自動テスト合格**。アプリの3画面とダミーUIを追加しました。Firebase・デプロイはまだ実装していません。
-> 次は **Phase 1B: TODO CRUD UI** に進みます。iPhone実機のSafari / standalone表示検証はPhase 1Eで行います。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
+> 現在は **Phase 1B: TODOのローカルCRUD実装**。アプリの3画面とダミーUIを追加しました。Firebase・デプロイはまだ実装していません。
+> 次はPhase 1Bの動作確認後、**Phase 1C: カレンダー予定CRUD UI**へ進みます。iPhone実機のSafari / standalone表示検証はPhase 1Eで行います。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
 
 ## コンセプト
 
@@ -90,9 +90,9 @@ npx playwright install chromium
 npm run test:e2e
 ~~~
 
-初期表示は `/todo`。下部タブで `/calendar`、`/memo` に切り替わります。右下の＋ボタンは追加シートの**表示デモ**で、保存は行いません。
+初期表示は `/todo`。下部タブで `/calendar`、`/memo` に切り替わります。TODOでは右下の＋ボタンから追加・編集・削除できます。TODOは**この端末のlocalStorageに仮保存**されます（2人同期・Firebase保存はまだありません）。カレンダー／メモの＋は表示デモです。
 
-shadcn/uiの **Radix版** を採用し、ソースを `src/components/ui` に配置しています。カラー・角丸等は `src/styles/globals.css` で共通管理します。詳細: [Phase 1A 実装・検証記録](docs/PHASE1A_REPORT.md)。
+shadcn/uiの **Radix版** を採用し、ソースを `src/components/ui` に配置しています。カラー・角丸等は `src/styles/globals.css` で共通管理します。詳細: [Phase 1A 実装・検証記録](docs/PHASE1A_REPORT.md)、[Phase 1B TODO実装](docs/PHASE1B_REPORT.md)。
 
 実機確認はiPhoneの **Safari表示** と **ホーム画面追加後のstandalone表示** の両方を対象とします。CIのChromiumモバイル検証だけではiOS実機合格とはしません。
 

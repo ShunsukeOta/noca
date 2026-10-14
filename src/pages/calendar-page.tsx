@@ -2,12 +2,14 @@ import { useMemo, useState } from "react"
 import { addMonths, eachDayOfInterval, endOfWeek, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns"
 import { ja } from "date-fns/locale"
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, ListTodo, MapPin } from "lucide-react"
-import { mockEvents, mockTasks } from "@/app/mock-data"
+import { mockEvents } from "@/app/mock-data"
+import { useTodos } from "@/features/todos/todo-store"
 import { cn } from "@/lib/utils"
 
 const daysOfWeek = ["日", "月", "火", "水", "木", "金", "土"]
 
 export function CalendarPage() {
+  const { todos, openEdit } = useTodos()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [month, setMonth] = useState(startOfMonth(new Date()))
   const today = new Date()
@@ -17,7 +19,7 @@ export function CalendarPage() {
   }), [month])
   const key = format(selectedDate, "yyyy-MM-dd")
   const events = mockEvents.filter((event) => event.date === key)
-  const tasks = mockTasks.filter((task) => task.dueDate === key && !task.done)
+  const tasks = todos.filter((task) => task.dueDate === key && !task.done)
 
   const changeMonth = (direction: number) => {
     const next = addMonths(month, direction)
@@ -49,7 +51,7 @@ export function CalendarPage() {
           ))}
           {dates.map((date) => {
             const dateKey = format(date, "yyyy-MM-dd")
-            const count = mockEvents.filter((event) => event.date === dateKey).length + mockTasks.filter((task) => task.dueDate === dateKey && !task.done).length
+            const count = mockEvents.filter((event) => event.date === dateKey).length + todos.filter((task) => task.dueDate === dateKey && !task.done).length
             const selected = isSameDay(date, selectedDate)
             const isToday = isSameDay(date, today)
             return (
@@ -94,16 +96,16 @@ export function CalendarPage() {
               </div>
             ))}
             {tasks.map((task) => (
-              <div key={task.id} className="flex items-center gap-3 border-t border-border/60 px-4 py-4 first:border-t-0">
+              <button type="button" key={task.id} onClick={() => openEdit(task.id)} aria-label={task.title + "を編集"} className="flex min-h-[72px] w-full items-center gap-3 border-t border-border/60 px-4 py-4 text-left first:border-t-0">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-secondary text-primary"><ListTodo className="size-5" /></div>
                 <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{task.title}</p><p className="mt-1 text-[11px] text-muted-foreground">TODO · {task.category}</p></div>
                 <span className="rounded-md bg-secondary px-2 py-1 text-[10px] font-semibold text-primary">TODO</span>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </section>
-      <p className="text-center text-[11px] text-muted-foreground/80">Phase 1A ・ サンプルデータで表示中</p>
+      <p className="text-center text-[11px] text-muted-foreground/80">Phase 1B ・ 予定はサンプル、TODOは端末内のデータ</p>
     </div>
   )
 }

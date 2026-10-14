@@ -5,6 +5,8 @@ import { NavLink, Outlet, useLocation } from "react-router-dom"
 import { CalendarDays, ListTodo, NotebookPen, Moon, Plus, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
+import { TodoEditorSheet } from "@/components/todo-editor-sheet"
+import { useTodos } from "@/features/todos/todo-store"
 import { cn } from "@/lib/utils"
 
 const tabs: { to: string; label: string; icon: typeof ListTodo; kind: PageKind }[] = [
@@ -17,6 +19,7 @@ export function AppShell() {
   const location = useLocation()
   const active = tabs.find((tab) => location.pathname.startsWith(tab.to)) ?? tabs[0]
   const [sheetOpen, setSheetOpen] = useState(false)
+  const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     typeof localStorage !== "undefined" && localStorage.getItem("noca.theme") === "dark" ? "dark" : "light"
   )
@@ -27,7 +30,7 @@ export function AppShell() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#111826" : "#f6f8fb")
   }, [theme])
 
-  useEffect(() => setSheetOpen(false), [location.pathname])
+  useEffect(() => { setSheetOpen(false); closeEditor() }, [location.pathname, closeEditor])
 
   return (
     <div className="app-shell relative">
@@ -61,7 +64,7 @@ export function AppShell() {
       <div className="pointer-events-none fixed bottom-0 left-1/2 z-30 h-0 w-full max-w-[540px] -translate-x-1/2">
         <div className="pointer-events-auto fab absolute right-5">
           <Button type="button" size="icon" aria-label={active.label + "を追加"}
-            onClick={() => setSheetOpen(true)}
+            onClick={() => active.kind === "todo" ? openCreate() : setSheetOpen(true)}
             className="noca-shadow size-[58px] rounded-[21px] shadow-lg active:scale-95">
             <Plus className="size-6 stroke-[2.3px]" />
           </Button>
@@ -82,7 +85,24 @@ export function AppShell() {
           </NavLink>
         ))}
       </nav>
-      <PreviewCreateSheet kind={active.kind} open={sheetOpen} onOpenChange={setSheetOpen} />
+      {deleted && (
+        <div className="pointer-events-none fixed bottom-[calc(153px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
+          <div role="status" aria-live="polite" className="pointer-events-auto flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-[13px] shadow-xl">
+            <span className="font-medium">タスクを削除しました</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={undoDelete} className="tap-target px-2 font-bold text-primary">元に戻す</button>
+              <button type="button" onClick={dismissDeleted} className="tap-target px-2 text-muted-foreground" aria-label="通知を閉じる">×</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {storageError && (
+        <div role="alert" className="fixed left-1/2 top-[calc(60px+env(safe-area-inset-top))] z-40 w-[calc(100%-40px)] max-w-[480px] -translate-x-1/2 rounded-xl bg-destructive px-4 py-3 text-sm font-medium text-white shadow-lg">
+          この端末に保存できません。ブラウザの設定を確認してください。
+        </div>
+      )}
+      {editor && <TodoEditorSheet key={editor.mode === "edit" ? editor.id : "create"} />}
+      {active.kind !== "todo" && <PreviewCreateSheet kind={active.kind} open={sheetOpen} onOpenChange={setSheetOpen} />}
     </div>
   )
 }

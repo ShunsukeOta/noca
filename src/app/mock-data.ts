@@ -1,7 +1,7 @@
 import { addDays, format } from "date-fns"
 
 export type TaskCategory = "暮らし" | "おでかけ" | "ふたり" | "その他"
-export type Task = { id: string; title: string; category: TaskCategory; dueDate?: string; done: boolean; by: "A" | "B" }
+export type Task = { id: string; title: string; category: TaskCategory; dueDate?: string; memo?: string; url?: string; address?: string; done: boolean; by: "A" | "B" }
 export type CalendarEvent = { id: string; title: string; date: string; time?: string; category: TaskCategory; by: "A" | "B" }
 export type SharedNote = { id: string; title: string; body: string; updated: string; pinned?: boolean }
 
