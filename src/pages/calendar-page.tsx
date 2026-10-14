@@ -30,9 +30,7 @@ export function CalendarPage() {
   return (
     <div className="space-y-6" data-testid="calendar-page">
       <div>
-        <p className="mb-1 text-[11px] font-bold tracking-[.17em] text-muted-foreground">OUR SCHEDULE</p>
         <h1 className="text-[32px] font-bold leading-[1.3] tracking-[-.045em]">カレンダー</h1>
-        <p className="mt-2 text-sm text-muted-foreground">ふたりの予定を、ひと目で。</p>
       </div>
 
       <section className="noca-card rounded-[23px] border border-border bg-card px-3.5 pb-5 pt-4">
@@ -75,8 +73,7 @@ export function CalendarPage() {
       <section>
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-bold tracking-[.1em] text-muted-foreground">SELECTED DAY</p>
-            <h2 className="mt-1 text-[18px] font-bold">{format(selectedDate, "M月d日（E）", { locale: ja })}</h2>
+            <h2 className="text-[18px] font-bold">{format(selectedDate, "M月d日（E）", { locale: ja })}</h2>
           </div>
           <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">{events.length + tasks.length} 件</span>
         </div>
@@ -84,7 +81,6 @@ export function CalendarPage() {
           <div className="rounded-[20px] border border-dashed border-border bg-card/65 py-10 text-center">
             <CalendarDays className="mx-auto mb-3 size-7 text-muted-foreground/45" strokeWidth={1.5} />
             <p className="text-sm font-semibold">この日の予定はありません</p>
-            <p className="mt-1 text-xs text-muted-foreground">ゆったり過ごすのもいいですね。</p>
           </div>
         ) : (
           <div className="noca-card overflow-hidden rounded-[20px] border border-border bg-card">
@@ -105,7 +101,6 @@ export function CalendarPage() {
           </div>
         )}
       </section>
-      <p className="text-center text-[11px] text-muted-foreground/80">Phase 1B ・ 予定はサンプル、TODOは端末内のデータ</p>
     </div>
   )
 }

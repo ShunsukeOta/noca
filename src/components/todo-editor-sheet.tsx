@@ -79,7 +79,7 @@ export function TodoEditorSheet() {
             <NotebookPen className="size-5" />
           </div>
           <SheetTitle className="text-left text-[22px] font-bold tracking-tight">{editor?.mode === "edit" ? "タスクを編集" : "タスクを追加"}</SheetTitle>
-          <SheetDescription className="mt-1 text-left text-[13px]">やることを、ひとつずつ。</SheetDescription>
+          <SheetDescription className="sr-only">タスクのタイトルや期限、カテゴリを設定します。</SheetDescription>
         </SheetHeader>
         <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
           <SheetBody>

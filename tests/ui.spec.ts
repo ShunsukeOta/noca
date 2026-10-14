@@ -87,3 +87,23 @@ test("memo search narrows results", async ({ page }) => {
   await expect(page.getByRole("button", { name: "次の旅行のことを開く" })).toBeVisible()
   await expect(page.getByRole("button", { name: "行きたいお店を開く" })).toHaveCount(0)
 })
+
+test("no decorative lead copy remains across three screens or sheets", async ({ page }) => {
+  const removed = [
+    "今日も、ひとつずつ片付けよう。",
+    "今日も一緒に、無理せず。",
+    "やることを、ひとつずつ。",
+    "ふたりの予定を、ひと目で。",
+    "思いついたことも、大切なことも。",
+    "YOUR EVERYDAY", "OUR SCHEDULE", "LITTLE NOTES", "SELECTED DAY"
+  ]
+  for (const path of ["/todo", "/calendar", "/memo"]) {
+    await page.goto(path)
+    for (const lead of removed) await expect(page.getByText(lead, { exact: true })).toHaveCount(0)
+  }
+  await page.goto("/todo")
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await expect(page.getByRole("dialog")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "タスクを追加" })).toBeVisible()
+  await expect(page.getByText("やることを、ひとつずつ。")).toHaveCount(0)
+})

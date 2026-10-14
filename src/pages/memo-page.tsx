@@ -13,9 +13,7 @@ export function MemoPage() {
   return (
     <div className="space-y-6" data-testid="memo-page">
       <div>
-        <p className="mb-1 text-[11px] font-bold tracking-[.17em] text-muted-foreground">LITTLE NOTES</p>
         <h1 className="text-[32px] font-bold leading-[1.3] tracking-[-.045em]">メモ</h1>
-        <p className="mt-2 text-sm text-muted-foreground">思いついたことも、大切なことも。</p>
       </div>
 
       <label className="flex h-[52px] items-center gap-3 rounded-[17px] border border-border bg-card px-4 text-muted-foreground">
@@ -35,7 +33,6 @@ export function MemoPage() {
           <div className="rounded-[20px] border border-dashed border-border bg-card/60 px-4 py-11 text-center">
             <NotebookPen className="mx-auto mb-3 size-7 text-muted-foreground/50" />
             <p className="text-sm font-semibold">該当するメモがありません</p>
-            <p className="mt-1 text-xs text-muted-foreground">検索キーワードを変えてみましょう。</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -57,13 +54,6 @@ export function MemoPage() {
         )}
       </section>
 
-      <div className="rounded-[19px] bg-[#e9eef7] px-4 py-4 dark:bg-[#253248]">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[13px] bg-card text-primary"><NotebookPen className="size-5" /></div>
-          <p className="text-[12px] leading-relaxed text-secondary-foreground">ふたりのアイデアや気になることを、<br />ここに残していこう。</p>
-        </div>
-      </div>
-      <p className="text-center text-[11px] text-muted-foreground/80">Phase 1A ・ サンプルデータで表示中</p>
 
       <Sheet open={Boolean(selected)} onOpenChange={(next) => { if (!next) setSelected(null) }}>
         <SheetContent>

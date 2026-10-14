@@ -24,9 +24,7 @@ export function PreviewCreateSheet({ open, onOpenChange, kind }: { open: boolean
         <SheetHeader className="pr-14">
           <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-secondary text-primary"><Icon className="size-5" /></div>
           <SheetTitle className="text-left text-[22px] font-bold tracking-tight">{config.title}</SheetTitle>
-          <SheetDescription className="mt-1 text-left text-sm leading-relaxed text-muted-foreground">
-            UI確認用の入力シートです。保存機能は次のフェーズで実装します。
-          </SheetDescription>
+          <SheetDescription className="sr-only">プレビュー画面です。入力内容は保存されません。</SheetDescription>
         </SheetHeader>
         <SheetBody>
           <label htmlFor="preview-title" className="mb-2 block text-sm font-semibold">タイトル</label>

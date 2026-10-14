@@ -28,13 +28,7 @@ export function TodoPage() {
   return (
     <div className="space-y-6" data-testid="todo-page">
       <div>
-        <div className="mb-1 flex items-center gap-2">
-          <span className="text-[11px] font-bold tracking-[.17em] text-muted-foreground">YOUR EVERYDAY</span>
-          <span className="size-1 rounded-full bg-[#a4b7ce]" />
-          <span className="text-[11px] text-muted-foreground">ふたりで、少しずつ</span>
-        </div>
         <h1 className="text-[32px] font-bold leading-[1.3] tracking-[-.045em]">やること</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">今日も、ひとつずつ片付けよう。</p>
       </div>
 
       <section className="noca-shadow relative overflow-hidden rounded-[23px] bg-primary px-5 py-5 text-primary-foreground">
@@ -43,7 +37,6 @@ export function TodoPage() {
           <div>
             <p className="text-[12px] font-semibold text-primary-foreground/70">残りのタスク</p>
             <div className="mt-1 flex items-baseline gap-2"><span className="text-[34px] font-bold leading-none">{tasks.filter((t) => !t.done).length}</span><span className="text-sm text-primary-foreground/70">件</span></div>
-            <p className="mt-3 text-xs text-primary-foreground/75">今日も一緒に、無理せず。</p>
           </div>
           <div className="flex size-[62px] items-center justify-center rounded-[20px] bg-white/14"><ListChecks className="size-7" strokeWidth={1.75} /></div>
         </div>
@@ -67,8 +60,7 @@ export function TodoPage() {
           {active.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-11 text-center">
               <div className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-secondary text-primary"><Sparkles className="size-5" /></div>
-              <p className="text-sm font-semibold">{tasks.length === 0 ? "最初のタスクを追加しよう" : "すべて終わりました"}</p>
-              <p className="text-xs text-muted-foreground">思いついたことを気軽に残せます。</p>
+              <p className="text-sm font-semibold">{tasks.length === 0 ? "タスクはありません" : "すべて終わりました"}</p>
               <button type="button" onClick={openCreate} className="mt-3 min-h-11 rounded-xl bg-secondary px-4 text-[13px] font-bold text-primary">＋ タスクを追加</button>
             </div>
           ) : active.map((task, index) => (
@@ -112,7 +104,6 @@ export function TodoPage() {
           </div>}
         </section>
       )}
-      <p className="text-center text-[11px] text-muted-foreground/80">Phase 1B ・ この端末内に仮保存（共有前）</p>
     </div>
   )
 }
