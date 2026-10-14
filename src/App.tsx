@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom"
 import { AppShell } from "@/components/app-shell"
 import { TodoProvider } from "@/features/todos/todo-store"
+import { CalendarProvider } from "@/features/calendar/calendar-store"
 import { TodoPage } from "@/pages/todo-page"
 import { CalendarPage } from "@/pages/calendar-page"
 import { MemoPage } from "@/pages/memo-page"
@@ -9,6 +10,7 @@ import { SettingsPage } from "@/pages/settings-page"
 export default function App() {
   return (
     <TodoProvider>
+      <CalendarProvider>
       <Routes>
       <Route element={<AppShell />}>
         <Route path="/todo" element={<TodoPage />} />
@@ -18,6 +20,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/todo" replace />} />
       </Route>
       </Routes>
+      </CalendarProvider>
     </TodoProvider>
   )
 }

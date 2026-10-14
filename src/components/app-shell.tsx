@@ -7,6 +7,8 @@ import { CalendarDays, ListTodo, NotebookPen, Plus, Settings } from "lucide-reac
 import { Button } from "@/components/ui/button"
 import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
 import { TodoEditorSheet } from "@/components/todo-editor-sheet"
+import { CalendarEditorSheet } from "@/components/calendar-editor-sheet"
+import { useCalendar } from "@/features/calendar/calendar-store"
 import { useTodos } from "@/features/todos/todo-store"
 import { cn } from "@/lib/utils"
 
@@ -23,6 +25,7 @@ export function AppShell() {
   const reduceMotion = useReducedMotion()
   const [sheetOpen, setSheetOpen] = useState(false)
   const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
+  const calendar = useCalendar()
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     typeof localStorage !== "undefined" && localStorage.getItem("noca.theme") === "dark" ? "dark" : "light"
   )
@@ -33,7 +36,7 @@ export function AppShell() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#111826" : "#f6f8fb")
   }, [theme])
 
-  useEffect(() => { setSheetOpen(false); closeEditor() }, [location.pathname, closeEditor])
+  useEffect(() => { setSheetOpen(false); closeEditor(); calendar.closeEditor() }, [location.pathname, closeEditor, calendar.closeEditor])
   const page = useOutlet({ theme, onThemeChange: setTheme })
 
   return (
@@ -77,7 +80,7 @@ export function AppShell() {
           whileTap={reduceMotion ? undefined : { scale: 0.91 }}
           transition={{ type: "spring", stiffness: 510, damping: 28 }}>
           <Button type="button" size="icon" aria-label={active.label + "を追加"}
-            onClick={() => active.kind === "todo" ? openCreate() : setSheetOpen(true)}
+            onClick={() => { if (active.kind === "todo") openCreate(); else if (active.kind === "calendar") calendar.openCreate(); else setSheetOpen(true) }}
             className="noca-shadow size-[58px] rounded-[21px] shadow-lg">
             <Plus className="size-6 stroke-[2.3px]" />
           </Button>
@@ -124,13 +127,32 @@ export function AppShell() {
           )}
         </AnimatePresence>
       </div>
-      {storageError && (
+      <div className="pointer-events-none fixed bottom-[calc(153px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
+        <AnimatePresence initial={false}>
+          {calendar.deleted && (
+            <motion.div key={calendar.deleted.event.id} role="status" aria-live="polite"
+              initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
+              className="pointer-events-auto flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-[13px] shadow-xl">
+              <span className="font-medium">予定を削除しました</span>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={calendar.undoDelete} className="tap-target px-2 font-bold text-primary">元に戻す</button>
+                <button type="button" onClick={calendar.dismissDeleted} className="tap-target px-2 text-muted-foreground" aria-label="通知を閉じる">×</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      {(storageError || calendar.storageError) && (
         <div role="alert" className="fixed left-1/2 top-[calc(60px+env(safe-area-inset-top))] z-40 w-[calc(100%-40px)] max-w-[480px] -translate-x-1/2 rounded-xl bg-destructive px-4 py-3 text-sm font-medium text-white shadow-lg">
           この端末に保存できません。ブラウザの設定を確認してください。
         </div>
       )}
       {editor && <TodoEditorSheet key={editor.mode === "edit" ? editor.id : "create"} />}
-      {active && active.kind !== "todo" && <PreviewCreateSheet kind={active.kind} open={sheetOpen} onOpenChange={setSheetOpen} />}
+      {calendar.editor && <CalendarEditorSheet key={calendar.editor.mode === "edit" ? calendar.editor.id : "create-" + calendar.editor.date} />}
+      {active?.kind === "memo" && <PreviewCreateSheet kind="memo" open={sheetOpen} onOpenChange={setSheetOpen} />}
     </div>
   )
 }

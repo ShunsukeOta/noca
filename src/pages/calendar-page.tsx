@@ -1,115 +1,183 @@
 import { useMemo, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { addMonths, eachDayOfInterval, endOfWeek, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns"
+import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns"
 import { ja } from "date-fns/locale"
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, ListTodo, MapPin } from "lucide-react"
-import { mockEvents } from "@/app/mock-data"
+import { CalendarDays, CalendarClock, ChevronLeft, ChevronRight, Clock3, ListTodo, MapPin } from "lucide-react"
 import { useTodos } from "@/features/todos/todo-store"
+import { useCalendar } from "@/features/calendar/calendar-store"
 import { cn } from "@/lib/utils"
 
 const daysOfWeek = ["日", "月", "火", "水", "木", "金", "土"]
 
 export function CalendarPage() {
-  const { todos, openEdit } = useTodos()
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [month, setMonth] = useState(startOfMonth(new Date()))
+  const { todos, openEdit: editTodo } = useTodos()
+  const { events, selectedDate, setSelectedDate, openCreate, openEdit } = useCalendar()
   const [direction, setDirection] = useState(1)
   const reduceMotion = useReducedMotion()
+  const selectedDay = parseISO(selectedDate)
+  const month = startOfMonth(selectedDay)
+  const monthKey = format(month, "yyyy-MM")
   const today = new Date()
-  const dates = useMemo(() => eachDayOfInterval({
-    start: startOfWeek(startOfMonth(month), { weekStartsOn: 0 }),
-    end: endOfWeek(endOfMonth(month), { weekStartsOn: 0 })
-  }), [month])
-  const key = format(selectedDate, "yyyy-MM-dd")
-  const events = mockEvents.filter((event) => event.date === key)
-  const tasks = todos.filter((task) => task.dueDate === key && !task.done)
 
-  const changeMonth = (direction: number) => {
-    setDirection(direction)
-    const next = addMonths(month, direction)
-    setMonth(next)
-    setSelectedDate(startOfMonth(next))
+  const dates = useMemo(() => {
+    const firstDay = parseISO(monthKey + "-01")
+    return eachDayOfInterval({
+      start: startOfWeek(startOfMonth(firstDay), { weekStartsOn: 0 }),
+      end: endOfWeek(endOfMonth(firstDay), { weekStartsOn: 0 })
+    })
+  }, [monthKey])
+
+  const counts = useMemo(() => {
+    const result = new Map<string, { events: number; tasks: number }>()
+    const increase = (date: string, kind: "events" | "tasks") => {
+      const current = result.get(date) ?? { events: 0, tasks: 0 }
+      current[kind] += 1
+      result.set(date, current)
+    }
+    events.forEach(event => increase(event.date, "events"))
+    todos.forEach(task => { if (task.dueDate && !task.done) increase(task.dueDate, "tasks") })
+    return result
+  }, [events, todos])
+
+  const dayEvents = useMemo(() => events.filter(event => event.date === selectedDate).sort(
+    (a, b) => (a.time ?? "").localeCompare(b.time ?? "") || a.title.localeCompare(b.title, "ja")
+  ), [events, selectedDate])
+  const dayTasks = useMemo(() => todos.filter(task => task.dueDate === selectedDate && !task.done), [todos, selectedDate])
+
+  const changeMonth = (delta: number) => {
+    setDirection(delta)
+    setSelectedDate(format(addMonths(month, delta), "yyyy-MM-dd"))
   }
 
   return (
     <div className="space-y-6" data-testid="calendar-page">
-
       <section className="noca-card rounded-[23px] border border-border bg-card px-3.5 pb-5 pt-4">
         <div className="mb-6 flex items-center justify-between px-2">
           <h2 className="text-[19px] font-bold tracking-tight">{format(month, "yyyy年 M月")}</h2>
           <div className="flex items-center gap-1">
-            <button type="button" onClick={() => { setDirection(today < month ? -1 : 1); setMonth(startOfMonth(today)); setSelectedDate(today) }}
+            <button type="button" onClick={() => { setDirection(today < month ? -1 : 1); setSelectedDate(format(today, "yyyy-MM-dd")) }}
               className="tap-target rounded-xl px-2 text-xs font-semibold text-primary hover:bg-secondary">今日</button>
-            <button type="button" aria-label="前の月" onClick={() => changeMonth(-1)} className="tap-target flex items-center justify-center rounded-full hover:bg-secondary"><ChevronLeft className="size-5" /></button>
-            <button type="button" aria-label="次の月" onClick={() => changeMonth(1)} className="tap-target flex items-center justify-center rounded-full hover:bg-secondary"><ChevronRight className="size-5" /></button>
+            <button type="button" aria-label="前の月" onClick={() => changeMonth(-1)}
+              className="tap-target flex items-center justify-center rounded-full hover:bg-secondary"><ChevronLeft className="size-5" /></button>
+            <button type="button" aria-label="次の月" onClick={() => changeMonth(1)}
+              className="tap-target flex items-center justify-center rounded-full hover:bg-secondary"><ChevronRight className="size-5" /></button>
           </div>
         </div>
+
         <div className="grid grid-cols-7">
-          {daysOfWeek.map((item, i) => (
-            <div key={item} className={cn("pb-3 text-center text-xs font-semibold", i === 0 ? "text-[#c28086]" : i === 6 ? "text-[#7798be]" : "text-muted-foreground")}>{item}</div>
+          {daysOfWeek.map((day, index) => (
+            <div key={day} className={cn("pb-3 text-center text-xs font-semibold",
+              index === 0 ? "text-[#c28086]" : index === 6 ? "text-[#7798be]" : "text-muted-foreground")}>{day}</div>
           ))}
         </div>
         <AnimatePresence initial={false} mode="wait" custom={direction}>
-          <motion.div key={format(month, "yyyy-MM")} custom={direction}
+          <motion.div key={monthKey} custom={direction}
             initial={reduceMotion ? false : { opacity: 0, x: direction * 12 }}
             animate={{ opacity: 1, x: 0 }}
             exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: -direction * 12 }}
             transition={{ duration: reduceMotion ? 0 : 0.19, ease: "easeOut" }}
             className="grid grid-cols-7 gap-y-1">
-          {dates.map((date) => {
-            const dateKey = format(date, "yyyy-MM-dd")
-            const count = mockEvents.filter((event) => event.date === dateKey).length + todos.filter((task) => task.dueDate === dateKey && !task.done).length
-            const selected = isSameDay(date, selectedDate)
-            const isToday = isSameDay(date, today)
-            return (
-              <button key={dateKey} type="button"
-                aria-label={format(date, "M月d日", { locale: ja }) + (count ? "、予定" + count + "件" : "")}
-                aria-pressed={selected}
-                onClick={() => { setSelectedDate(date); if (!isSameMonth(date, month)) { setDirection(date < month ? -1 : 1); setMonth(startOfMonth(date)) } }}
-                className="tap-target flex w-full flex-col items-center justify-center gap-1 rounded-xl px-0 py-1">
-                <span className={cn("flex size-[34px] items-center justify-center rounded-full text-[13px] font-semibold", !isSameMonth(date, month) && "text-muted-foreground/40", isToday && !selected && "ring-1 ring-primary text-primary", selected && "bg-primary text-primary-foreground")}>
-                  {format(date, "d")}
-                </span>
-                <span className="flex h-1 items-center justify-center gap-0.5">
-                  {count ? Array.from({ length: Math.min(count, 3) }, (_, i) => <span key={i} className={cn("size-1 rounded-full bg-[#84a9a0]", selected && "bg-primary")} />) : null}
-                </span>
-              </button>
-            )
-          })}
+            {dates.map(date => {
+              const dateKey = format(date, "yyyy-MM-dd")
+              const dayCount = counts.get(dateKey) ?? { events: 0, tasks: 0 }
+              const count = dayCount.events + dayCount.tasks
+              const selected = isSameDay(date, selectedDay)
+              const isToday = isSameDay(date, today)
+              return (
+                <button key={dateKey} type="button" data-calendar-date={dateKey}
+                  aria-label={format(date, "M月d日", { locale: ja }) + (count ? "、予定" + count + "件" : "")}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    if (!isSameMonth(date, month)) setDirection(date < month ? -1 : 1)
+                    setSelectedDate(dateKey)
+                  }}
+                  className="tap-target flex w-full flex-col items-center justify-center gap-1 rounded-xl px-0 py-1">
+                  <span className={cn("relative flex size-[34px] items-center justify-center rounded-full text-[13px] font-semibold",
+                    !isSameMonth(date, month) && "text-muted-foreground/40",
+                    isToday && !selected && "ring-1 ring-primary text-primary",
+                    selected && "text-primary-foreground")}>
+                    {selected && <motion.span layoutId="calendar-selected-day" aria-hidden="true"
+                      className="absolute inset-0 rounded-full bg-primary"
+                      transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 480, damping: 40 }} />}
+                    <span className="relative z-10">{format(date, "d")}</span>
+                  </span>
+                  <span className="flex h-1 items-center justify-center gap-0.5">
+                    {Array.from({ length: Math.min(dayCount.events, 2) }, (_, i) =>
+                      <span key={"event-" + i} className="size-1 rounded-full bg-[#84a9a0]" />)}
+                    {dayCount.tasks > 0 && <span className="size-1 rounded-full bg-primary" />}
+                  </span>
+                </button>
+              )
+            })}
           </motion.div>
         </AnimatePresence>
       </section>
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-[18px] font-bold">{format(selectedDate, "M月d日（E）", { locale: ja })}</h2>
-          </div>
-          <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">{events.length + tasks.length} 件</span>
+          <h2 className="text-[18px] font-bold">{format(selectedDay, "M月d日（E）", { locale: ja })}</h2>
+          <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">{dayEvents.length + dayTasks.length} 件</span>
         </div>
-        {events.length + tasks.length === 0 ? (
-          <div className="rounded-[20px] border border-dashed border-border bg-card/65 py-10 text-center">
-            <CalendarDays className="mx-auto mb-3 size-7 text-muted-foreground/45" strokeWidth={1.5} />
-            <p className="text-sm font-semibold">この日の予定はありません</p>
-          </div>
-        ) : (
-          <div className="noca-card overflow-hidden rounded-[20px] border border-border bg-card">
-            {events.map((event) => (
-              <div key={event.id} className="flex items-center gap-3 border-b border-border/60 px-4 py-4 last:border-b-0">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#e6eee8] text-[#648874] dark:bg-[#2c443a] dark:text-[#a4d1ae]"><MapPin className="size-5" /></div>
-                <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{event.title}</p><p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Clock3 className="size-3" />{event.time ?? "終日"} · {event.category}</p></div>
-                <span className="text-[10px] font-semibold text-muted-foreground">{event.by}</span>
-              </div>
-            ))}
-            {tasks.map((task) => (
-              <button type="button" key={task.id} onClick={() => openEdit(task.id)} aria-label={task.title + "を編集"} className="flex min-h-[72px] w-full items-center gap-3 border-t border-border/60 px-4 py-4 text-left first:border-t-0">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-secondary text-primary"><ListTodo className="size-5" /></div>
-                <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{task.title}</p><p className="mt-1 text-[11px] text-muted-foreground">TODO · {task.category}</p></div>
-                <span className="rounded-md bg-secondary px-2 py-1 text-[10px] font-semibold text-primary">TODO</span>
-              </button>
-            ))}
-          </div>
-        )}
+        <AnimatePresence initial={false} mode="wait">
+          {dayEvents.length + dayTasks.length === 0 ? (
+            <motion.div key="empty" initial={reduceMotion ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.16 }}
+              className="rounded-[20px] border border-dashed border-border bg-card/65 py-9 text-center">
+              <CalendarDays className="mx-auto mb-3 size-7 text-muted-foreground/45" strokeWidth={1.5} />
+              <p className="text-sm font-semibold">この日の予定はありません</p>
+              <button type="button" onClick={() => openCreate(selectedDate)}
+                className="mt-3 min-h-11 rounded-xl bg-secondary px-4 text-[13px] font-bold text-primary">＋ 予定を追加</button>
+            </motion.div>
+          ) : (
+            <motion.div key="agenda" initial={reduceMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.16 }}
+              className="noca-card overflow-hidden rounded-[20px] border border-border bg-card">
+              <AnimatePresence initial={false} mode="popLayout">
+                {dayEvents.map(event => (
+                  <motion.div key={"event-" + event.id} layout
+                    initial={reduceMotion ? false : { opacity: 0, height: 0, x: 10 }}
+                    animate={{ opacity: 1, height: "auto", x: 0 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, x: -10 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.2 }} className="overflow-hidden">
+                    <button type="button" onClick={() => openEdit(event.id)} aria-label={event.title + "を編集"}
+                      data-calendar-event={event.id}
+                      className="flex min-h-[76px] w-full items-center gap-3 border-b border-border/60 px-4 py-4 text-left">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#e6eee8] text-[#648874] dark:bg-[#2c443a] dark:text-[#a4d1ae]">
+                        <CalendarClock className="size-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-semibold">{event.title}</p>
+                        <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                          <Clock3 className="size-3" />
+                          {event.time ? (event.endTime ? event.time + "–" + event.endTime : event.time) : "終日"}
+                          <span>· {event.category}</span>
+                        </p>
+                        {event.address && <p className="mt-1 flex items-center gap-1 break-words text-[11px] text-muted-foreground">
+                          <MapPin className="size-3 shrink-0" />{event.address}
+                        </p>}
+                      </div>
+                      <span className="shrink-0 rounded-md bg-[#e6eee8] px-2 py-1 text-[10px] font-semibold text-[#648874] dark:bg-[#2c443a] dark:text-[#a4d1ae]">予定</span>
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {dayTasks.map(task => (
+                <button type="button" key={"todo-" + task.id} onClick={() => editTodo(task.id)}
+                  aria-label={task.title + "を編集"}
+                  className="flex min-h-[72px] w-full items-center gap-3 border-b border-border/60 px-4 py-4 text-left last:border-b-0">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-secondary text-primary">
+                    <ListTodo className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-semibold">{task.title}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">TODO · {task.category}</p>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-[10px] font-semibold text-primary">TODO</span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
     </div>
   )

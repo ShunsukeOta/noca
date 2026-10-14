@@ -2,7 +2,7 @@
 
 - Version: 0.1
 - Updated: 2026-10-14
-- Current: **Phase 1B (TODO UIとローカルCRUD)** / Next: **Phase 1C (カレンダーUI)**
+- Current: **Phase 1C (カレンダーCRUD実装)** / Next: **Phase 1D (メモUI)**
 - Product spec: [SPECIFICATION.md](SPECIFICATION.md)
 - UI tokens: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 - UI verification: [UI_QA.md](UI_QA.md)
@@ -24,7 +24,7 @@
 | **0** | README・仕様・ロードマップ・UIテスト計画 | なし | READMEと4つのdocs文書が整備され、Phase 1の合格基準が明確 |
 | **1A** | Vite/React/TypeScript/shadcn/ui/Tailwind、画面枠、3タブ | 0 | 実装済み・ビルドとChromium自動テスト合格（実機確認は1E） |
 | **1B** | TODO UIとローカルCRUD | 1A | 実装済み・ビルドと7つのChromiumテスト合格（Safari実機は1E） |
-| **1C** | カレンダー UIとダミー操作 | 1B | 月移動、日付選択、予定/期限TODO表示、予定編集 |
+| **1C** | カレンダーUIと端末内CRUD | 1B | 実装済み・自動テスト検証対象。Safari/PWA実機検証は1E |
 | **1D** | メモ UIとダミー操作 | 1C | 一覧・検索・作成・編集・空状態が操作できる |
 | **1E** | iPhone実機・Safari/PWA表示確認、UI最終調整 | 1D | UI_QAの必須ケース合格、デザイン承認、Phase 1完了 |
 | **2** | Firebase Auth・workspace・メンバーシップ・招待 | 1E | 2アカウントの招待/参加/権限制限が正常 |
@@ -95,17 +95,19 @@
 ### スコープ
 
 - 月グリッド・今日/選択日・月移動
-- 日別アジェンダ（通常予定と期限TODOを統合表示）
-- 予定の作成/編集シート
-- ダミー予定、終日、時刻あり、予定なし状態
+- 日別アジェンダ（予定と期限TODOを区別して表示）
+- 予定の作成・編集・削除・Undo、localStorageへの仮保存
+- 終日／開始・終了時間、カテゴリ・場所・メモの編集
+- iPhone向け共通ボトムシートと月移動アニメーション
 
 ### DoD
 
-- [ ] 正しい曜日/日数で月表示できる
-- [ ] 日付選択で日別一覧が切り替わる
-- [ ] 予定と期限TODOを区別して表示
-- [ ] 前月/翌月、月末、2月29日の表示に問題がない
-- [ ] 小さいiPhone幅でもカレンダーセルがつぶれない
+- [x] 正しい曜日/日数で月表示できる（自動テストに閏日のケースを追加）
+- [x] 日付選択で日別一覧が切り替わる
+- [x] 予定と期限TODOを区別して表示
+- [x] 前月/翌月、月末、2月29日の表示を実装
+- [x] 320 / 375 / 390 / 430pxの自動テストを追加
+- [ ] Safari・ホーム画面PWA実機で日付／時刻ピッカーとキーボードを確認（1E）
 
 ## Phase 1D — メモ UI
 

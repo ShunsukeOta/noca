@@ -5,8 +5,8 @@
 noca は、2人で使うことを前提とした **iPhone向け共有PWA** です。TODO・カレンダー・メモを、直感的な3タブにまとめます。
 
 > [!IMPORTANT]
-> 現在は **Phase 1B: TODOのローカルCRUD実装**。TODOの追加・編集・完了・削除・Undoと端末内仮保存に対応しました。Firebaseと2人同期は未実装です。
-> 次はPhase 1Bの動作確認後、**Phase 1C: カレンダー予定CRUD UI**へ進みます。iPhone実機のSafari / standalone表示検証はPhase 1Eで行います。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
+> 現在は **Phase 1C: カレンダーのローカルCRUD実装**。TODOに加え、予定の追加・編集・削除・Undoと端末内仮保存に対応しました。Firebaseと2人同期は未実装です。
+> 次はカレンダーの実機操作確認後、**Phase 1D: メモ編集UI**へ進みます。iPhone実機のSafari / standalone表示検証はPhase 1Eで行います。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
 
 ## コンセプト
 
@@ -43,7 +43,7 @@ TODOの作成・編集は丸いボトムシートを使用します。シート�
 | 画面 | 概要 |
 | --- | --- |
 | TODO | 一覧、クイック追加、完了、タグ、期限、編集シート |
-| カレンダー | 月表示、日付選択、その日の予定、期限つきTODOの表示 |
+| カレンダー | 月表示、日付選択、予定の追加・編集・削除・Undo、期限付きTODO表示、端末内仮保存 |
 | メモ | 共有メモ一覧、検索、作成・編集、ピン留め（後続フェーズ） |
 
 **予定とTODOは別データ**です。予定日が設定されたTODOはカレンダーにも「参照表示」しますが、同じデータを二重に保存しません。
@@ -55,7 +55,7 @@ TODOの作成・編集は丸いボトムシートを使用します。シート�
 | 0 | 仕様・計画・受け入れ基準の文書化 | 完了（ドキュメント整備） |
 | 1A | 初期構築・デザイントークン・下部タブ | 実装済み・Chromium自動テスト合格 |
 | 1B | TODO画面UI・端末内CRUD | 実装済み・CI全7テスト合格 |
-| 1C | カレンダー画面UI | 未着手 |
+| 1C | カレンダー画面・端末内CRUD | 実装済み・自動テスト検証対象 |
 | 1D | メモ画面UI | 未着手 |
 | 1E | iPhone表示テストとUI確定 | 未着手 |
 | 2 | Firebase認証・2人の共有スペース・招待 | 未着手 |
@@ -98,9 +98,9 @@ npx playwright install chromium
 npm run test:e2e
 ~~~
 
-初期表示は `/todo`。下部タブで `/calendar`、`/memo` に切り替わります。TODOでは右下の＋ボタンから追加・編集・削除できます。TODOは**この端末のlocalStorageに仮保存**されます（2人同期・Firebase保存はまだありません）。カレンダー／メモの＋は表示デモです。
+初期表示は `/todo`。下部タブで `/calendar`、`/memo` に切り替わります。TODOでは右下の＋ボタンから追加・編集・削除できます。TODOは**この端末のlocalStorageに仮保存**されます（2人同期・Firebase保存はまだありません）。カレンダーも右下の＋から予定を追加・編集・削除でき、端末内のlocalStorageに仮保存されます。メモの＋は引き続き表示デモです。
 
-shadcn/uiの **Radix版** を採用し、ソースを `src/components/ui` に配置しています。カラー・角丸等は `src/styles/globals.css` で共通管理します。詳細: [Phase 1A 実装・検証記録](docs/PHASE1A_REPORT.md)、[Phase 1B TODO実装](docs/PHASE1B_REPORT.md)。
+shadcn/uiの **Radix版** を採用し、ソースを `src/components/ui` に配置しています。カラー・角丸等は `src/styles/globals.css` で共通管理します。詳細: [Phase 1A 実装・検証記録](docs/PHASE1A_REPORT.md)、[Phase 1B TODO実装](docs/PHASE1B_REPORT.md)、[Phase 1C カレンダー実装](docs/PHASE1C_REPORT.md)。
 
 実機確認はiPhoneの **Safari表示** と **ホーム画面追加後のstandalone表示** の両方を対象とします。CIのChromiumモバイル検証だけではiOS実機合格とはしません。
 
