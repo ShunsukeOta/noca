@@ -105,13 +105,11 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteTodo = useCallback((id: string) => {
-    setTodos(previous => {
-      const index = previous.findIndex(task => task.id === id)
-      if (index < 0) return previous
-      setDeleted({ task: previous[index], index })
-      return previous.filter(task => task.id !== id)
-    })
-  }, [])
+    const index = todos.findIndex(task => task.id === id)
+    if (index === -1) return
+    setDeleted({ task: todos[index], index })
+    setTodos(previous => previous.filter(task => task.id !== id))
+  }, [todos])
 
   const undoDelete = useCallback(() => {
     if (!deleted) return
