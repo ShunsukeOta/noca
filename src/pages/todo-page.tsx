@@ -27,6 +27,13 @@ export function TodoPage() {
   const { todos: tasks, toggleTodo, openEdit, openCreate } = useTodos()
   const [showCompleted, setShowCompleted] = useState(false)
   const reduceMotion = useReducedMotion()
+  const unfinishedCounts = tasks.reduce<Record<Filter, number>>((counts, task) => {
+    if (!task.done) {
+      counts["すべて"] += 1
+      counts[task.category] += 1
+    }
+    return counts
+  }, { "すべて": 0, "おでかけ": 0, "暮らし": 0, "ふたり": 0, "その他": 0 })
   const visible = tasks.filter(task => filter === "すべて" || task.category === filter)
   const active = visible.filter((task) => !task.done)
   const completed = visible.filter((task) => task.done)
@@ -42,12 +49,12 @@ export function TodoPage() {
             <p className="text-[12px] font-semibold text-primary-foreground/70">残りのタスク</p>
             <div className="mt-1 flex items-baseline gap-2"><span className="relative inline-flex h-9 min-w-5 items-center overflow-hidden text-[34px] font-bold leading-none">
               <AnimatePresence mode="wait" initial={false}>
-                <motion.span key={tasks.filter(t => !t.done).length}
+                <motion.span key={unfinishedCounts["すべて"]}
                   initial={reduceMotion ? false : { opacity: 0, y: 9 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduceMotion ? undefined : { opacity: 0, y: -9 }}
                   transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}>
-                  {tasks.filter(t => !t.done).length}
+                  {unfinishedCounts["すべて"]}
                 </motion.span>
               </AnimatePresence>
             </span><span className="text-sm text-primary-foreground/70">件</span></div>
@@ -58,34 +65,34 @@ export function TodoPage() {
 
       <LayoutGroup id="todo-filters">
         <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="TODOの絞り込み">
-          {filters.map((item) => (
-            <button key={item} type="button" onClick={() => setFilter(item)} aria-pressed={filter === item}
+          {filters.map((item, index) => (
+            <button key={item} type="button" onClick={() => setFilter(item)}
+              aria-label={item} aria-describedby={`todo-filter-count-${index}`} aria-pressed={filter === item}
               className={cn(
-                "relative h-11 shrink-0 overflow-hidden rounded-full border px-5 text-[13px] font-semibold transition-colors",
+                "relative flex h-[60px] min-w-[76px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-[14px] border px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 item === "すべて"
                   ? (filter === item ? "border-primary text-primary-foreground" : "border-border bg-card text-muted-foreground")
-                  : cn("border-transparent", categoryColor[item]),
-                filter === item && "font-bold"
+                  : cn("border-transparent", categoryColor[item])
               )}>
               {filter === item && (
                 <motion.span layoutId="filter-indicator" aria-hidden="true"
                   className={cn(
-                    "pointer-events-none absolute inset-0 rounded-full",
+                    "pointer-events-none absolute inset-0 rounded-[13px]",
                     item === "すべて" ? "bg-primary" : cn("ring-2 ring-inset", categorySelectedRing[item])
                   )}
                   transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 440, damping: 38 }} />
               )}
-              <span className="relative z-10">{item}</span>
+              <span className="relative z-10 text-[11px] font-semibold leading-[1.3]">{item}</span>
+              <span id={`todo-filter-count-${index}`} data-testid={`todo-filter-count-${item}`}
+                className="relative z-10 mt-1 text-[10px] font-medium leading-[1.3] opacity-80">
+                {unfinishedCounts[item]}件
+              </span>
             </button>
           ))}
         </div>
       </LayoutGroup>
 
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-bold tracking-tight">これからすること</h2>
-          <span className="text-xs font-medium text-muted-foreground">{active.length} 件</span>
-        </div>
+      <section aria-label="未完了のTODO">
         <LayoutGroup id="todo-items">
           <div className="noca-card overflow-hidden rounded-[20px] border border-border bg-card">
             <AnimatePresence initial={false} mode="popLayout">

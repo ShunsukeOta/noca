@@ -426,8 +426,8 @@ test("header date changes at midnight without reloading the PWA", async ({ page 
 test("TODO chips filter by category, keep completed tasks, and include newly created items", async ({ page }) => {
   await page.goto("/todo")
   const chips = page.getByRole("group", { name: "TODOの絞り込み" })
-  const chipLabels = await chips.getByRole("button").allTextContents()
-  expect(chipLabels.map(text => text.trim())).toEqual(["すべて", "おでかけ", "暮らし", "ふたり", "その他"])
+  const chipLabels = await Promise.all((await chips.getByRole("button").all()).map(chip => chip.getAttribute("aria-label")))
+  expect(chipLabels).toEqual(["すべて", "おでかけ", "暮らし", "ふたり", "その他"])
   await expect(chips.getByRole("button", { name: "すべて" })).toHaveAttribute("aria-pressed", "true")
   await expect(page.getByRole("button", { name: "週末のカフェを探すを編集" })).toBeVisible()
 
@@ -498,4 +498,43 @@ test("category filter chips match task category tag colors in light and dark mod
     await chips.getByRole("button", { name: "すべて", exact: true }).click()
     await expect(chips.getByRole("button", { name: "すべて", exact: true })).toHaveAttribute("aria-pressed", "true")
   }
+})
+
+
+test("TODO category tiles show two-line unfinished counts and no redundant section title", async ({ page }) => {
+  await page.goto("/todo")
+  await expect(page.getByText("これからすること", { exact: true })).toHaveCount(0)
+  const chips = page.getByRole("group", { name: "TODOの絞り込み" })
+  for (const [category, count] of [
+    ["すべて", "4件"], ["おでかけ", "1件"], ["暮らし", "2件"], ["ふたり", "1件"], ["その他", "0件"]
+  ]) {
+    const chip = chips.getByRole("button", { name: category, exact: true })
+    await expect(chip).toHaveAttribute("aria-describedby", /todo-filter-count-/)
+    await expect(page.getByTestId("todo-filter-count-" + category)).toHaveText(count)
+    const dimensions = await chip.boundingBox()
+    expect(dimensions?.height).toBeGreaterThanOrEqual(58)
+    expect(dimensions?.width).toBeGreaterThanOrEqual(74)
+  }
+  await expect(chips.getByRole("button", { name: "すべて", exact: true })).toHaveAttribute("aria-pressed", "true")
+})
+
+test("TODO tile counts respond immediately to creating and completing tasks", async ({ page }) => {
+  await page.goto("/todo")
+  const chips = page.getByRole("group", { name: "TODOの絞り込み" })
+  await chips.getByRole("button", { name: "その他", exact: true }).click()
+  await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("0件")
+
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await page.locator("#todo-title").fill("件数のテスト")
+  await page.getByRole("button", { name: "タスクを追加" }).last().click()
+  await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("1件")
+  await expect(page.getByTestId("todo-filter-count-すべて")).toHaveText("5件")
+
+  await page.getByRole("button", { name: "件数のテストを完了" }).click()
+  await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("0件")
+  await expect(page.getByTestId("todo-filter-count-すべて")).toHaveText("4件")
+  await page.getByRole("button", { name: /完了したこと/ }).click()
+  await expect(page.getByRole("button", { name: "件数のテストの完了を解除" })).toBeVisible()
+  await page.getByRole("button", { name: "件数のテストの完了を解除" }).click()
+  await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("1件")
 })
