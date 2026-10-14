@@ -756,3 +756,117 @@ test("two-person timeline fits 320px iPhone without horizontal overflow", async 
     await context.close()
   }
 })
+
+
+test("calendar all-day labels are compact, match timed typography, and have no redundant wording", async ({ page }) => {
+  await page.goto("/calendar")
+  const strip = page.getByTestId("all-day-strip")
+  const a = strip.getByRole("button", { name: "給料日を編集" })
+  const timed = page.getByTestId("timeline-lane-A").getByRole("button", { name: "午前の用事を編集" })
+  await expect(a).toHaveText("給料日")
+  await expect(strip.getByRole("button", { name: "お休みを編集" })).toHaveText("お休み")
+  await expect(strip.getByRole("button", { name: "記念日を編集" })).toHaveText("記念日")
+  const fonts = await Promise.all([
+    a.locator("span").first().evaluate(el => ({ size: getComputedStyle(el).fontSize, weight: getComputedStyle(el).fontWeight })),
+    timed.locator("span").first().evaluate(el => ({ size: getComputedStyle(el).fontSize, weight: getComputedStyle(el).fontWeight }))
+  ])
+  expect(fonts[0]).toEqual(fonts[1])
+  const appearance = await page.getByTestId("schedule-surface").evaluate(el => ({
+    bg: getComputedStyle(el).backgroundColor,
+    borderTop: getComputedStyle(el).borderTopWidth,
+    borderLeft: getComputedStyle(el).borderLeftWidth,
+    shadow: getComputedStyle(el).boxShadow
+  }))
+  expect(appearance).toEqual({ bg: "rgba(0, 0, 0, 0)", borderTop: "0px", borderLeft: "0px", shadow: "none" })
+})
+
+test("shared events span both personal lanes with a dedicated all-day column", async ({ page }) => {
+  await page.goto("/calendar")
+  await expect(page.getByTestId("person-header-both")).toContainText("ふたりの予定")
+  await expect(page.getByTestId("all-day-both").getByRole("button", { name: "記念日を編集" })).toBeVisible()
+  const shared = page.getByTestId("timeline-lane-both").getByRole("button", { name: "ふたりで買い物を編集" })
+  await expect(shared).toHaveAttribute("data-owner", "both")
+  const geometry = await page.evaluate(() => {
+    const bounds = (selector: string) => document.querySelector<HTMLElement>(selector)!.getBoundingClientRect()
+    const a = bounds('[data-testid="timeline-lane-A"]')
+    const b = bounds('[data-testid="timeline-lane-B"]')
+    const shared = bounds('[data-owner="both"][data-start="15:00"]')
+    return { sharedLeft: shared.left, sharedRight: shared.right, aLeft: a.left, aRight: a.right, bLeft: b.left, bRight: b.right }
+  })
+  expect(geometry.sharedLeft).toBeGreaterThanOrEqual(geometry.aLeft)
+  expect(geometry.sharedRight).toBeLessThanOrEqual(geometry.bRight)
+  expect(geometry.sharedRight - geometry.sharedLeft).toBeGreaterThan((geometry.aRight - geometry.aLeft) * 1.7)
+  await shared.click()
+  await expect(page.getByRole("heading", { name: "予定を編集" })).toBeVisible()
+  await expect(page.getByRole("group", { name: "予定の担当" }).getByRole("button", { name: "ふたりの予定" })).toHaveAttribute("aria-pressed", "true")
+})
+
+test("nested schedule overlap paints the shorter appointment above the longer one", async ({ page }) => {
+  await page.goto("/calendar")
+  const lane = page.getByTestId("timeline-lane-A")
+  const long = lane.getByRole("button", { name: "午前の用事を編集" })
+  const short = lane.getByRole("button", { name: "打ち合わせを編集" })
+  await expect(long).toHaveAttribute("data-depth", "0")
+  await expect(short).toHaveAttribute("data-depth", "1")
+  const boxes = await Promise.all([long, short].map(b => b.evaluate(el => {
+    const rect = el.getBoundingClientRect()
+    return { x: rect.left, right: rect.right, y: rect.top, bottom: rect.bottom, height: rect.height, z: Number(getComputedStyle(el).zIndex) }
+  })))
+  expect(boxes[0].y).toBeLessThan(boxes[1].y)
+  expect(boxes[0].bottom).toBeGreaterThan(boxes[1].bottom)
+  expect(boxes[0].x).toBeLessThan(boxes[1].x)
+  expect(boxes[0].right).toBeGreaterThan(boxes[1].right)
+  expect(boxes[0].z).toBeLessThan(boxes[1].z)
+  await short.click()
+  await expect(page.getByRole("heading", { name: "予定を編集" })).toBeVisible()
+})
+
+test("shared appointment can be created and persists with owner both", async ({ page }) => {
+  await page.goto("/calendar")
+  await page.getByRole("button", { name: "カレンダーを追加" }).click()
+  await page.locator("#event-title").fill("ふたりの予約")
+  await page.getByRole("group", { name: "予定の担当" }).getByRole("button", { name: "ふたりの予定" }).click()
+  await page.getByRole("switch", { name: "終日" }).click()
+  await page.locator("#event-start").fill("17:00")
+  await page.locator("#event-end").fill("18:00")
+  await page.getByRole("button", { name: "予定を追加" }).last().click()
+  await expect(page.getByTestId("timeline-lane-both").getByRole("button", { name: "ふたりの予約を編集" })).toBeVisible()
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("noca.calendar.events.v1") || "[]"))
+  expect(saved.some((x: { title: string; by: string }) => x.title === "ふたりの予約" && x.by === "both")).toBe(true)
+  await page.reload()
+  await expect(page.getByTestId("timeline-lane-both").getByRole("button", { name: "ふたりの予約を編集" })).toBeVisible()
+  await expect(page.getByTestId("all-day-both").getByRole("button", { name: "記念日を編集" })).toBeVisible()
+})
+
+test("three-column all-day layout and compact time lines fit narrow phones", async ({ browser }) => {
+  for (const width of [320, 375, 390, 430]) {
+    const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
+    const page = await context.newPage()
+    await page.goto("/calendar")
+    await expect(page.getByTestId("person-header-both")).toBeVisible()
+    const dims = await page.evaluate(() => {
+      const strip = document.querySelector<HTMLElement>('[data-testid="all-day-strip"]')!
+      const timeline = document.querySelector<HTMLElement>('[data-testid="timeline-grid"]')!
+      const parts = ["A", "B", "both"].map(p => strip.querySelector<HTMLElement>('[data-testid="all-day-' + p + '"]')!.getBoundingClientRect())
+      const hourLines = [...timeline.querySelectorAll<HTMLElement>(".pointer-events-none > div")].map(el => el.offsetTop)
+      return {
+        overflow: document.documentElement.scrollWidth > innerWidth + 1,
+        stripWidth: strip.getBoundingClientRect().width,
+        parts: parts.map(x => ({left:x.left,right:x.right,width:x.width})),
+        lines: hourLines
+      }
+    })
+    expect(dims.overflow).toBe(false)
+    expect(dims.parts[0].width).toBeGreaterThan(55)
+    expect(dims.parts[0].right).toBeLessThanOrEqual(dims.parts[1].left + 1)
+    expect(dims.parts[1].right).toBeLessThanOrEqual(dims.parts[2].left + 1)
+    expect(dims.lines[1] - dims.lines[0]).toBe(54)
+    await page.evaluate(() => {
+      const timeline = document.querySelector<HTMLElement>('[data-testid="timeline-grid"]')!
+      window.scrollTo({ top: timeline.getBoundingClientRect().top + scrollY - 140, behavior: "instant" })
+    })
+    await page.waitForTimeout(250)
+    await page.screenshot({ path: "test-results/screenshots/shared-calendar-v2-" + width + ".png", fullPage: false })
+    await context.close()
+  }
+})

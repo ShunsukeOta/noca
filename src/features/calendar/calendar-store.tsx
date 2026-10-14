@@ -13,7 +13,7 @@ export type EventDraft = {
   time?: string
   endTime?: string
   category: TaskCategory
-  by: "A" | "B"
+  by: "A" | "B" | "both"
   address?: string
   memo?: string
 }
@@ -29,7 +29,7 @@ function isCalendarEvent(value: unknown): value is CalendarEvent {
   const item = value as Partial<CalendarEvent>
   return typeof item.id === "string" && typeof item.title === "string" &&
     typeof item.date === "string" && isCalendarDate(item.date) &&
-    (item.by === "A" || item.by === "B") &&
+    (item.by === "A" || item.by === "B" || item.by === "both") &&
     categories.includes(item.category as TaskCategory) &&
     (item.time === undefined || (typeof item.time === "string" && timeFormat.test(item.time))) &&
     (item.endTime === undefined || (typeof item.endTime === "string" && timeFormat.test(item.endTime))) &&
@@ -43,14 +43,20 @@ function readEvents(): CalendarEvent[] {
     if (raw === null) return mockEvents
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.every(isCalendarEvent)) return mockEvents
-    // 初回だけ旧デモ版へ新しい2人用サンプルを追加。編集済みの予定や削除操作は上書きしない
-    if (localStorage.getItem("noca.calendar.samples.v2") !== "done" &&
-      parsed.some(event => ["e1", "e2", "e3", "e4"].includes(event.id))) {
-      const sampleIds = new Set(parsed.map(event => event.id))
-      const additional = mockEvents.filter(event => event.id.startsWith("demo-") && !sampleIds.has(event.id))
-      return [...parsed, ...additional]
-    }
-    return parsed
+    // One-time upgrades for calendars still containing bundled sample IDs.
+    // Merge v2 and v3 in the SAME initialization, without touching user items.
+    const hasSamples = parsed.some(event =>
+      ["e1", "e2", "e3", "e4"].includes(event.id) || event.id.startsWith("demo-"))
+    if (!hasSamples) return parsed
+    const ids = new Set(parsed.map(event => event.id))
+    const wantsV2 = localStorage.getItem("noca.calendar.samples.v2") !== "done"
+    const wantsV3 = localStorage.getItem("noca.calendar.samples.v3") !== "done"
+    const additional = mockEvents.filter(event => {
+      if (ids.has(event.id)) return false
+      if (event.id.startsWith("demo-v3-")) return wantsV3
+      return event.id.startsWith("demo-") && wantsV2
+    })
+    return [...parsed, ...additional]
   } catch {
     return mockEvents
   }
@@ -89,6 +95,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       // initialize state twice before effects run, so the initializer stays pure.
       if (events.some(event => event.id.startsWith("demo-"))) {
         localStorage.setItem("noca.calendar.samples.v2", "done")
+      }
+      if (events.some(event => event.id.startsWith("demo-v3-"))) {
+        localStorage.setItem("noca.calendar.samples.v3", "done")
       }
       setStorageError(false)
     } catch {

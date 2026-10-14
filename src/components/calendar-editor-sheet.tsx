@@ -18,7 +18,7 @@ export function CalendarEditorSheet() {
   const [time, setTime] = useState(original?.time ?? "09:00")
   const [endTime, setEndTime] = useState(original?.endTime ?? "")
   const [category, setCategory] = useState<TaskCategory>(original?.category ?? "その他")
-  const [by, setBy] = useState<"A" | "B">(original?.by ?? "A")
+  const [by, setBy] = useState<"A" | "B" | "both">(original?.by ?? "A")
   const [address, setAddress] = useState(original?.address ?? "")
   const [memo, setMemo] = useState(original?.memo ?? "")
   const [error, setError] = useState("")
@@ -89,16 +89,20 @@ export function CalendarEditorSheet() {
 
             <div className="mt-5">
               <p className="mb-2 text-[13px] font-semibold">誰の予定？</p>
-              <div role="group" aria-label="予定の担当" className="grid grid-cols-2 gap-2">
-                {(["A", "B"] as const).map(person => (
+              <div role="group" aria-label="予定の担当" className="grid grid-cols-3 gap-2">
+                {(["A", "B", "both"] as const).map(person => (
                   <button key={person} type="button" aria-pressed={by === person} onClick={() => setBy(person)}
                     className={cn("flex min-h-11 items-center justify-center gap-2 rounded-[12px] border px-3 text-[13px] font-semibold transition-colors",
                       by === person
-                        ? person === "A" ? "border-[#73a2a4] bg-[#e5f1ef] text-[#356d6a] dark:bg-[#244145] dark:text-[#a2d7d5]" : "border-[#d59677] bg-[#faeee8] text-[#9a6654] dark:bg-[#48332f] dark:text-[#f3cbb9]"
+                        ? person === "A"
+                          ? "border-[#73a2a4] bg-[#e5f1ef] text-[#356d6a] dark:bg-[#244145] dark:text-[#a2d7d5]"
+                          : person === "B"
+                            ? "border-[#d59677] bg-[#faeee8] text-[#9a6654] dark:bg-[#48332f] dark:text-[#f3cbb9]"
+                            : "border-[#9586c6] bg-[#ece8f8] text-[#63568d] dark:bg-[#383451] dark:text-[#d5caf6]"
                         : "border-border bg-card text-muted-foreground")}>
                     <span className={cn("flex size-6 items-center justify-center rounded-full text-[10px] font-bold",
-                      person === "A" ? "bg-[#d7e7ea] text-[#3e6470]" : "bg-[#f3dfda] text-[#90625a]")}>{person}</span>
-                    {person}の予定
+                      person === "A" ? "bg-[#d7e7ea] text-[#3e6470]" : person === "B" ? "bg-[#f3dfda] text-[#90625a]" : "bg-[#e7e2f4] text-[#70649c]")}>{person === "both" ? "2" : person}</span>
+                    {person === "both" ? "ふたり" : person}の予定
                   </button>
                 ))}
               </div>

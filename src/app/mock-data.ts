@@ -2,7 +2,7 @@ import { addDays, format } from "date-fns"
 
 export type TaskCategory = "暮らし" | "おでかけ" | "ふたり" | "その他"
 export type Task = { id: string; title: string; category: TaskCategory; dueDate?: string; memo?: string; url?: string; address?: string; done: boolean; by: "A" | "B" }
-export type CalendarEvent = { id: string; title: string; date: string; time?: string; endTime?: string; address?: string; memo?: string; category: TaskCategory; by: "A" | "B" }
+export type CalendarEvent = { id: string; title: string; date: string; time?: string; endTime?: string; address?: string; memo?: string; category: TaskCategory; by: "A" | "B" | "both" }
 export type SharedNote = { id: string; title: string; body: string; updated: string; pinned?: boolean }
 
 const today = new Date()
@@ -29,7 +29,12 @@ export const mockEvents: CalendarEvent[] = [
   { id: "demo-next-a", title: "買い物に行く", date: day(1), time: "09:30", endTime: "13:30", category: "暮らし", by: "A" },
   { id: "demo-next-b", title: "友だちとランチ", date: day(1), time: "11:15", endTime: "14:40", category: "おでかけ", by: "B" },
   { id: "demo-next-a-all", title: "在宅の日", date: day(1), category: "暮らし", by: "A" },
-  { id: "demo-next-b-all", title: "休暇", date: day(1), category: "ふたり", by: "B" }
+  { id: "demo-next-b-all", title: "休暇", date: day(1), category: "ふたり", by: "B" },
+  // 3分類と重なり表示を確認するためのサンプル
+  { id: "demo-v3-a-meeting", title: "打ち合わせ", date: day(0), time: "11:00", endTime: "12:00", category: "暮らし", by: "A" },
+  { id: "demo-v3-both-all", title: "記念日", date: day(0), category: "ふたり", by: "both" },
+  { id: "demo-v3-both-timed", title: "ふたりで買い物", date: day(0), time: "15:00", endTime: "16:30", category: "ふたり", by: "both" },
+  { id: "demo-v3-next-both", title: "夜の散歩", date: day(1), time: "19:00", endTime: "20:00", category: "ふたり", by: "both" }
 ]
 
 export const mockNotes: SharedNote[] = [
