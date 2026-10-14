@@ -23,7 +23,7 @@
 | --- | --- | --- | --- |
 | **0** | README・仕様・ロードマップ・UIテスト計画 | なし | READMEと4つのdocs文書が整備され、Phase 1の合格基準が明確 |
 | **1A** | Vite/React/TypeScript/shadcn/ui/Tailwind、画面枠、3タブ | 0 | 実装済み・ビルドとChromium自動テスト合格（実機確認は1E） |
-| **1B** | TODO UIとローカルCRUD | 1A | 実装済み・CI検証対象。実機Safari確認は1E |
+| **1B** | TODO UIとローカルCRUD | 1A | 実装済み・ビルドと7つのChromiumテスト合格（Safari実機は1E） |
 | **1C** | カレンダー UIとダミー操作 | 1B | 月移動、日付選択、予定/期限TODO表示、予定編集 |
 | **1D** | メモ UIとダミー操作 | 1C | 一覧・検索・作成・編集・空状態が操作できる |
 | **1E** | iPhone実機・Safari/PWA表示確認、UI最終調整 | 1D | UI_QAの必須ケース合格、デザイン承認、Phase 1完了 |

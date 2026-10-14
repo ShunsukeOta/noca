@@ -5,7 +5,7 @@
 noca は、2人で使うことを前提とした **iPhone向け共有PWA** です。TODO・カレンダー・メモを、直感的な3タブにまとめます。
 
 > [!IMPORTANT]
-> 現在は **Phase 1B: TODOのローカルCRUD実装**。アプリの3画面とダミーUIを追加しました。Firebase・デプロイはまだ実装していません。
+> 現在は **Phase 1B: TODOのローカルCRUD実装**。TODOの追加・編集・完了・削除・Undoと端末内仮保存に対応しました。Firebaseと2人同期は未実装です。
 > 次はPhase 1Bの動作確認後、**Phase 1C: カレンダー予定CRUD UI**へ進みます。iPhone実機のSafari / standalone表示検証はPhase 1Eで行います。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
 
 ## コンセプト
@@ -46,7 +46,7 @@ noca は、2人で使うことを前提とした **iPhone向け共有PWA** で�
 | --- | --- | --- |
 | 0 | 仕様・計画・受け入れ基準の文書化 | 完了（ドキュメント整備） |
 | 1A | 初期構築・デザイントークン・下部タブ | 実装済み・Chromium自動テスト合格 |
-| 1B | TODO画面UI | 未着手 |
+| 1B | TODO画面UI・端末内CRUD | 実装済み・CI全7テスト合格 |
 | 1C | カレンダー画面UI | 未着手 |
 | 1D | メモ画面UI | 未着手 |
 | 1E | iPhone表示テストとUI確定 | 未着手 |

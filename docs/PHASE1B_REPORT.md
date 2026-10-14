@@ -35,6 +35,17 @@
 - 375/390/430pxの横スクロール確認は従来どおり実行。
 - iPhone実機 Safari / ホーム画面 PWA は Phase 1E で確認。
 
+## 自動テスト結果
+
+- [GitHub Actions実行](https://github.com/ShunsukeOta/noca/actions/runs/38507111184)
+- TypeScript / Vite build: **PASS**
+- Playwright Chromium: **7 tests passed**
+- 375 / 390 / 430pxで画面遷移・横はみ出し確認: **PASS**
+- 新規追加 → リロード後も保持 → 編集 → 削除 → Undo: **PASS**
+- 期限付きTODOのカレンダー表示・完了後の非表示: **PASS**
+- テーマ切替、完了操作、メモ検索: **PASS**
+- iPhone Safari・ホーム画面PWA実機: **未確認（Phase 1E）**
+
 ## 次のフェーズ
 
 Phase 1Cはカレンダーの予定CRUD（日付・時間・月移動・追加編集UI）を主対象とする。Phase 1Bで追加したTODOと予定の同居表示を引き続き活用する。
