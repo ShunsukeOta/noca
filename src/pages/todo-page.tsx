@@ -15,6 +15,12 @@ const categoryColor: Record<TaskCategory, string> = {
   "ふたり": "bg-[#ece9f7] text-[#756b9c] dark:bg-[#3b3655] dark:text-[#d6cafa]",
   "その他": "bg-secondary text-secondary-foreground"
 }
+const categorySelectedRing: Record<TaskCategory, string> = {
+  "暮らし": "ring-[#52785d]/75 dark:ring-[#add6b3]/75",
+  "おでかけ": "ring-[#956e5b]/75 dark:ring-[#f0c5ac]/75",
+  "ふたり": "ring-[#756b9c]/75 dark:ring-[#d6cafa]/75",
+  "その他": "ring-primary/75"
+}
 
 export function TodoPage() {
   const [filter, setFilter] = useState<Filter>("すべて")
@@ -54,9 +60,21 @@ export function TodoPage() {
         <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="TODOの絞り込み">
           {filters.map((item) => (
             <button key={item} type="button" onClick={() => setFilter(item)} aria-pressed={filter === item}
-              className={cn("relative h-11 shrink-0 overflow-hidden rounded-full border px-5 text-[13px] font-semibold", filter === item ? "border-primary text-primary-foreground" : "border-border bg-card text-muted-foreground")}>
-              {filter === item && <motion.span layoutId="filter-indicator" aria-hidden="true" className="absolute inset-0 rounded-full bg-primary"
-                transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 440, damping: 38 }} />}
+              className={cn(
+                "relative h-11 shrink-0 overflow-hidden rounded-full border px-5 text-[13px] font-semibold transition-colors",
+                item === "すべて"
+                  ? (filter === item ? "border-primary text-primary-foreground" : "border-border bg-card text-muted-foreground")
+                  : cn("border-transparent", categoryColor[item]),
+                filter === item && "font-bold"
+              )}>
+              {filter === item && (
+                <motion.span layoutId="filter-indicator" aria-hidden="true"
+                  className={cn(
+                    "pointer-events-none absolute inset-0 rounded-full",
+                    item === "すべて" ? "bg-primary" : cn("ring-2 ring-inset", categorySelectedRing[item])
+                  )}
+                  transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 440, damping: 38 }} />
+              )}
               <span className="relative z-10">{item}</span>
             </button>
           ))}

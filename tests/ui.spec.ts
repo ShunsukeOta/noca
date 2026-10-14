@@ -456,3 +456,46 @@ test("TODO chips filter by category, keep completed tasks, and include newly cre
   await chips.getByRole("button", { name: "その他" }).click()
   await expect(page.getByRole("button", { name: "カテゴリ別のテストを編集" })).toBeVisible()
 })
+
+
+test("category filter chips match task category tag colors in light and dark modes", async ({ page }) => {
+  for (const theme of ["light", "dark"]) {
+    await page.goto("/todo")
+    if (theme === "dark") {
+      await page.getByRole("link", { name: "設定を開く" }).click()
+      await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click()
+      await page.getByRole("button", { name: "前の画面に戻る" }).click()
+      await expect(page.locator("html")).toHaveClass(/dark/)
+    }
+    const chips = page.getByRole("group", { name: "TODOの絞り込み" })
+    const samples = [
+      { category: "おでかけ", task: "週末のカフェを探す" },
+      { category: "暮らし", task: "洗剤と柔軟剤を買う" },
+      { category: "ふたり", task: "旅行の宿泊先を決める" }
+    ]
+    for (const { category, task } of samples) {
+      const chip = chips.getByRole("button", { name: category, exact: true })
+      await chip.click()
+      await expect(chip).toHaveAttribute("aria-pressed", "true")
+      const badge = page.getByRole("button", { name: task + "を編集" }).getByText(category, { exact: true })
+      await expect(badge).toBeVisible()
+      const chipColor = await chip.evaluate(node => ({
+        bg: getComputedStyle(node).backgroundColor,
+        text: getComputedStyle(node).color
+      }))
+      const badgeColor = await badge.evaluate(node => ({
+        bg: getComputedStyle(node).backgroundColor,
+        text: getComputedStyle(node).color
+      }))
+      expect(chipColor).toEqual(badgeColor)
+      await expect(chip.locator('[class*="ring-2"]')).toHaveCount(1)
+    }
+    const other = chips.getByRole("button", { name: "その他", exact: true })
+    await other.click()
+    await expect(other).toHaveAttribute("aria-pressed", "true")
+    await expect(other).toHaveClass(/bg-secondary/)
+    await expect(other.locator('[class*="ring-2"]')).toHaveCount(1)
+    await chips.getByRole("button", { name: "すべて", exact: true }).click()
+    await expect(chips.getByRole("button", { name: "すべて", exact: true })).toHaveAttribute("aria-pressed", "true")
+  }
+})
