@@ -335,3 +335,51 @@ test("calendar drawer stays within mobile width with time and details expanded",
     await context.close()
   }
 })
+
+
+test("header stays fixed at the top while scrolling across all tabs and settings", async ({ browser }) => {
+  for (const width of [320, 390, 430]) {
+    const context = await browser.newContext({
+      viewport: { width, height: 760 },
+      isMobile: true, hasTouch: true, deviceScaleFactor: 2
+    })
+    const page = await context.newPage()
+    for (const route of ["/todo", "/calendar", "/memo", "/settings"]) {
+      await page.goto(route)
+      const header = page.getByTestId("app-header")
+      await expect(header).toBeVisible()
+      await page.evaluate(() => {
+        const spacer = document.createElement("div")
+        spacer.setAttribute("data-test-scroll-spacer", "")
+        spacer.style.height = "1400px"
+        document.querySelector("main")!.appendChild(spacer)
+        window.scrollTo(0, 1200)
+      })
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
+      const top = await header.evaluate(element => element.getBoundingClientRect().top)
+      expect(top).toBeGreaterThanOrEqual(-1)
+      expect(top).toBeLessThanOrEqual(1)
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+      expect(overflow).toBe(false)
+      await expect(page.getByRole("link", { name: "設定を開く" })).toBeVisible()
+      if (route === "/todo") {
+        await page.getByRole("link", { name: "設定を開く" }).click()
+        await expect(page.getByTestId("settings-page")).toBeVisible()
+      }
+    }
+    await context.close()
+  }
+})
+
+test("drawer overlays the sticky header without blocking the close control", async ({ page }) => {
+  await page.goto("/todo")
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await expect(page.getByRole("dialog")).toBeVisible()
+  const stacking = await page.evaluate(() => ({
+    header: Number(getComputedStyle(document.querySelector('[data-testid="app-header"]')!).zIndex),
+    dialog: Number(getComputedStyle(document.querySelector('[role="dialog"]')!).zIndex)
+  }))
+  expect(stacking.dialog).toBeGreaterThan(stacking.header)
+  await page.getByRole("button", { name: "閉じる" }).click()
+  await expect(page.getByRole("dialog")).toBeHidden()
+})

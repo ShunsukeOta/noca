@@ -41,7 +41,7 @@ export function AppShell() {
 
   return (
     <div className="app-shell relative">
-      <header className="app-header relative px-5 pb-3">
+      <header data-testid="app-header" className="app-header sticky top-0 z-40 border-b border-border/65 bg-background/95 px-5 pb-3 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex min-w-0 items-baseline gap-2">

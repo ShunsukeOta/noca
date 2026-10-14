@@ -92,7 +92,13 @@ a { -webkit-touch-callout: none; }
 ::selection { background: #b9cce8; color: #1c2e45; }
 
 .app-shell { min-height: 100svh; max-width: 540px; margin: 0 auto; background: var(--background); }
-.app-header { padding-top: max(env(safe-area-inset-top), 12px); }
+/* Keep the header in the document flow and stick it to the visible top.
+   Includes the notch/safe area so the status bar never sits on the content. */
+.app-header {
+  padding-top: max(env(safe-area-inset-top), 12px);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
 .app-content { padding-bottom: calc(116px + env(safe-area-inset-bottom)); }
 .bottom-nav { padding-bottom: max(env(safe-area-inset-bottom), 8px); }
 .fab { bottom: calc(84px + env(safe-area-inset-bottom)); }
