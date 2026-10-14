@@ -223,4 +223,4 @@ shadcn/uiのCSS変数を単一のテーマ定義で管理。局所的なHEX直�
 - 最終カラー、フォントサイズ、角丸、タブ高などを本書へ反映
 
 ---
-実装開始時にはこの文書を元にCSS変数の実値を作り、画面テスト後に確定する。
+現行のCSS変数は `src/styles/globals.css`、アニメーションは `src/styles/animations.css` に実装済み。iPhone Safari/ホーム画面PWA実機の最終確認はPhase 1Eで行う。

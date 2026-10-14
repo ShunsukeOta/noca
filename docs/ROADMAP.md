@@ -2,7 +2,8 @@
 
 - Version: 0.1
 - Updated: 2026-10-14
-- Current: **Phase 1C (カレンダーCRUD実装)** / Next: **Phase 1D (メモUI)**
+- Current: **Phase 1C実装・改修済み（ローカルCRUD / A・B・ふたりのタイムライン）** / Next: **Phase 1D（メモのローカルCRUD）**
+- Latest overall verification: [GitHub Actions #38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) — **build PASS / Chromium 43 tests PASS**（2026-10-14、ドキュメント更新前）。実機Safariは未検証
 - Product spec: [SPECIFICATION.md](SPECIFICATION.md)
 - UI tokens: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 - UI verification: [UI_QA.md](UI_QA.md)
@@ -10,11 +11,11 @@
 ## 基本原則
 
 - フェーズを跨いだ先行実装を避ける。各フェーズの **DoD (Definition of Done)** を満たし、確認後に次へ進む。
-- **Phase 1A–1Eはダミーデータのみ。Firebase接続、認証・共有・オフライン同期は行わない。**
+- **Phase 1A–1EではFirebase・認証・2人間の共有同期を実装しない。** TODO/予定はデモ起点の`localStorage` CRUDが実装済み、メモは閲覧/検索のみ。データの自動共有はできない。
 - フェーズ1で固定するのは画面の情報設計・外観・タップ操作。公開後のデータモデルまでは凍結しない。
 - 旧realtime-todosのコード・DB・公開環境を変更しない。
 - 作業は原則ブランチ/PRごとに小さく分割。画面キャプチャとテスト結果を残してレビュー可能にする。
-- ライブラリは安定版を選び、package-lock.json等で再現性を担保する。
+- 現時点で`package-lock.json`はコミットされておらず、CIは`npm install`を使用している。ロックファイル導入は別途検証して再現性を高める。
 - 不明点は暫定判断と明記し、理由・確定日を文書に残す。
 
 ## 全体ロードマップ
@@ -23,9 +24,9 @@
 | --- | --- | --- | --- |
 | **0** | README・仕様・ロードマップ・UIテスト計画 | なし | READMEと4つのdocs文書が整備され、Phase 1の合格基準が明確 |
 | **1A** | Vite/React/TypeScript/shadcn/ui/Tailwind、画面枠、3タブ | 0 | 実装済み・ビルドとChromium自動テスト合格（実機確認は1E） |
-| **1B** | TODO UIとローカルCRUD | 1A | 実装済み・ビルドと7つのChromiumテスト合格（Safari実機は1E） |
-| **1C** | カレンダーUIと端末内CRUD | 1B | 実装済み・本番ビルドとChromium自動テスト19/19合格。Safari/PWA実機は1E |
-| **1D** | メモ UIとダミー操作 | 1C | 一覧・検索・作成・編集・空状態が操作できる |
+| **1B** | TODO UIとローカルCRUD | 1A | **実装済み**（最新の全体CIでは43テスト合格、Safari実機は1E） |
+| **1C** | カレンダーCRUD・A/B/ふたりの時間比較UI | 1B | **実装済み**（最新の全体CIでは43テスト合格、Safari/PWA実機は1E） |
+| **1D** | メモのローカルCRUD | 1C | **次の作業**。既存の検索・閲覧を維持して作成/編集/削除・ローカル保存・空状態・長文を実装しテストを追加 |
 | **1E** | iPhone実機・Safari/PWA表示確認、UI最終調整 | 1D | UI_QAの必須ケース合格、デザイン承認、Phase 1完了 |
 | **2** | Firebase Auth・workspace・メンバーシップ・招待 | 1E | 2アカウントの招待/参加/権限制限が正常 |
 | **3** | FirestoreのCRUD・共有同期・競合対策 | 2 | TODO/予定/メモが2端末で安全に同期される |
@@ -94,9 +95,9 @@
 
 ### スコープ
 
-- 月グリッド・今日/選択日・月移動
-- 日別アジェンダ（予定と期限TODOを区別して表示）
-- 予定の作成・編集・削除・Undo、localStorageへの仮保存
+- 月グリッド・今日/選択日・月移動（下部タイムラインのA/B列は2列のみ）
+- 選択日のA/B別タイムライン、A+B全幅の共有予定、終日チップ、期限TODOの別一覧
+- 予定の作成・編集・削除・Undo、localStorageへの仮保存。担当A/B/ふたり（`both`）と時間重複の重ね表示に対応
 - 終日／開始・終了時間、カテゴリ・場所・メモの編集
 - iPhone向け共通ボトムシートと月移動アニメーション
 
@@ -115,12 +116,12 @@
 
 - メモ一覧/検索
 - 新規作成、本文編集、閉じる/戻る
-- 保存中/保存済みのダミー状態表現（バックエンド保存はしない）
+- 端末内localStorageへの保存・削除/Undo・保存失敗の扱い。Firebase等のバックエンド保存はしない
 - 空状態、長文、改行、iOSキーボード動作
 
 ### DoD
 
-- [ ] タイトル・本文の編集UIが完成
+- [ ] タイトル・本文を追加/編集/削除でき、再読み込み後も端末内保存が維持される
 - [ ] 長文を入力してもカーソル位置・スクロールが安定
 - [ ] 検索、空状態、保存フィードバックの表示が成立
 - [ ] 将来リアルタイム同期を追加しやすいUIの境界を確保
@@ -170,7 +171,7 @@
 - Service Workerのアップデート/キャッシュ戦略
 - オフライン読書き・再接続後の同期検証
 - 通知は「必要性を再確認→採用する場合に実装」、許可取得と端末差異を検証
-- Firebase Hosting + HTTPS
+- HTTPSの本番公開先を判断（現行プレビューはVercel。Firebase Hostingは候補で未確定）
 
 **DoD:** ホーム画面起動、更新、オンライン/オフラインが実用レベルで安定する。
 

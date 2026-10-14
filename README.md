@@ -2,116 +2,179 @@
 
 **ふたりの「やること・予定・メモ」を、ひとつの場所に。**
 
-noca は、2人で使うことを前提とした **iPhone向け共有PWA** です。TODO・カレンダー・メモを、直感的な3タブにまとめます。
+noca は、2人で使うことを目指す **iPhoneファーストの日本語PWA** です。メイン画面は **TODO / カレンダー / メモ** の3つ。スマホの片手操作・落ち着いたデザイン・必要十分な情報密度を重視しています。
+
+**プレビュー:** https://noca-delta.vercel.app  
+**ソース:** https://github.com/ShunsukeOta/noca  
+**開発状況:** 2026-10-14 時点、**Phase 1Cのローカル機能とUI改善まで実装**／次は **Phase 1D：メモCRUD**。
 
 > [!IMPORTANT]
-> 現在は **Phase 1C: カレンダーのローカルCRUD実装**。TODOに加え、予定の追加・編集・削除・Undoと端末内仮保存に対応しました。Firebaseと2人同期は未実装です。
-> 次はカレンダーの実機操作確認後、**Phase 1D: メモ編集UI**へ進みます。iPhone実機のSafari / standalone表示検証はPhase 1Eで行います。旧リポジトリ `realtime-todos` のコード・DBは変更しません。
+> **これは「2人で共有できる完成版」ではありません。** 現在は同一ブラウザの `localStorage` を使うUIプレビューです。TODOと予定は追加・編集・削除できますが、ログイン、招待、実際の2端末間同期、Firebase、通知は未実装。メモは検索・閲覧のみで、新規追加ボタンは**保存しないプレビュー**です。ブラウザの保存データを消すとTODO/予定も消えます。
 
-## コンセプト
+## Codex / AIエージェントへの引き継ぎ
 
-- **シンプル:** タスクを登録・完了する操作を最短にし、設定や入力項目を増やさない
-- **ふたりで共有:** 初回ペアリング後は、TODO・予定・メモが自動的に同期される
-- **iPhoneファースト:** Safari / ホーム画面に追加したPWAでの操作感を最優先する
-- **3画面だけ:** 下部タブ「TODO」「カレンダー」「メモ」。設定は別途小さな導線にまとめる
-- **使える品質:** オフライン復帰、誤操作からの復元、読みやすさ・アクセシビリティも重視する
+**まず [AGENTS.md](AGENTS.md) を読んでください。** 続いて [最新引き継ぎメモ](docs/CODEX_HANDOFF.md)、[コード構成と保存仕様](docs/ARCHITECTURE.md)、[デザインシステム](docs/DESIGN_SYSTEM.md) を確認してください。
 
-## 予定している技術スタック
+- `AGENTS.md`：変更時の必須ルール、作業手順、テストと禁則
+- `docs/CODEX_HANDOFF.md`：**現在地・検証済み範囲・次の実装・既知の注意点**
+- `docs/ARCHITECTURE.md`：画面とProviderの関係、各実装ファイル、データ契約、localStorage、PWA/CI
+- `docs/DESIGN_SYSTEM.md`：**ユーザーが決めた見た目とUI設計**。独断で変更しない
 
-| 用途 | 技術 |
-| --- | --- |
-| UI / 言語 | React + TypeScript + Vite |
-| デザイン | shadcn/ui + Tailwind CSS v4 |
-| アイコン / アニメーション | Lucide React + Motion |
-| ルーティング / 日付 | React Router + date-fns |
-| 認証 / 共有 / DB | Firebase Authentication + Cloud Firestore |
-| PWA | vite-plugin-pwa |
-| プレビュー公開 | Vercel（ユーザー設定済み） |
-| 将来の本番公開先 | Firebase Hosting等（未確定） |
+これらは**現行実装から確認して更新した資料**です。`docs/PHASE1*_REPORT.md` は過去のチェックポイントの記録なので、最新仕様と混同しないでください。
 
-※ フェーズ1は**ダミーデータのみ**。Firebase・認証・招待・同期はフェーズ2以降に導入します。ライブラリのバージョンは実装開始時に安定版を検証して固定します。
+## 現在できること
 
-## 設定画面
-
-共通ヘッダー右端の歯車アイコンから `/settings` を開けます。設定は下部タブに追加しません。テーマ（ライト／ダーク）の切替は設定画面に一本化しています。共有・招待・通知・クラウド同期は後続フェーズまで「準備中」です。
-
-## iPhoneでの入力シート
-
-TODOの作成・編集は丸いボトムシートを使用します。シートを開くだけではソフトウェアキーボードを起動せず、タイトル欄等をタップしたときだけ入力を開始します。キーボード表示中は `visualViewport` に応じてシートをキーボード上へ配置し、ヘッダーを縮め、内容をスクロール可能にして保存ボタンを表示します。実機iPhone Safari／ホーム画面PWAでの最終確認はPhase 1Eで行います。
-
-## アプリの3画面
-
-| 画面 | 概要 |
-| --- | --- |
-| TODO | 一覧、クイック追加、完了、タグ、期限、編集シート |
-| カレンダー | 月表示、日付選択、予定の追加・編集・削除・Undo、期限付きTODO表示、端末内仮保存 |
-| メモ | 共有メモ一覧、検索、作成・編集、ピン留め（後続フェーズ） |
-
-**予定とTODOは別データ**です。予定日が設定されたTODOはカレンダーにも「参照表示」しますが、同じデータを二重に保存しません。
-
-## フェーズ
-
-| フェーズ | 目的 | 状態 |
+| 画面・機能 | 現状 | 主な操作・特徴 |
 | --- | --- | --- |
-| 0 | 仕様・計画・受け入れ基準の文書化 | 完了（ドキュメント整備） |
-| 1A | 初期構築・デザイントークン・下部タブ | 実装済み・Chromium自動テスト合格 |
-| 1B | TODO画面UI・端末内CRUD | 実装済み・CI全7テスト合格 |
-| 1C | カレンダー画面・端末内CRUD | 実装済み・CI全19テスト合格 |
-| 1D | メモ画面UI | 未着手 |
-| 1E | iPhone表示テストとUI確定 | 未着手 |
-| 2 | Firebase認証・2人の共有スペース・招待 | 未着手 |
-| 3 | 共有CRUD・リアルタイム同期・競合対策 | 未着手 |
-| 4 | PWA最適化・オフライン検証・通知検討 | 未着手 |
-| 5 | 本番検証・リリース | 未着手 |
+| **TODO** | **動作**・端末内に保存 | 作成・編集・完了/解除・削除/Undo。カテゴリ別の角丸四角チップに未完了件数を2段表示。期限・任意メモ等 |
+| **カレンダー** | **動作**・端末内に保存 | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了・担当A/B/ふたり、期限付きTODOの参照 |
+| **2人用日別タイムライン** | **動作するUIプレビュー** | A/Bの2列と時間軸、A+B全幅の共有予定、共有の終日予定を2列幅で表示。重なる予定は長いものの上に短いものを重ね、ラベルの可読性を維持 |
+| **メモ** | **表示・検索のみ** | サンプル一覧・検索・読み取り専用の詳細。**追加/編集/削除/保存は未実装** |
+| **設定** | テーマ切替のみ動作 | ライト／ダーク、端末内保存。共有・招待・通知・クラウド同期は「準備中」 |
+| **PWA** | 基本構成あり | manifest / service workerの自動更新設定。iPhone Safari・ホーム画面standalone実機QAやオフライン同期は未完了 |
 
-詳細: [フェーズ別開発計画](docs/ROADMAP.md)
+### UIで守るべき重要な決定
 
-## ドキュメント
+- **上部：** スクロールしても残る固定ヘッダー。nocaロゴの隣に**今日の日付**、右にA/B仮アバターと設定アイコン。
+- **下部：** 左の白いフローティングボックスに **TODO / カレンダー / メモ**。**16px離れた右側に独立した濃色の＋ボタン**。3タブを囲む白い枠には＋を入れません。
+- **TODO：** 最初にカテゴリ別の2段ボタン（すべて・おでかけ・暮らし・ふたり・その他）。カテゴリタグと同じ色。大きな「残りのタスク」ボックスと「これからすること ○件」の見出しはありません。
+- **カレンダー：** 月間グリッドの下に透明背景の**A/B 2列タイムライン**。終日でも**第3列「ふたりの予定」は置かない**。共有予定は終日・時刻付きともA+Bの2列にまたがる横長表示。1時間=54px、短い予定の最小表示高さ36px。時間重複時は短い予定を前面に置き、長い予定の文字が隠れない位置を選びます。
+- **入力：** 角丸のボトムシート。iPhoneでキーボードが出たら `visualViewport` に応じて移動し、保存ボタンを見失わない設計。開いた直後の自動フォーカスはしません。
+- **動き：** Motionによる自然なアニメーション。`prefers-reduced-motion` を尊重。ライト・ダーク両テーマ対応。
 
-- [製品・機能・データ設計仕様書](docs/SPECIFICATION.md)
-- [フェーズ別開発計画と完了条件](docs/ROADMAP.md)
-- [UIデザインシステム](docs/DESIGN_SYSTEM.md)
-- [iPhone表示・操作テスト計画](docs/UI_QA.md)
+A・B・`both` は**デモ用の予定所有者ラベル**です。現段階では本人認証・閲覧権限・共有相手との同期を意味しません。
 
-## 開発方針
+## 技術スタック
 
-1. **仕様 → ダミーUI → 実機確認 → デザイン承認 → データ接続** の順で進める。
-2. Phase 1 ではFirebaseに接続せず、表示と操作に集中する。
-3. 画面を増やさない。メイン導線は3タブ、編集は下部シートを基本とする。
-4. デスクトップ向けUIは今回の対象外。スマホ幅で崩れないことを優先する。
-5. 変更は小さなPR単位に分割し、各フェーズの受け入れ条件を確認する。
-6. 秘密情報をコミットしない。環境変数は `.env.example` にキー名だけ掲載する。
+| 分野 | 実装 |
+| --- | --- |
+| Web | React 19 / TypeScript 5 / Vite 7 |
+| UI | Tailwind CSS v4、Radix/shadcnスタイルのローカルコンポーネント |
+| ルーティング | React Router 7 |
+| アイコン / モーション | Lucide React / Motion |
+| 日付 | date-fns |
+| 状態・保存 | React Context + `localStorage`（TODO / 予定） |
+| PWA | vite-plugin-pwa（manifest と service worker） |
+| 自動テスト | Playwright + Chromium |
+| CI / プレビュー | GitHub Actions / Vercel |
 
-## ローカル起動（Phase 1A）
+**未導入:** Firebase Authentication、Firestore、実運用の共有スペース、プッシュ通知。将来の技術方針は [仕様書](docs/SPECIFICATION.md) にありますが、未実装のものと混同しないでください。
 
-Node.js 22以上を推奨します。
+## 開発環境と起動
 
-~~~bash
+**Node.js 22** 推奨（GitHub Actionsと同じ）。npmを使用します。
+
+```bash
+git clone https://github.com/ShunsukeOta/noca.git
+cd noca
 npm install
 npm run dev
-~~~
+```
 
-画面表示を確認したら次を実行できます。
+Viteの開発サーバーが起動します（通常は `http://localhost:5173`）。初期表示は `/todo` です。
 
-~~~bash
-npm run build
-npx playwright install chromium
-npm run test:e2e
-~~~
+### よく使うコマンド
 
-初期表示は `/todo`。下部タブで `/calendar`、`/memo` に切り替わります。TODOでは右下の＋ボタンから追加・編集・削除できます。TODOは**この端末のlocalStorageに仮保存**されます（2人同期・Firebase保存はまだありません）。カレンダーも右下の＋から予定を追加・編集・削除でき、端末内のlocalStorageに仮保存されます。メモの＋は引き続き表示デモです。
+| コマンド | 用途 |
+| --- | --- |
+| `npm run dev` | Vite開発サーバー（LANからもアクセス可能なhost指定あり） |
+| `npm run typecheck` | TypeScriptプロジェクトの型チェック |
+| `npm run build` | 型チェック + Vite本番ビルド |
+| `npm run preview` | ビルドのローカルプレビュー |
+| `npx playwright install chromium` | Playwright用ブラウザを準備 |
+| `npm run test:e2e` | Playwrightのブラウザテスト |
 
-shadcn/uiの **Radix版** を採用し、ソースを `src/components/ui` に配置しています。カラー・角丸等は `src/styles/globals.css` で共通管理します。詳細: [Phase 1A 実装・検証記録](docs/PHASE1A_REPORT.md)、[Phase 1B TODO実装](docs/PHASE1B_REPORT.md)、[Phase 1C カレンダー実装](docs/PHASE1C_REPORT.md)。
+CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → `npm run build` → `npx playwright install --with-deps chromium` → `npm run test:e2e` を実行します。テストのスクリーンショットと診断情報は GitHub Actions アーティファクト `noca-ui-mobile-preview` に保存されます。
 
-実機確認はiPhoneの **Safari表示** と **ホーム画面追加後のstandalone表示** の両方を対象とします。CIのChromiumモバイル検証だけではiOS実機合格とはしません。
+> **依存関係の注意:** 現時点で `package-lock.json` は**コミットされていません**。そのため `npm ci` 前提ではなく `npm install` を使っています。再現可能なインストールに向けたロックファイル導入は、別途変更・検証してください。
 
-## 範囲外（初期リリース）
+### テスト状況
 
-独自チャット、AI、習慣トラッカー、分析ダッシュボード、複数ワークスペース切替、Android / ネイティブアプリ、デスクトップ専用レイアウト。
+このREADME更新前の最新成功ランは [GitHub Actions #38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) で、**ビルド成功・Playwright Chromium 43件すべて成功**です。変更後は必ず新しいCIランを確認してください。
 
-## 既存アプリとの関係
+320 / 375 / 390 / 430pxのモバイル幅や一部のreduced-motion、ダークモードのテストを含みます。**Chromiumのモバイルエミュレーション ≠ iPhone Safari実機/standaloneの合格**です。実機確認は [UIテスト計画](docs/UI_QA.md) に沿って別途行います。
 
-旧 [realtime-todos](https://github.com/ShunsukeOta/realtime-todos) は参照用です。データの引き継ぎが必要になれば、事前バックアップと移行方針の承認を経て後続フェーズで実施します。
+## リポジトリ構成
+
+```text
+.
+├── AGENTS.md                          # Codexに最初に読ませる指示
+├── README.md                          # プロジェクトの入口（このファイル）
+├── docs/
+│   ├── CODEX_HANDOFF.md               # 最新の引き継ぎ・次の作業
+│   ├── ARCHITECTURE.md                # 実装・保存・コード地図
+│   ├── DESIGN_SYSTEM.md               # UI設計の決定事項
+│   ├── ROADMAP.md                     # フェーズ計画
+│   ├── SPECIFICATION.md               # 製品全体の構想（将来の項目含む）
+│   ├── UI_QA.md                        # 実機検証計画
+│   └── PHASE1{A,B,C}_REPORT.md        # 各フェーズ当時の記録
+├── src/
+│   ├── App.tsx                         # ルーティング/Provider
+│   ├── app/mock-data.ts               # ドメイン型とデモデータ
+│   ├── features/
+│   │   ├── todos/todo-store.tsx       # TODO CRUD
+│   │   └── calendar/calendar-store.tsx # 予定 CRUD
+│   ├── components/
+│   │   ├── app-shell.tsx              # ヘッダー、Dock、設定、編集シート
+│   │   ├── calendar-day-timeline.tsx  # 2人用タイムライン/重なり計算
+│   │   ├── todo-editor-sheet.tsx
+│   │   ├── calendar-editor-sheet.tsx
+│   │   ├── preview-create-sheet.tsx   # メモ追加の非保存プレビュー
+│   │   └── ui/                        # Button, Sheetなど
+│   ├── pages/                         # TODO, Calendar, Memo, Settings
+│   └── styles/                        # CSS変数、テーマ、アニメーション
+├── tests/ui.spec.ts                   # Playwright E2E
+├── .github/workflows/ui-check.yml    # CI
+├── vite.config.ts                     # PWA設定/alias
+└── vercel.json                        # SPAのルーティングfallback
+```
+
+実装箇所やデータフローの詳細は [ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照。
+
+## 端末内保存の仕様・リスク
+
+| 保存先 | 内容 |
+| --- | --- |
+| `noca.todos.v1` | TODO配列 |
+| `noca.calendar.events.v1` | 予定配列（A/B/ふたり） |
+| `noca.calendar.samples.v2` / `.v3` | 旧デモ予定からの一度きりのサンプル追加フラグ |
+| `noca.theme` | ライト/ダーク |
+
+新規端末にはサンプル予定/TODOが表示されます。以前からサンプルが残る端末にはカレンダーの追加デモを一度だけ取り込む処理があります。**有効な保存済みの空配列は空のまま**です。
+
+現在のブラウザでのみデータが保存されます。スマホとPC、異なるブラウザや別オリジン間での同期・データ共有はありません。テストや変更時にローカル保存データを破壊しないでください。
+
+## 開発フェーズ
+
+| Phase | 目的 | 状態 |
+| --- | --- | --- |
+| 0 | コンセプト・仕様・計画 | 完了 |
+| 1A | UIシェル、テーマ、ナビゲーション | **実装済み**（実機未確認） |
+| 1B | TODO CRUD とUI改善 | **実装済み**（実機未確認） |
+| 1C | カレンダー CRUD、A/B/ふたりのタイムラインと各種改修 | **実装済み**（実機未確認） |
+| **1D** | **メモの本当の作成・編集・保存・削除** | **次の開発予定** |
+| 1E | iPhone Safari / Home Screen PWAでの実機レビュー | 未完了 |
+| 2 | Googleログイン、2人の共有スペース・招待 | 未実装 |
+| 3 | Firestoreによる共有CRUD・同期・競合対策 | 未実装 |
+| 4 | PWAオフライン挙動・通知など | 未完了 |
+| 5 | 本番QA・リリース | 未完了 |
+
+**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) を必ず参照**し、Phase 1Dの範囲と既存のUI決定事項を守ってください。
+
+## ドキュメント一覧
+
+- [AGENTS.md](AGENTS.md) — エージェント向けの必須指示
+- [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) — **いま何をすればよいか**
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — **どこを変更すればよいか**
+- [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — デザイン・画面構成
+- [SPECIFICATION.md](docs/SPECIFICATION.md) — 製品要件と将来の構想
+- [ROADMAP.md](docs/ROADMAP.md) — フェーズ・受け入れ条件
+- [UI_QA.md](docs/UI_QA.md) — Chromium/実機確認項目
+- [Phase 1A](docs/PHASE1A_REPORT.md) / [Phase 1B](docs/PHASE1B_REPORT.md) / [Phase 1C](docs/PHASE1C_REPORT.md) — **当時の**検証記録
+
+## 範囲と既存リポジトリ
+
+旧 [realtime-todos](https://github.com/ShunsukeOta/realtime-todos) は参照用であり、**nocaの作業で旧コード・DB・デプロイ先を変更しません**。独自チャット、AI機能、習慣トラッカー、分析ダッシュボード、複数ワークスペース切替は当面の対象外です。
 
 ---
-**Last updated:** 2026-10-14 · **Status:** Specification first / UI first
+**Last reviewed against implementation:** 2026-10-14 · **Status:** Local UI preview / Phase 1D next.
