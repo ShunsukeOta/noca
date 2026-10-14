@@ -115,6 +115,7 @@ a { -webkit-touch-callout: none; }
 .sheet-content[data-keyboard-open="true"] {
   padding-bottom: 12px;
   transition: none;
+  animation: none !important;
 }
 .sheet-content[data-keyboard-open="true"] .sheet-header {
   padding-top: 12px;
