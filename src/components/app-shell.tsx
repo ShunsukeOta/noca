@@ -3,17 +3,17 @@ import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Link, NavLink, useLocation, useOutlet } from "react-router-dom"
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
-import { CalendarDays, ListTodo, NotebookPen, Plus, Settings } from "lucide-react"
+import { CalendarDays, ListTodo, NotebookPen, Plus, Settings, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { OwnerAvatar } from "@/components/owner-ui"
 import { UndoToast } from "@/components/undo-toast"
-import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
 import { TodoEditorSheet } from "@/components/todo-editor-sheet"
 import { CalendarEditorSheet } from "@/components/calendar-editor-sheet"
 import { useCalendar } from "@/features/calendar/calendar-store"
 import { useTodos } from "@/features/todos/todo-store"
 import { cn } from "@/lib/utils"
 
+type PageKind = "todo" | "calendar" | "memo"
 const tabs: { to: string; label: string; icon: typeof ListTodo; kind: PageKind }[] = [
   { to: "/todo", label: "TODO", icon: ListTodo, kind: "todo" },
   { to: "/calendar", label: "カレンダー", icon: CalendarDays, kind: "calendar" },
@@ -24,8 +24,9 @@ export function AppShell() {
   const location = useLocation()
   const active = tabs.find((tab) => location.pathname.startsWith(tab.to))
   const isSettings = location.pathname === "/settings"
+  const requestedSettingsReturn = (location.state as { from?: unknown } | null)?.from
+  const settingsReturnTo = tabs.find(tab => tab.to === requestedSettingsReturn)?.to ?? "/todo"
   const reduceMotion = useReducedMotion()
-  const [sheetOpen, setSheetOpen] = useState(false)
   const [today, setToday] = useState(() => new Date())
   const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
   const calendar = useCalendar()
@@ -64,7 +65,8 @@ export function AppShell() {
     if (background) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background)
   }, [theme])
 
-  useEffect(() => { setSheetOpen(false); closeEditor(); calendar.closeEditor() }, [location.pathname, closeEditor, calendar.closeEditor])
+  // Memo editor owns its discard confirmation; do not close it from route cleanup.
+  useEffect(() => { closeEditor(); calendar.closeEditor() }, [location.pathname, closeEditor, calendar.closeEditor])
   const page = useOutlet({ theme, onThemeChange: setTheme })
 
   return (
@@ -83,50 +85,49 @@ export function AppShell() {
               <OwnerAvatar owner="A" size="lg" decorative className="border-[3px] border-background" />
               <OwnerAvatar owner="B" size="lg" decorative className="border-[3px] border-background" />
             </div>
-            <Link to="/settings" state={{ from: active?.to ?? "/todo" }} aria-label="設定を開く" aria-current={isSettings ? "page" : undefined}
+            <Link to={isSettings ? settingsReturnTo : "/settings"} state={isSettings ? undefined : { from: active?.to ?? "/todo" }}
+              aria-label={isSettings ? "設定を閉じる" : "設定を開く"} aria-current={isSettings ? "page" : undefined}
               className={cn("tap-target flex items-center justify-center rounded-full transition-colors", isSettings ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary")}>
-              <Settings className="size-5" />
+              {isSettings ? <X className="size-5" /> : <Settings className="size-5" />}
             </Link>
           </div>
         </div>
       </header>
 
-      <main id="main-content" aria-label={isSettings ? "設定" : active?.label ?? "TODO"} className="app-content px-5 pt-5">
-        <AnimatePresence initial={false} mode="wait">
-          <motion.div key={location.pathname} data-page-transition={location.pathname}
-            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -7 }}
-            transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}>
-            {page}
-          </motion.div>
-        </AnimatePresence>
+      <main id="main-content" aria-label={isSettings ? "設定" : active?.label ?? "TODO"}
+        className={cn("app-content px-5 pt-5", isSettings && "app-content-settings")}>
+        {isSettings ? page : (
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div key={location.pathname} data-page-transition={location.pathname}
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }} exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.07, ease: "easeOut" }}>
+              {page}
+            </motion.div>
+          </AnimatePresence>
+        )}
       </main>
 
-      <div data-testid="bottom-dock"
-        className="bottom-dock pointer-events-none fixed left-1/2 z-30 flex w-[calc(100%-32px)] max-w-[508px] -translate-x-1/2 items-center gap-4">
-        <nav className="bottom-nav pointer-events-auto flex min-w-0 flex-1 items-center rounded-[25px] border border-border/80 bg-card/95 p-[7px] backdrop-blur-2xl"
+      {!isSettings && <div data-testid="bottom-dock"
+        className={cn("bottom-dock pointer-events-none fixed left-1/2 z-30 flex w-[calc(100%-32px)] max-w-[508px] -translate-x-1/2 items-center gap-4", active?.kind === "memo" && "max-w-[360px]")}>
+        <nav className={cn("bottom-nav pointer-events-auto flex min-w-0 flex-1 items-center rounded-[25px] border border-border/80 bg-card/95 p-[7px] backdrop-blur-2xl", active?.kind === "memo" && "w-full")}
           aria-label="メインメニュー">
           <div className="flex min-w-0 flex-1 items-center">
             <LayoutGroup id="global-bottom-tabs">
               {tabs.map(({ to, label, icon: Icon }) => (
                 <NavLink key={to} to={to}
                   className={({ isActive }) => cn(
-                    "flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[16px] text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "relative flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[16px] text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     isActive && "text-primary"
                   )} aria-label={label}>
                   {({ isActive }) => (
                     <>
-                      <span className="relative flex h-[27px] w-full max-w-[54px] items-center justify-center rounded-full">
-                        {isActive && <motion.span layoutId="nav-indicator" aria-hidden="true" className="absolute inset-0 rounded-full bg-secondary"
-                          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 470, damping: 38 }} />}
-                        <motion.span className="relative z-10 flex items-center justify-center"
-                          animate={reduceMotion ? undefined : { scale: isActive ? 1.06 : 1, y: isActive ? -1 : 0 }}
-                          transition={{ duration: 0.17 }}>
-                          <Icon className="size-[21px]" strokeWidth={isActive ? 2.5 : 1.9} />
-                        </motion.span>
+                      {isActive && <motion.span layoutId="nav-indicator" aria-hidden="true" className="absolute inset-0 rounded-[16px] bg-secondary"
+                        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 470, damping: 38 }} />}
+                      <span className="relative z-10 flex h-[27px] w-full max-w-[54px] items-center justify-center rounded-full">
+                        <Icon className="size-[21px]" strokeWidth={2} />
                       </span>
-                      <span className={cn("text-[10px] font-medium leading-tight", isActive && "font-bold")}>{label}</span>
+                      <span className={cn("relative z-10 text-[10px] leading-tight", isActive ? "font-bold" : "font-medium")}>{label}</span>
                     </>
                   )}
                 </NavLink>
@@ -134,20 +135,19 @@ export function AppShell() {
             </LayoutGroup>
           </div>
         </nav>
-        {active && (
+        {active && active.kind !== "memo" && (
           <motion.div className="pointer-events-auto shrink-0"
-            whileTap={reduceMotion ? undefined : { scale: 0.90 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
             transition={{ type: "spring", stiffness: 510, damping: 29 }}>
             <Button type="button" size="fab" aria-label={active.label + "を追加"}
               data-testid="dock-add-button"
-              onClick={() => { if (active.kind === "todo") openCreate(); else if (active.kind === "calendar") calendar.openCreate(); else setSheetOpen(true) }}
-              className="dock-create relative overflow-hidden bg-dock-create-bg text-dock-create-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-              <span className="pointer-events-none absolute inset-x-3 top-[3px] h-px rounded-full bg-white/25" aria-hidden="true" />
-              <Plus className="relative size-[27px] stroke-[2.5px]" />
+              onClick={() => { if (active.kind === "todo") openCreate(); else calendar.openCreate() }}
+              className="dock-create bg-dock-create-bg text-dock-create-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <Plus className="size-[27px] stroke-[2.5px]" />
             </Button>
           </motion.div>
         )}
-      </div>
+      </div>}
       <div className="pointer-events-none fixed bottom-[calc(105px+env(safe-area-inset-bottom))] left-1/2 z-40 flex w-full max-w-[540px] -translate-x-1/2 flex-col gap-2 px-5">
         <AnimatePresence initial={false}>
           {deleted && <UndoToast key={"todo-" + deleted.task.id} message="タスクを削除しました" onUndo={undoDelete} onDismiss={dismissDeleted} />}
@@ -161,7 +161,6 @@ export function AppShell() {
       )}
       {editor && <TodoEditorSheet key={editor.mode === "edit" ? editor.id : "create"} />}
       {calendar.editor && <CalendarEditorSheet key={calendar.editor.mode === "edit" ? calendar.editor.id : "create-" + calendar.editor.date} />}
-      {active?.kind === "memo" && <PreviewCreateSheet kind="memo" open={sheetOpen} onOpenChange={setSheetOpen} />}
     </div>
   )
 }

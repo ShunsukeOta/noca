@@ -37,7 +37,9 @@ test("TODO create, edit, delete, undo and persistence", async ({ page }) => {
   await page.locator("#todo-title").fill("確認用のタスク")
   await page.getByRole("button", { name: "ふたり" }).click()
   await page.getByRole("button", { name: "タスクを追加" }).last().click()
-  await expect(page.getByRole("dialog")).toBeHidden()
+  await expect(page.locator("#todo-title")).toHaveValue("")
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(page.getByRole("button", { name: "確認用のタスクを編集" })).toBeVisible()
 
   await page.reload()
@@ -45,7 +47,8 @@ test("TODO create, edit, delete, undo and persistence", async ({ page }) => {
   await page.getByRole("button", { name: "確認用のタスクを編集" }).click()
   await expect(page.locator("#todo-title")).toHaveValue("確認用のタスク")
   await page.locator("#todo-title").fill("編集済みのタスク")
-  await page.getByRole("button", { name: "変更を保存" }).click()
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(page.getByRole("button", { name: "編集済みのタスクを編集" })).toBeVisible()
 
   await page.getByRole("button", { name: "編集済みのタスクを編集" }).click()
@@ -53,6 +56,11 @@ test("TODO create, edit, delete, undo and persistence", async ({ page }) => {
   await expect(page.getByRole("button", { name: "編集済みのタスクを編集" })).toHaveCount(0)
   await page.getByRole("button", { name: "元に戻す" }).click()
   await expect(page.getByRole("button", { name: "編集済みのタスクを編集" })).toBeVisible()
+
+  await page.getByRole("button", { name: "TODOを追加" }).click()
+  await page.locator("#todo-title").fill("閉じると追加されるタスク")
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("button", { name: "閉じると追加されるタスクを編集" })).toBeVisible()
 })
 
 test("TODO due date appears on calendar, completion removes it", async ({ page }) => {
@@ -64,8 +72,11 @@ test("TODO due date appears on calendar, completion removes it", async ({ page }
   })
   await page.getByRole("button", { name: "TODOを追加" }).click()
   await page.locator("#todo-title").fill("旅行の準備をする")
+  await page.getByText("詳細を入力", { exact: true }).click()
   await page.locator("#todo-date").fill(today)
   await page.getByRole("button", { name: "タスクを追加" }).last().click()
+  await expect(page.locator("#todo-title")).toHaveValue("")
+  await page.keyboard.press("Escape")
 
   await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
   await expect(page.getByRole("button", { name: "旅行の準備をするを編集" })).toBeVisible()
@@ -87,18 +98,17 @@ test("theme switch and mock task completion", async ({ page }) => {
   await expect(page.getByRole("checkbox", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
 })
 
-test("memo search narrows results", async ({ page }) => {
+test("memo tab remains in navigation and shows only its development notice", async ({ page }) => {
   await page.goto("/memo")
-  await page.getByRole("textbox", { name: "メモを検索" }).fill("旅行")
-  await expect(page.getByRole("button", { name: "次の旅行のことを開く" })).toBeVisible()
-  await expect(page.getByRole("button", { name: "行きたいお店を開く" })).toHaveCount(0)
+  await expect(page.getByTestId("memo-page")).toHaveText("メモ機能は開発中です")
+  await expect(page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "メモ" })).toHaveAttribute("aria-current", "page")
+  await expect(page.getByTestId("dock-add-button")).toHaveCount(0)
 })
 
-test("three main screens start with content, without redundant page headings", async ({ page }) => {
+test("TODO and calendar start with content, without redundant page headings", async ({ page }) => {
   for (const [path, label, firstSelector] of [
     ["/todo", "TODO", "section"],
-    ["/calendar", "カレンダー", "section"],
-    ["/memo", "メモ", "label"]
+    ["/calendar", "カレンダー", "section"]
   ]) {
     await page.goto(path)
     await expect(page.locator("main")).toHaveAttribute("aria-label", label)
@@ -123,7 +133,7 @@ test("no decorative lead copy remains across three screens or sheets", async ({ 
   await page.goto("/todo")
   await page.getByRole("button", { name: "TODOを追加" }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
-  await expect(page.getByRole("heading", { name: "タスクを追加" })).toBeVisible()
+  await expect(page.getByRole("dialog", { name: "タスクを追加" })).toBeVisible()
   await expect(page.getByText("やることを、ひとつずつ。")).toHaveCount(0)
 })
 
@@ -136,14 +146,16 @@ test("settings icon opens the page; theme setting persists; back returns to the 
   await expect(page.locator("main")).toHaveAttribute("aria-label", "設定")
   await expect(page.getByRole("heading", { name: "設定" })).toBeVisible()
   await expect(page.getByRole("button", { name: "カレンダーを追加" })).toHaveCount(0)
-  await expect(page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link")).toHaveCount(3)
+  await expect(page.getByTestId("bottom-dock")).toHaveCount(0)
+  await expect(page.getByRole("navigation", { name: "メインメニュー" })).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "設定を閉じる" })).toBeVisible()
 
   await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await page.reload()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await expect(page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" })).toHaveAttribute("aria-pressed", "true")
-  await page.getByRole("button", { name: "前の画面に戻る" }).click()
+  await page.getByRole("link", { name: "設定を閉じる" }).click()
   await expect(page.getByTestId("calendar-page")).toBeVisible()
 })
 
@@ -166,6 +178,23 @@ test("settings is reachable on small iPhone widths with no horizontal overflow",
   }
 })
 
+test("empty TODO categories delete directly while categories with TODOs require a destination", async ({ page }) => {
+  await page.goto("/settings")
+  await page.getByRole("button", { name: "その他を削除" }).click()
+  const emptyCategoryDialog = page.getByRole("dialog", { name: "カテゴリを削除しますか？" })
+  await expect(emptyCategoryDialog).toBeVisible()
+  await expect(emptyCategoryDialog.getByLabel("移動先")).toHaveCount(0)
+  await emptyCategoryDialog.getByRole("button", { name: "削除する" }).click()
+  await expect(page.getByTestId("todo-category-その他")).toHaveCount(0)
+
+  await page.getByRole("button", { name: "おでかけを削除" }).click()
+  const usedCategoryDialog = page.getByRole("dialog", { name: "カテゴリを削除しますか？" })
+  await expect(usedCategoryDialog.getByLabel("移動先")).toBeVisible()
+  await expect(usedCategoryDialog.getByText("対象のTODO：2件")).toBeVisible()
+  await expect(usedCategoryDialog.getByRole("button", { name: "移動して削除" })).toBeVisible()
+  await usedCategoryDialog.getByRole("button", { name: "キャンセル" }).click()
+})
+
 
 test("opening an editor does not immediately show the iPhone keyboard", async ({ page }) => {
   await page.goto("/todo")
@@ -173,7 +202,7 @@ test("opening an editor does not immediately show the iPhone keyboard", async ({
   await expect(page.getByRole("dialog")).toBeVisible()
   await expect(page.locator("#todo-title")).not.toBeFocused()
   await expect(page.getByRole("dialog")).toHaveAttribute("data-keyboard-open", "false")
-  await page.getByRole("button", { name: "閉じる" }).click()
+  await page.keyboard.press("Escape")
   await expect(page.getByRole("dialog")).toBeHidden()
 })
 
@@ -246,11 +275,12 @@ test("tab and settings routes transition and remain usable with reduced motion",
   await page.getByRole("button", { name: "次の月" }).click()
   await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "メモ" }).click()
   await expect(page.locator('[data-page-transition="/memo"]')).toBeVisible()
-  await page.getByRole("textbox", { name: "メモを検索" }).fill("旅行")
-  await expect(page.getByRole("button", { name: "次の旅行のことを開く" })).toBeVisible()
+  await expect(page.getByTestId("memo-page")).toHaveText("メモ機能は開発中です")
+  await expect(page.getByTestId("dock-add-button")).toHaveCount(0)
   await page.getByRole("link", { name: "設定を開く" }).click()
-  await expect(page.locator('[data-page-transition="/settings"]')).toBeVisible()
-  await page.getByRole("button", { name: "前の画面に戻る" }).click()
+  await expect(page.getByTestId("settings-page")).toBeVisible()
+  await expect(page.locator('[data-page-transition="/settings"]')).toHaveCount(0)
+  await page.getByRole("link", { name: "設定を閉じる" }).click()
   await expect(page.getByTestId("memo-page")).toBeVisible()
 })
 
@@ -263,18 +293,18 @@ test("calendar events: create, edit, persistent storage and leap day", async ({ 
   await expect(page.locator("#event-title")).not.toBeFocused()
   await page.locator("#event-title").fill("テスト用の予定")
   await page.getByRole("switch", { name: "終日" }).click()
-  await page.locator("#event-start").fill("12:00")
-  await page.locator("#event-end").fill("11:00")
+  await page.locator("#event-start").fill("17:00")
+  await page.locator("#event-end").fill("16:00")
   await page.getByRole("button", { name: "予定を追加" }).last().click()
   await expect(page.getByRole("alert")).toHaveText("終了時間は開始時間より後にしてください")
-  await page.locator("#event-end").fill("13:30")
+  await page.locator("#event-end").fill("18:30")
   await page.getByText("詳細を追加（任意）").click()
   await page.locator("#event-address").fill("駅前のカフェ")
   await page.getByRole("group", { name: "カテゴリ" }).getByRole("button", { name: "おでかけ" }).click()
   await page.getByRole("button", { name: "予定を追加" }).last().click()
   await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(page.getByRole("button", { name: "テスト用の予定を編集" })).toBeVisible()
-  await expect(page.getByText("12:00–13:30", { exact: false })).toBeVisible()
+  await expect(page.getByText("17:00–18:30", { exact: false })).toBeVisible()
 
   await page.reload()
   await expect(page.getByRole("button", { name: "テスト用の予定を編集" })).toBeVisible()
@@ -361,9 +391,12 @@ test("header stays fixed at the top while scrolling across all tabs and settings
       expect(top).toBeLessThanOrEqual(1)
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
       expect(overflow).toBe(false)
-      await expect(page.getByRole("link", { name: "設定を開く" })).toBeVisible()
+      const settingsLink = route === "/settings"
+        ? page.getByRole("link", { name: "設定を閉じる" })
+        : page.getByRole("link", { name: "設定を開く" })
+      await expect(settingsLink).toBeVisible()
       if (route === "/todo") {
-        await page.getByRole("link", { name: "設定を開く" }).click()
+        await settingsLink.click()
         await expect(page.getByTestId("settings-page")).toBeVisible()
       }
     }
@@ -371,7 +404,7 @@ test("header stays fixed at the top while scrolling across all tabs and settings
   }
 })
 
-test("drawer overlays the sticky header without blocking the close control", async ({ page }) => {
+test("drawer overlays the sticky header and closes with Escape", async ({ page }) => {
   await page.goto("/todo")
   await page.getByRole("button", { name: "TODOを追加" }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
@@ -380,7 +413,7 @@ test("drawer overlays the sticky header without blocking the close control", asy
     dialog: Number(getComputedStyle(document.querySelector('[role="dialog"]')!).zIndex)
   }))
   expect(stacking.dialog).toBeGreaterThan(stacking.header)
-  await page.getByRole("button", { name: "閉じる" }).click()
+  await page.keyboard.press("Escape")
   await expect(page.getByRole("dialog")).toBeHidden()
 })
 
@@ -451,6 +484,8 @@ test("TODO chips filter by category, keep completed tasks, and include newly cre
   await page.getByRole("button", { name: "TODOを追加" }).click()
   await page.locator("#todo-title").fill("カテゴリ別のテスト")
   await page.getByRole("button", { name: "タスクを追加" }).last().click()
+  await expect(page.locator("#todo-title")).toHaveValue("")
+  await page.keyboard.press("Escape")
   await expect(page.getByRole("button", { name: "カテゴリ別のテストを編集" })).toBeVisible()
   await page.reload()
   await chips.getByRole("button", { name: "その他" }).click()
@@ -477,17 +512,27 @@ test("category filter chips match task category tag colors in light and dark mod
       const chip = chips.getByRole("button", { name: category, exact: true })
       await chip.click()
       await expect(chip).toHaveAttribute("aria-pressed", "true")
+      await expect(page.getByRole("button", { name: task + "を編集" }).getByText(category, { exact: true })).toHaveCount(0)
+      await page.mouse.move(0, 0)
+      const chipColor = await chip.evaluate(node => ({
+        bg: getComputedStyle(node).backgroundColor,
+        text: getComputedStyle(node).color
+      }))
+      await expect(chip.locator('[class*="ring-2"]')).toHaveCount(1)
+      await chips.getByRole("button", { name: "すべて", exact: true }).click()
       const badge = page.getByRole("button", { name: task + "を編集" }).getByText(category, { exact: true })
       await expect(badge).toBeVisible()
       const badgeColor = await badge.evaluate(node => ({
         bg: getComputedStyle(node).backgroundColor,
         text: getComputedStyle(node).color
       }))
-      await expect.poll(() => chip.evaluate(node => ({
-        bg: getComputedStyle(node).backgroundColor,
-        text: getComputedStyle(node).color
-      }))).toEqual(badgeColor)
-      await expect(chip.locator('[class*="ring-2"]')).toHaveCount(1)
+      expect(badgeColor.text).toBe(chipColor.text)
+      const channels = (value: string) => value.match(/\d+/g)?.map(Number) ?? []
+      const chipChannels = channels(chipColor.bg)
+      const badgeChannels = channels(badgeColor.bg)
+      expect(chipChannels).toHaveLength(3)
+      expect(badgeChannels).toHaveLength(3)
+      expect(badgeChannels.every((channel, index) => Math.abs(channel - chipChannels[index]) <= 1)).toBe(true)
     }
     const other = chips.getByRole("button", { name: "その他", exact: true })
     await other.click()
@@ -528,6 +573,7 @@ test("TODO tile counts respond immediately to creating and completing tasks", as
   await page.getByRole("button", { name: "タスクを追加" }).last().click()
   await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("1件")
   await expect(page.getByTestId("todo-filter-count-すべて")).toHaveText("5件")
+  await page.keyboard.press("Escape")
 
   await page.getByRole("checkbox", { name: "件数のテストを完了" }).click()
   await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("0件")
@@ -611,11 +657,10 @@ test("floating navigation dock fits narrow iPhones and has a distinct right-side
   }
 })
 
-test("the same dock plus button opens the correct editor for each main tab", async ({ page }) => {
+test("the dock plus opens supported editors and is hidden on the memo placeholder", async ({ page }) => {
   for (const { route, tab, addLabel, editorTitle } of [
     { route: "/todo", tab: "TODO", addLabel: "TODOを追加", editorTitle: "タスクを追加" },
-    { route: "/calendar", tab: "カレンダー", addLabel: "カレンダーを追加", editorTitle: "予定を追加" },
-    { route: "/memo", tab: "メモ", addLabel: "メモを追加", editorTitle: "メモを追加" }
+    { route: "/calendar", tab: "カレンダー", addLabel: "カレンダーを追加", editorTitle: "予定を追加" }
   ]) {
     await page.goto(route)
     const dock = page.getByTestId("bottom-dock")
@@ -623,18 +668,22 @@ test("the same dock plus button opens the correct editor for each main tab", asy
     await expect(dock.getByRole("link", { name: tab })).toHaveAttribute("aria-current", "page")
     await dock.getByRole("button", { name: addLabel }).click()
     await expect(page.getByRole("dialog")).toBeVisible()
-    await expect(page.getByRole("heading", { name: editorTitle })).toBeVisible()
-    await page.getByRole("button", { name: "閉じる", exact: true }).first().click()
+    await expect(page.getByRole("dialog", { name: editorTitle })).toBeVisible()
+    await page.keyboard.press("Escape")
     await expect(page.getByRole("dialog")).toBeHidden()
   }
+  await page.goto("/memo")
+  await expect(page.getByTestId("memo-page")).toHaveText("メモ機能は開発中です")
+  await expect(page.getByTestId("dock-add-button")).toHaveCount(0)
   await page.goto("/settings")
-  await expect(page.getByTestId("bottom-dock").getByRole("button")).toHaveCount(0)
-  await expect(page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link")).toHaveCount(3)
+  await expect(page.getByTestId("bottom-dock")).toHaveCount(0)
+  await expect(page.getByRole("navigation", { name: "メインメニュー" })).toHaveCount(0)
 })
 
 test("floating dock maintains create action and contrast in dark mode", async ({ page }) => {
   await page.goto("/settings")
   await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click()
+  await page.getByRole("link", { name: "設定を閉じる" }).click()
   await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   const add = page.getByTestId("dock-add-button")
@@ -964,7 +1013,7 @@ test("5-minute and 15-minute events always display their titles inside readable 
     expect(r[1].width).toBeGreaterThan(40)
     await button.click()
     await expect(page.getByRole("heading", { name: "予定を編集" })).toBeVisible()
-    await page.getByRole("button", { name: "閉じる" }).first().click()
+    await page.keyboard.press("Escape")
   }
 })
 

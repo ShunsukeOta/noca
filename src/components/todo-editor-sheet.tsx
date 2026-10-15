@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react"
-import { CalendarDays, ChevronDown, Link2, MapPin, NotebookPen, Trash2 } from "lucide-react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import { CalendarDays, Check, ChevronDown, Link2, MapPin, NotebookPen, Trash2 } from "lucide-react"
 import { type TaskCategory } from "@/app/mock-data"
 import { useTodos, type TodoDraft } from "@/features/todos/todo-store"
 import { Button } from "@/components/ui/button"
@@ -7,25 +8,30 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetTitle, SheetDescription, SheetHeader, SheetBody, SheetFooter } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { CategorySelector } from "@/components/category-ui"
+import { TodoCategorySelector } from "@/components/category-ui"
 
 export function TodoEditorSheet() {
-  const { todos, editor, closeEditor, addTodo, updateTodo, deleteTodo } = useTodos()
+  const { todos, categories, editor, closeEditor, addTodo, updateTodo, deleteTodo } = useTodos()
   const original = editor?.mode === "edit" ? todos.find(todo => todo.id === editor.id) : undefined
+  const defaultCategory = categories.find(item => item.name === "その他")?.name ?? categories[0]?.name ?? ""
   const [title, setTitle] = useState(original?.title ?? "")
   const [dueDate, setDueDate] = useState(original?.dueDate ?? "")
-  const [category, setCategory] = useState<TaskCategory>(original?.category ?? "その他")
+  const [category, setCategory] = useState<TaskCategory>(original?.category ?? defaultCategory)
+  const [savedCategory, setSavedCategory] = useState<TaskCategory>(original?.category ?? defaultCategory)
   const [memo, setMemo] = useState(original?.memo ?? "")
   const [url, setUrl] = useState(original?.url ?? "")
   const [address, setAddress] = useState(original?.address ?? "")
   const [error, setError] = useState("")
-  const [discardOpen, setDiscardOpen] = useState(false)
+  const [showSavedCheck, setShowSavedCheck] = useState(false)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const detailsRef = useRef<HTMLDetailsElement>(null)
+  const flashTimeoutRef = useRef<number | null>(null)
+  const reduceMotion = useReducedMotion()
 
   // A new sheet component is mounted per create/edit session, so draft state is isolated.
   const previous: TodoDraft = {
     title: original?.title ?? "",
-    category: original?.category ?? "その他",
+    category: original?.category ?? savedCategory,
     dueDate: original?.dueDate,
     memo: original?.memo,
     url: original?.url,
@@ -36,16 +42,13 @@ export function TodoEditorSheet() {
     memo !== (previous.memo ?? "") || url !== (previous.url ?? "") || address !== (previous.address ?? "")
 
   useEffect(() => setError(""), [title, url])
+  useEffect(() => () => {
+    if (flashTimeoutRef.current !== null) window.clearTimeout(flashTimeoutRef.current)
+  }, [])
 
-  const close = () => {
-    if (dirty) { setDiscardOpen(true); return }
-    closeEditor()
-  }
-
-  const handleSave = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const buildDraft = (): TodoDraft | null => {
     const cleanTitle = title.trim()
-    if (!cleanTitle) { setError("タイトルを入力してください"); return }
+    if (!cleanTitle) { setError("タイトルを入力してください"); return null }
     const cleanUrl = url.trim()
     if (cleanUrl) {
       try {
@@ -53,19 +56,55 @@ export function TodoEditorSheet() {
         if (!["https:", "http:"].includes(parsed.protocol)) throw new Error("unsupported protocol")
       } catch {
         setError("URLは http:// または https:// で入力してください")
-        return
+        return null
       }
     }
-    const draft: TodoDraft = {
+
+    return {
       title: cleanTitle, category,
       dueDate: dueDate || undefined,
       memo: memo.trim() || undefined,
       url: cleanUrl || undefined,
       address: address.trim() || undefined
     }
-    if (editor?.mode === "edit") updateTodo(editor.id, draft)
-    else addTodo(draft)
+  }
+
+  const close = () => {
+    if (dirty) {
+      const draft = buildDraft()
+      if (!draft) return
+      if (editor?.mode === "edit") updateTodo(editor.id, draft)
+      else addTodo(draft)
+    }
     closeEditor()
+  }
+
+  const handleSave = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const draft = buildDraft()
+    if (!draft) return
+    if (editor?.mode === "edit") {
+      updateTodo(editor.id, draft)
+      closeEditor()
+      return
+    }
+
+    addTodo(draft)
+    if (flashTimeoutRef.current !== null) window.clearTimeout(flashTimeoutRef.current)
+    setShowSavedCheck(true)
+    flashTimeoutRef.current = window.setTimeout(() => {
+      setShowSavedCheck(false)
+      flashTimeoutRef.current = null
+    }, 1400)
+    setSavedCategory(category)
+    setTitle("")
+    setDueDate("")
+    setMemo("")
+    setUrl("")
+    setAddress("")
+    setError("")
+    if (detailsRef.current) detailsRef.current.open = false
+    window.requestAnimationFrame(() => titleInputRef.current?.focus({ preventScroll: true }))
   }
 
   const handleDelete = () => {
@@ -76,34 +115,47 @@ export function TodoEditorSheet() {
 
   return (
     <Sheet open onOpenChange={(next) => { if (!next) close() }}>
-      <SheetContent onEscapeKeyDown={(event) => { if (dirty) { event.preventDefault(); close() } }}>
-        <SheetHeader className="pr-14">
-          <div className="sheet-leading-icon mb-2 flex size-11 items-center justify-center rounded-2xl bg-secondary text-primary">
-            <NotebookPen className="size-5" />
-          </div>
-          <SheetTitle className="text-left text-[22px] font-bold tracking-tight">{editor?.mode === "edit" ? "タスクを編集" : "タスクを追加"}</SheetTitle>
+      <SheetContent>
+        <SheetHeader className="sr-only">
+          <SheetTitle>{editor?.mode === "edit" ? "タスクを編集" : "タスクを追加"}</SheetTitle>
           <SheetDescription className="sr-only">タスクのタイトルや期限、カテゴリを設定します。</SheetDescription>
         </SheetHeader>
         <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
-          <SheetBody>
-            <Label htmlFor="todo-title" className="mb-2">やること <span className="text-destructive">*</span></Label>
-            <Input id="todo-title" value={title} onChange={event => setTitle(event.target.value)}
-              maxLength={200} placeholder="例：週末の買い出し"
-              aria-invalid={Boolean(error && !title.trim())}
-            />
+          <SheetBody className="pt-6">
+            <Label htmlFor="todo-title" className="sr-only">やること</Label>
+            <div className="relative">
+              <Input ref={titleInputRef} id="todo-title" value={title} onChange={event => setTitle(event.target.value)}
+                maxLength={200} placeholder="例：週末の買い出し"
+                aria-invalid={Boolean(error && !title.trim())}
+                className="pr-11"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 size-[18px] -translate-y-1/2">
+                <AnimatePresence>
+                  {showSavedCheck && <motion.span role="status" aria-live="polite"
+                    initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
+                    className="flex size-full items-center justify-center rounded-full border border-emerald-600 bg-emerald-600 text-white">
+                    <Check className="size-2.5" strokeWidth={2.5} aria-hidden="true" />
+                    <span className="sr-only">タスクを追加しました</span>
+                  </motion.span>}
+                </AnimatePresence>
+              </span>
+            </div>
 
-            <div className="mt-6 flex items-center gap-2 text-primary"><CalendarDays className="size-[17px]" /><h3 className="text-[13px] font-semibold">期限</h3></div>
-            <Input id="todo-date" aria-label="期限" type="date" value={dueDate} onChange={event => setDueDate(event.target.value)} className="mt-2 appearance-none" />
-            {dueDate && <Button type="button" variant="link" onClick={() => setDueDate("")} className="mt-2 min-h-11 px-0 text-xs font-semibold text-muted-foreground">期限を解除</Button>}
+            <TodoCategorySelector aria-label="カテゴリ" value={category} onChange={setCategory} categories={categories} className="mt-6" />
 
-            <h3 className="mb-3 mt-6 text-[13px] font-semibold">カテゴリ</h3>
-            <CategorySelector value={category} onChange={setCategory} />
-
-            <details className="group mt-6 rounded-lg border border-border bg-background/65 px-4 py-1" open={Boolean(original?.memo || original?.url || original?.address) || undefined}>
+            <details ref={detailsRef} className="group mt-6 rounded-lg border border-border bg-background/65 px-4 py-1" open={Boolean(original?.dueDate || original?.memo || original?.url || original?.address) || undefined}>
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[13px] font-semibold [&::-webkit-details-marker]:hidden">
-                詳細を追加（任意）<ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                詳細を入力<ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
               </summary>
               <div className="space-y-4 border-t border-border pb-4 pt-4">
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-primary"><CalendarDays className="size-4" /><Label htmlFor="todo-date" className="text-xs">期限</Label></div>
+                  <Input id="todo-date" aria-label="期限" type="date" value={dueDate} onChange={event => setDueDate(event.target.value)} className="appearance-none bg-card" />
+                  {dueDate && <Button type="button" variant="link" onClick={() => setDueDate("")} className="mt-1 min-h-11 px-0 text-xs font-semibold text-muted-foreground">期限を解除</Button>}
+                </div>
                 <div>
                   <Label htmlFor="todo-memo" className="mb-2 flex items-center gap-2 text-xs"><NotebookPen className="size-4" />メモ</Label>
                   <Textarea id="todo-memo" rows={3} maxLength={5000} value={memo} onChange={event => setMemo(event.target.value)} placeholder="補足したいこと" className="bg-card" />
@@ -132,15 +184,6 @@ export function TodoEditorSheet() {
           </SheetFooter>
         </form>
       </SheetContent>
-      <ConfirmDialog
-        open={discardOpen}
-        onOpenChange={setDiscardOpen}
-        onConfirm={closeEditor}
-        title="入力内容を破棄しますか？"
-        description="保存していない変更は失われます。"
-        confirmLabel="破棄する"
-        cancelLabel="編集を続ける"
-      />
     </Sheet>
   )
 }

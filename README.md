@@ -6,10 +6,10 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 
 **プレビュー:** https://noca-delta.vercel.app  
 **ソース:** https://github.com/ShunsukeOta/noca  
-**開発状況:** 2026-10-14 時点、**Phase 1Cのローカル機能とUI改善まで実装**／次は **Phase 1D：メモCRUD**。
+**開発状況:** TODO・カレンダーの端末内機能とUIを実装済み。メモタブは残し、現在は「メモ機能は開発中です」と案内するプレースホルダーです。
 
 > [!IMPORTANT]
-> **これは「2人で共有できる完成版」ではありません。** 現在は同一ブラウザの `localStorage` を使うUIプレビューです。TODOと予定は追加・編集・削除できますが、ログイン、招待、実際の2端末間同期、Firebase、通知は未実装。メモは検索・閲覧のみで、新規追加ボタンは**保存しないプレビュー**です。ブラウザの保存データを消すとTODO/予定も消えます。
+> **これは「2人で共有できる完成版」ではありません。** 現在は同一ブラウザの `localStorage` を使うUIプレビューです。TODOと予定はこの端末で追加・編集・削除できます。メモ機能は開発中で、ログイン、招待、実際の2端末間同期、Firebase、通知も未実装です。ブラウザの保存データを消すと端末内の編集内容も消えます。
 
 ## Codex / AIエージェントへの引き継ぎ
 
@@ -26,18 +26,18 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 
 | 画面・機能 | 現状 | 主な操作・特徴 |
 | --- | --- | --- |
-| **TODO** | **動作**・端末内に保存 | 作成・編集・完了/解除・削除/Undo。カテゴリ別の角丸四角チップに未完了件数を2段表示。期限・任意メモ等 |
+| **TODO** | **動作**・端末内に保存 | 作成・編集・完了/解除・削除/Undo。カテゴリは設定から追加・名前変更・色変更・並び替え・削除ができ、削除時はTODOを別カテゴリへ移動。 |
 | **カレンダー** | **動作**・端末内に保存 | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了・担当A/B/ふたり、期限付きTODOの参照。終日予定がない日は終日欄を省略 |
 | **2人用日別タイムライン** | **動作するUIプレビュー** | A/Bの2列と時間軸、A+B全幅の共有予定、共有の終日予定を2列幅で表示。同じ担当者の重なりはグループ内で最長の予定を表示し、担当色の「他N件」チップから時刻順の一覧を開けます |
-| **メモ** | **表示・検索のみ** | サンプル一覧・検索・読み取り専用の詳細。**追加/編集/削除/保存は未実装** |
-| **設定** | テーマ切替のみ動作 | ライト／ダーク、端末内保存。共有・招待・通知・クラウド同期は「準備中」 |
+| **メモ** | **開発中** | メモタブを開くと「メモ機能は開発中です」と表示。入力や保存の操作はありません。 |
+| **設定** | テーマ・TODOカテゴリが動作 | ライト／ダークの切替と、TODOカテゴリの管理。共有・招待・通知・クラウド同期は「準備中」 |
 | **PWA** | 基本構成あり | manifest / service workerの自動更新設定。iPhone Safari・ホーム画面standalone実機QAやオフライン同期は未完了 |
 
 ### UIで守るべき重要な決定
 
-- **上部：** スクロールしても残る固定ヘッダー。nocaロゴの隣に**今日の日付**、右にA/B仮アバターと設定アイコン。
-- **下部：** 左の白いフローティングボックスに **TODO / カレンダー / メモ**。**16px離れた右側に独立した濃色の＋ボタン**。3タブを囲む白い枠には＋を入れません。
-- **TODO：** 最初にカテゴリ別の2段ボタン（すべて・おでかけ・暮らし・ふたり・その他）。カテゴリタグと同じ色。大きな「残りのタスク」ボックスと「これからすること ○件」の見出しはありません。
+- **上部：** スクロールしても残る固定ヘッダー。nocaロゴの隣に**今日の日付**、右にA/B仮アバターと設定アイコン。設定画面では設定アイコンが「×」になり、開く前の画面へ戻れます。
+- **下部：** 左の白いフローティングボックスに **TODO / カレンダー / メモ**。TODO/カレンダーでは**16px離れた右側に独立した濃色の＋ボタン**。メモは開発中表示のため＋を隠します。設定画面ではグローバルメニュー全体を非表示にします。
+- **TODO：** 最初に「すべて」と設定済みカテゴリの2段ボタン。初期カテゴリはおでかけ・暮らし・ふたり・その他で、設定から追加・編集できます。カテゴリタグと同じ色。大きな「残りのタスク」ボックスと「これからすること ○件」の見出しはありません。
 - **カレンダー：** 月間グリッドの下に透明背景の**A/B 2列タイムライン**。終日でも**第3列「ふたりの予定」は置かず**、A/B/ふたりすべてに終日予定がない日は終日欄を省略します。共有予定は終日・時刻付きともA+Bの2列にまたがる横長表示。1時間=54px、単独表示の短い予定は最小36px。同じ担当者の時間重複はグループ内で最長の予定を開始時刻どおりに表示し、担当色の「他N件」チップから正確な時刻付き一覧を開きます。
 - **入力：** 角丸のボトムシート。iPhoneでキーボードが出たら `visualViewport` に応じて移動し、保存ボタンを見失わない設計。開いた直後の自動フォーカスはしません。
 - **動き：** Motionによる自然なアニメーション。`prefers-reduced-motion` を尊重。ライト・ダーク両テーマ対応。
@@ -54,7 +54,7 @@ A・B・`both` は**デモ用の予定所有者ラベル**です。現段階で�
 | ルーティング | React Router 7 |
 | アイコン / モーション | Lucide React / Motion |
 | 日付 | date-fns |
-| 状態・保存 | React Context + `localStorage`（TODO / 予定） |
+| 状態・保存 | React Context + `localStorage`（TODO / 予定 / TODOカテゴリ） |
 | PWA | vite-plugin-pwa（manifest と service worker） |
 | 自動テスト | Playwright + Chromium |
 | CI / プレビュー | GitHub Actions / Vercel |
@@ -87,7 +87,7 @@ Viteの開発サーバーが起動します（通常は `http://localhost:5173`�
 
 CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → `npm run build` → `npx playwright install --with-deps chromium` → `npm run test:e2e` を実行します。テストのスクリーンショットと診断情報は GitHub Actions アーティファクト `noca-ui-mobile-preview` に保存されます。
 
-> **依存関係の注意:** 現時点で `package-lock.json` は**コミットされていません**。そのため `npm ci` 前提ではなく `npm install` を使っています。再現可能なインストールに向けたロックファイル導入は、別途変更・検証してください。
+> **依存関係の注意:** `package-lock.json` はコミット済みですが、CIは現在 `npm install` を使っています。CIを `npm ci` に切り替える場合は別途確認してください。
 
 ### テスト状況
 
@@ -122,7 +122,6 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 │   │   ├── calendar-day-timeline.tsx  # 2人用タイムライン/重なり計算
 │   │   ├── todo-editor-sheet.tsx
 │   │   ├── calendar-editor-sheet.tsx
-│   │   ├── preview-create-sheet.tsx   # メモ追加の非保存プレビュー
 │   │   ├── undo-toast.tsx             # 共通Undo通知
 │   │   └── ui/                        # Button, Input, Label, Textarea, Checkbox, Switch, Sheet等
 │   ├── pages/                         # TODO, Calendar, Memo, Settings
@@ -139,7 +138,8 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 
 | 保存先 | 内容 |
 | --- | --- |
-| `noca.todos.v1` | TODO配列 |
+| `noca.todos.v1` | TODO配列（カテゴリ名を各TODOに保存） |
+| `noca.todo.categories.v1` | TODOカテゴリ名・色・表示順 |
 | `noca.calendar.events.v1` | 予定配列（A/B/ふたり） |
 | `noca.calendar.samples.v2` / `.v3` | 旧デモ予定からの一度きりのサンプル追加フラグ |
 | `noca.theme` | ライト/ダーク |
@@ -156,14 +156,16 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 | 1A | UIシェル、テーマ、ナビゲーション | **実装済み**（実機未確認） |
 | 1B | TODO CRUD とUI改善 | **実装済み**（実機未確認） |
 | 1C | カレンダー CRUD、A/B/ふたりのタイムラインと各種改修 | **実装済み**（実機未確認） |
-| **1D** | **メモの本当の作成・編集・保存・削除** | **次の開発予定** |
+| **1D** | **メモ機能** | **保留**。メモタブと「開発中です」の案内のみ。作成・編集・保存はなし |
 | 1E | iPhone Safari / Home Screen PWAでの実機レビュー | 未完了 |
 | 2 | Googleログイン、2人の共有スペース・招待 | 未実装 |
 | 3 | Firestoreによる共有CRUD・同期・競合対策 | 未実装 |
 | 4 | PWAオフライン挙動・通知など | 未完了 |
 | 5 | 本番QA・リリース | 未完了 |
 
-**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) を必ず参照**し、Phase 1Dの範囲と既存のUI決定事項を守ってください。
+以前のプレビューが書き込んだ `noca.notes.v1` がある場合も、この版では読み書きせず、削除もしません。
+
+**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) を必ず参照**し、Phase 1Dは保留、次の対象はPhase 1Eであることを確認してください。
 
 ## ドキュメント一覧
 
@@ -181,4 +183,4 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 旧 [realtime-todos](https://github.com/ShunsukeOta/realtime-todos) は参照用であり、**nocaの作業で旧コード・DB・デプロイ先を変更しません**。独自チャット、AI機能、習慣トラッカー、分析ダッシュボード、複数ワークスペース切替は当面の対象外です。
 
 ---
-**Last reviewed against implementation:** 2026-10-14 · **Status:** Local UI preview / Phase 1D next.
+**Last reviewed against implementation:** 2026-10-15 · **Status:** Local UI preview / memo feature deferred; Phase 1E QA next.

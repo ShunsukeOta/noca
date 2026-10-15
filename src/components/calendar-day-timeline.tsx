@@ -156,7 +156,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
         initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: reduceMotion ? 0 : 0.19 }}
+        transition={{ duration: reduceMotion ? 0 : 0.13 }}
         style={style}
         className={cn(
           buttonVariants({ variant: "ghost", size: "sm", className: "p-0 whitespace-normal" }),
@@ -344,8 +344,9 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
             {todos.map(task => (
               <motion.button key={task.id} type="button" onClick={() => onEditTodo(task.id)}
                 aria-label={task.title + "を編集"}
-                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                initial={reduceMotion ? false : { opacity: 0, y: 3 }}
                 animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.12 }}
                 className={cn(buttonVariants({ variant: "ghost", size: "sm", className: "h-auto whitespace-normal" }), "flex min-h-[58px] w-full items-center justify-start gap-3 rounded-none border-b border-border/70 px-3 py-3 text-left last:border-0 hover:bg-accent/50")}>
                 <OwnerAvatar owner={task.by} size="sm" decorative />
                 <span className="min-w-0 flex-1 break-words text-[12px] font-semibold">{task.title}</span>

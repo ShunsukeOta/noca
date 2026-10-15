@@ -1,9 +1,11 @@
 import { addDays, format } from "date-fns"
 
-export type TaskCategory = "暮らし" | "おでかけ" | "ふたり" | "その他"
+// TODO category names are user-managed. Calendar keeps using the built-in names for now.
+export type TaskCategory = string
+export type CategoryTone = "peach" | "green" | "lavender" | "blue" | "mint" | "yellow" | "rose" | "neutral" | "life" | "outing" | "couple"
+export type TodoCategory = { id: string; name: TaskCategory; tone: CategoryTone }
 export type Task = { id: string; title: string; category: TaskCategory; dueDate?: string; memo?: string; url?: string; address?: string; done: boolean; by: "A" | "B" }
 export type CalendarEvent = { id: string; title: string; date: string; time?: string; endTime?: string; address?: string; memo?: string; category: TaskCategory; by: "A" | "B" | "both" }
-export type SharedNote = { id: string; title: string; body: string; updated: string; pinned?: boolean }
 
 const today = new Date()
 const day = (offset: number) => format(addDays(today, offset), "yyyy-MM-dd")
@@ -15,7 +17,6 @@ export const mockTasks: Task[] = [
   { id: "t4", title: "部屋の片付け", category: "暮らし", done: false, by: "B" },
   { id: "t5", title: "次のお出かけの候補を送る", category: "おでかけ", done: true, by: "B" }
 ]
-
 export const mockEvents: CalendarEvent[] = [
   { id: "e1", title: "夜ごはん", date: day(0), time: "19:00", endTime: "20:30", category: "ふたり", by: "A" },
   { id: "e2", title: "ランチに行く", date: day(2), time: "12:30", category: "おでかけ", by: "B" },
@@ -35,10 +36,4 @@ export const mockEvents: CalendarEvent[] = [
   { id: "demo-v3-both-all", title: "記念日", date: day(0), category: "ふたり", by: "both" },
   { id: "demo-v3-both-timed", title: "ふたりで買い物", date: day(0), time: "15:00", endTime: "16:30", category: "ふたり", by: "both" },
   { id: "demo-v3-next-both", title: "夜の散歩", date: day(1), time: "19:00", endTime: "20:00", category: "ふたり", by: "both" }
-]
-
-export const mockNotes: SharedNote[] = [
-  { id: "n1", title: "行きたいお店", body: "駅の近くの小さなイタリアン\n景色のいいカフェ\n気になっていた和食のお店", updated: "今日", pinned: true },
-  { id: "n2", title: "次の旅行のこと", body: "行き先の候補をまとめておく。\n温泉もいいかもしれない。", updated: "昨日" },
-  { id: "n3", title: "お買いものメモ", body: "洗剤、キッチンペーパー、コーヒー", updated: "3日前" }
 ]

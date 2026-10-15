@@ -1,6 +1,6 @@
 # noca — Current architecture (implementation reference)
 
-Updated: 2026-10-14. Based on the code in `main` when the Codex handoff was prepared. This document describes **what exists now**, not the future architecture in `SPECIFICATION.md`.
+Updated: 2026-10-15. Based on the current local implementation. This document describes **what exists now**, not the future architecture in `SPECIFICATION.md`.
 
 ## 1. Product / runtime boundaries
 
@@ -24,7 +24,7 @@ Updated: 2026-10-14. Based on the code in `main` when the Codex handoff was prep
 | Tests | Playwright with Chromium (`tests/ui.spec.ts`) |
 | CI | GitHub Actions `.github/workflows/ui-check.yml`, Node.js 22, `npm install`, build + browser tests |
 
-`package-lock.json` is absent as of this handoff; CI uses `npm install` rather than `npm ci`.
+`package-lock.json` is committed; CI currently uses `npm install` rather than `npm ci`.
 
 ## 3. Routes and composition
 
@@ -46,9 +46,9 @@ TodoProvider
 ```
 
 `src/components/app-shell.tsx`:
-- sticky header with noca logo, **local today** (updates across midnight and app focus), placeholder A/B avatars and settings link;
+- sticky header with noca logo, **local today** (updates across midnight and app focus), placeholder A/B avatars and settings link; on `/settings`, the settings icon becomes a close link that returns to the originating tab (or TODO for a direct URL);
 - `<main>` with page enter/exit animation;
-- bottom floating dock: **3 tabs in a left white card + 16px gap + separate dark + CTA**; CTA opens current tab's editor, including a memo *non-saving preview*;
+- bottom floating dock on the three main tabs: **3 tabs in a left white card + 16px gap + separate dark + CTA**; the CTA is hidden on the memo placeholder. The entire dock is hidden on `/settings`, which renders without a route transition animation;
 - TODO and calendar editor sheets, shared Undo notices and theme state;
 - `/settings` retains tabs but does not show + button.
 
@@ -56,7 +56,7 @@ TodoProvider
 
 Shared UI foundation:
 - `src/components/ui/`: Button, Input, Textarea, Label, Checkbox, Switch, mobile Sheet and ConfirmDialog. Form controls share typography, borders, focus rings and invalid states.
-- `src/components/category-ui.tsx` and `src/components/owner-ui.tsx`: common category badges/selectors and A/B/both avatars/selectors.
+- `src/components/category-ui.tsx` and `src/components/owner-ui.tsx`: common category badges/selectors and A/B/both avatars/selectors. TODO editor uses the horizontally scrolling, palette-filled category tile selector; its 「詳細を入力」 section contains the due date, memo, URL and address fields. Creating a TODO keeps the sheet open, briefly overlays a green check at the title input's right edge, clears the draft fields, retains the selected category and returns focus to the title input; editing a TODO saves and closes the sheet.
 - `src/components/undo-toast.tsx`: shared delete Undo notice; simultaneous TODO/calendar notices stack in one host.
 - `src/styles/globals.css` is the source of truth for light/dark palette, owner/category meaning colors, weekend/calendar accents and radius steps. Avoid component-local hex values.
 - Motion-driven controls use the shared `buttonVariants` styles where wrapping the Button component would interfere with layout animation.
@@ -69,20 +69,22 @@ Defined in `src/app/mock-data.ts`:
 
 - `Task`: `{id, title, category, dueDate?, memo?, url?, address?, done, by:"A"|"B"}`
 - `CalendarEvent`: `{id, title, date, time?, endTime?, address?, memo?, category, by:"A"|"B"|"both"}`
-- `SharedNote`: `{id, title, body, updated, pinned?}` **mock/read-only**
 - `TaskCategory`: `"暮らし" | "おでかけ" | "ふたり" | "その他"`
 
 ### Storage keys
 
 | Key | Writer | Meaning |
 | --- | --- | --- |
-| `noca.todos.v1` | `TodoProvider` | JSON array of tasks; loaded on startup |
+| `noca.todos.v1` | `TodoProvider` | JSON array of tasks; category names remain on each task |
+| `noca.todo.categories.v1` | `TodoProvider` | Ordered TODO category names and palette tone keys |
 | `noca.calendar.events.v1` | `CalendarProvider` | JSON array of events; loaded on startup |
 | `noca.calendar.samples.v2` | Calendar store | One-time migration marker for old bundled examples |
 | `noca.calendar.samples.v3` | Calendar store | One-time migration marker for shared/overlap example events |
 | `noca.theme` | `AppShell` | `light` or `dark` |
 
-`loadTodos` and `readEvents` validate selected fields and use initial mock arrays only on absent/invalid data. **A legitimately stored empty array remains empty**. Browser storage deletion means losing local-only edits. Browser `storage` events update providers across tabs **of the same origin**, not a real shared account or reliable two-device sync.
+`loadTodos` and `readEvents` validate selected fields and use initial mock arrays only on absent/invalid data. **A legitimately stored empty array remains empty**. Existing TODO records keep their category names in `noca.todos.v1`; the category configuration stores `{ id, name, tone }` items in display order. Existing configurations without `id` receive one during load. On first load, built-in categories are used and any category already referenced by a saved TODO but missing from the configuration is retained with the neutral tone. Renaming a category updates the associated TODO names; deleting one moves its TODOs to a selected remaining category before removing the category. Category tones use eight theme-defined palette choices; earlier `life`/`outing`/`couple` tone keys are normalized to their matching palette choices on load. Browser storage deletion means losing local-only edits. Browser `storage` events update providers across tabs **of the same origin**, not a real shared account or reliable two-device sync.
+
+There is currently no memo model, sample list, store or persistence path. The `/memo` route is a placeholder. If `noca.notes.v1` was written by an earlier local preview, this version intentionally leaves that key untouched and does not read or display it.
 
 The calendar initializer can append versioned `demo-*` sample events to existing *sample-containing* calendars once. **This is preview-data migration logic**; do not silently reseed user data, recreate previously deleted samples or treat marker flags as real DB migrations. Preserve local edit/delete/Undo and migration behavior when refactoring. Initial demo dates are relative to the runtime date.
 
@@ -107,7 +109,7 @@ Time semantics:
 - Page: `src/pages/todo-page.tsx`
 - Store: `src/features/todos/todo-store.tsx`
 - Editor: `src/components/todo-editor-sheet.tsx`
-- Two-line **category tiles** (すべて / おでかけ / 暮らし / ふたり / その他) display open counts. No redundant summary card/heading. Active/completed tasks, category filtering, creation/edit/complete/delete/Undo, due dates and optional details persist locally.
+- Two-line **category tiles** show the all filter and user-managed categories in configured order. Categories can be added, renamed (saved on input blur only when changed), assigned one of eight palette tones, reordered by a drag handle, and deleted with a required destination for associated TODOs. The built-in calendar category set remains unchanged. No redundant summary card/heading. Active/completed tasks, category filtering, creation/edit/complete/delete/Undo, due dates and optional details persist locally.
 
 ### Calendar
 - Month UI: `src/pages/calendar-page.tsx`
@@ -126,19 +128,18 @@ Time semantics:
 This is a sophisticated **preview visualization**, not a general-purpose interval scheduler with exhaustively verified behavior for many nested/cross-day events. Extend it with focused tests if changing overlap math.
 
 ### Memo
-- `src/pages/memo-page.tsx` uses `mockNotes` directly for **search, list and read-only sheet**. Search uses the shared Input and the note card uses the common Button variants.
-- `src/components/preview-create-sheet.tsx` is the + CTA preview **without persistence**. No notes Context/store or localStorage key exists yet.
-- **Phase 1D** is to add real memo creation/editing/deletion, validation and persistence.
+- `src/pages/memo-page.tsx` displays only **「メモ機能は開発中です」**. The global navigation tab remains, and the + action is hidden while this route is active.
+- Memo list, editor, sample records, state and persistence code are deferred. There is no currently supported memo CRUD behavior.
 
 ### Settings
-- `src/pages/settings-page.tsx` handles theme through `AppShell` outlet context; appearance is persisted.
+- `src/pages/settings-page.tsx` handles theme through `AppShell` outlet context; appearance is persisted. TODO category management is in `src/components/todo-category-settings.tsx` and backed by `TodoProvider`.
 - Sharing, invite, auth, notifications and cloud sync options are labeled **準備中** (no implementation).
 
 ## 6. Design and mobile considerations
 
 - Core CSS tokens, theme values, safe areas: `src/styles/globals.css`; transition overrides: `src/styles/animations.css`.
 - Sticky header sits within document flow; lower navigation uses safe-area-inset-bottom.
-- Input sheet uses `visualViewport` to remain above the keyboard and should not autofocus on open. New memo forms should reuse it unless a full-screen editor is explicitly needed.
+- Input sheet uses `visualViewport` to remain above the keyboard and should not autofocus on open. Memo forms reuse this behavior.
 - Motion is subtle and disabled/reduced when `prefers-reduced-motion` is active.
 - Primary testing widths: 320, 375, 390, 430 CSS px, including dark mode; compare interactive controls and overflow.
 - Real iPhone Safari and Home Screen PWA verification is **NOT complete**.
@@ -164,7 +165,7 @@ Routes use a SPA fallback in `vercel.json`. Deployment at Vercel can occur on ma
 ## 8. Known boundaries / engineering risks
 
 - No auth, database, shared live updates, invitation, permission model or push notifications yet.
-- No actual memo persistence; no offline data-sync contract, even though PWA static cache/service-worker support is configured.
+- Memo CRUD and persistence are currently deferred. A legacy `noca.notes.v1` key may remain in browser storage but this version does not access or delete it.
 - Calendar demo migration and multiple overlapping events require caution; protect user-generated items from any sample reset.
 - Arbitrarily many nested events, very short events, personal/shared collisions and accessibility need dedicated edge tests and iPhone verification.
 - CI has Chromium emulation, not real WebKit/iOS.

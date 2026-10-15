@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
-import { motion, useReducedMotion } from "motion/react"
 import { useLocation, useNavigate, useOutletContext } from "react-router-dom"
 import { Button } from "@/components/ui/button"
+import { TodoCategorySettings } from "@/components/todo-category-settings"
 import {
   ArrowLeft, Bell, CalendarClock, Check, Cloud, Database, Info,
   ListTodo, LockKeyhole, Moon, Palette, ShieldCheck, Sun, UserRoundPlus,
@@ -17,16 +17,12 @@ function SoonBadge() {
   return <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">準備中</span>
 }
 
-function SettingsGroup({ title, children, index }: { title: string; children: ReactNode; index: number }) {
-  const reduceMotion = useReducedMotion()
+function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <motion.section aria-label={title} className="space-y-3"
-      initial={reduceMotion ? false : { opacity: 0, y: 9 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduceMotion ? 0 : 0.22, delay: reduceMotion ? 0 : index * 0.035, ease: "easeOut" }}>
+    <section aria-label={title} className="space-y-3">
       <h2 className="px-1 text-[13px] font-bold tracking-wide text-muted-foreground">{title}</h2>
       <div className="noca-card overflow-hidden rounded-2xl border border-border bg-card">{children}</div>
-    </motion.section>
+    </section>
   )
 }
 
@@ -72,7 +68,7 @@ export function SettingsPage() {
         <h1 className="text-[23px] font-bold tracking-[-.035em]">設定</h1>
       </div>
 
-      <SettingsGroup title="外観" index={0}>
+      <SettingsGroup title="外観">
         <div className="space-y-4 px-4 py-4">
           <div className="flex items-center gap-3">
             <IconBox><Palette className="size-[19px]" /></IconBox>
@@ -103,31 +99,35 @@ export function SettingsPage() {
         </div>
       </SettingsGroup>
 
-      <SettingsGroup title="ふたりの共有" index={1}>
+      <SettingsGroup title="TODOカテゴリ">
+        <TodoCategorySettings />
+      </SettingsGroup>
+
+      <SettingsGroup title="ふたりの共有">
         <ComingSoonRow icon={UsersRound} title="共有スペース" description="メンバー管理" />
         <ComingSoonRow icon={UserRoundPlus} title="相手を招待" description="招待リンク・コード" />
         <ComingSoonRow icon={LockKeyhole} title="アカウント" description="Googleログイン・プロフィール" />
       </SettingsGroup>
 
-      <SettingsGroup title="通知" index={2}>
+      <SettingsGroup title="通知">
         <ComingSoonRow icon={CalendarClock} title="予定のリマインダー" />
         <ComingSoonRow icon={ListTodo} title="TODOの期限通知" />
         <ComingSoonRow icon={Bell} title="共有内容の更新通知" />
       </SettingsGroup>
 
-      <SettingsGroup title="データ" index={3}>
+      <SettingsGroup title="データ">
         <div className="flex min-h-[76px] items-center gap-3 border-b border-border/70 px-4 py-3">
           <IconBox tone="green"><Database className="size-[19px]" /></IconBox>
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold">TODOの保存先</p>
-            <p className="mt-1 text-[12px] text-muted-foreground">この端末内（プレビュー）</p>
+            <p className="text-[14px] font-semibold">データの保存先</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">TODO・予定はこの端末内</p>
           </div>
           <ShieldCheck className="size-[19px] text-success" aria-label="端末内保存" />
         </div>
         <ComingSoonRow icon={Cloud} title="クラウド同期" description="2人のデータをリアルタイムで同期" />
       </SettingsGroup>
 
-      <SettingsGroup title="アプリについて" index={4}>
+      <SettingsGroup title="アプリについて">
         <div className="flex min-h-[72px] items-center gap-3 px-4 py-3">
           <IconBox tone="peach"><Info className="size-[19px]" /></IconBox>
           <div className="min-w-0 flex-1">

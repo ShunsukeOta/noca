@@ -1,4 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog"
+import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 
 type ConfirmDialogProps = {
@@ -9,6 +10,7 @@ type ConfirmDialogProps = {
   description: string
   confirmLabel?: string
   cancelLabel?: string
+  children?: ReactNode
 }
 
 function ConfirmDialog({
@@ -18,7 +20,8 @@ function ConfirmDialog({
   title,
   description,
   confirmLabel = "破棄する",
-  cancelLabel = "編集を続ける"
+  cancelLabel = "編集を続ける",
+  children
 }: ConfirmDialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -31,6 +34,7 @@ function ConfirmDialog({
           <DialogPrimitive.Description className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {description}
           </DialogPrimitive.Description>
+          {children}
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <DialogPrimitive.Close asChild>
               <Button type="button" variant="secondary" className="w-full sm:w-auto">{cancelLabel}</Button>

@@ -18,11 +18,11 @@ Earlier `docs/PHASE1*_REPORT.md` files are **historical snapshots**. If a histor
 - Product: minimalist **Japanese-language**, **two-person-oriented** TODO / Calendar / Memo iPhone PWA.
 - Main navigation: `/todo`, `/calendar`, `/memo`; settings are `/settings`. Do not add extra global tabs or decorative page titles without direction.
 - The **sticky top header** contains the noca brand, current local date, placeholder A/B avatars and settings.
-- Bottom navigation: **a floating rounded box containing only three tabs**, a **16px gap**, and a **separate dark raised + button**. The + action depends on the current tab. Preserve iPhone safe-area spacing.
+- Bottom navigation: **a floating rounded box containing only three tabs**, a **16px gap**, and a **separate dark raised + button** on TODO/calendar. Hide the + on the memo development-placeholder route. Preserve iPhone safe-area spacing.
 - TODO filtering uses **square-rounded, two-line colored category tiles** with **remaining open counts**; there is **no** “残りのタスク” overview box or “これからすること” heading.
 - Calendar has a monthly grid plus a **transparent, two-column A/B daily timeline**. All-day `both` events stretch across the A+B width **below** the individual all-day row; there is **no third header/column**. Timed `both` events span both lanes. Nested overlaps keep the longer appointment's title visible; short appointments prioritize readable titles.
 - A and B and `both` are **placeholder ownership labels**, **not** actual authenticated users or sharing permission checks.
-- The TODO and calendar editors are real local CRUD; the memo add sheet is **preview only** and does not save. Settings only persist the theme.
+- TODO and calendar editors are real local CRUD persisted in this browser's `localStorage`; memo is a development placeholder with no editor or persistence. Settings persist the theme and TODO category configuration.
 - Do **not** claim that Firebase, authentication, invitations, 2-device sync, real notifications, native iOS verification or memo persistence are implemented.
 - Do **not** modify the separate `ShunsukeOta/realtime-todos` repository, its database or deployment.
 
@@ -54,4 +54,4 @@ Earlier `docs/PHASE1*_REPORT.md` files are **historical snapshots**. If a histor
 - `package-lock.json` is currently **not committed**. Use `npm install` in this repository as CI does; consider adding a lockfile in a *separate, explicitly reviewed* dependency-hygiene change.
 - Leave existing local preview data intact. Back up test/dev data before any destructive changes.
 
-**Starting the next planned feature?** Read [docs/CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md), then implement **Phase 1D (real local memo CRUD)** unless the maintainer requests otherwise.
+**Starting the next planned feature?** Read [docs/CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md). Memo CRUD is deferred; proceed with **Phase 1E (iPhone Safari/PWA QA)** unless the maintainer requests otherwise.

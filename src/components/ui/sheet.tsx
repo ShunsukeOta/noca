@@ -1,7 +1,5 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X } from "lucide-react"
-import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 const Sheet = DialogPrimitive.Root
@@ -80,7 +78,50 @@ function SheetContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   const contentRef = React.useRef<HTMLDivElement>(null)
+  const closeTriggerRef = React.useRef<HTMLButtonElement>(null)
+  const dragStartRef = React.useRef<{ pointerId: number; x: number; y: number; startedAt: number } | null>(null)
+  const [dragOffset, setDragOffset] = React.useState(0)
+  const [dragging, setDragging] = React.useState(false)
   const keyboard = useKeyboardLayout()
+
+  const handleGripPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return
+    dragStartRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, startedAt: performance.now() }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setDragging(true)
+  }
+
+  const handleGripPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current
+    if (!start || start.pointerId !== event.pointerId) return
+    const deltaY = Math.max(0, event.clientY - start.y)
+    if (Math.abs(event.clientX - start.x) > deltaY + 12) {
+      dragStartRef.current = null
+      setDragging(false)
+      setDragOffset(0)
+      return
+    }
+    setDragOffset(deltaY)
+  }
+
+  const finishGripDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current
+    if (!start || start.pointerId !== event.pointerId) return
+    const deltaY = Math.max(0, event.clientY - start.y)
+    const elapsed = Math.max(1, performance.now() - start.startedAt)
+    const shouldClose = deltaY >= 88 || (deltaY >= 36 && deltaY / elapsed >= 0.65)
+    dragStartRef.current = null
+    setDragging(false)
+    if (shouldClose) closeTriggerRef.current?.click()
+    else setDragOffset(0)
+  }
+
+  const cancelGripDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartRef.current?.pointerId !== event.pointerId) return
+    dragStartRef.current = null
+    setDragging(false)
+    setDragOffset(0)
+  }
 
   React.useEffect(() => {
     if (!keyboard) return
@@ -117,7 +158,9 @@ function SheetContent({
         data-keyboard-open={keyboard ? "true" : "false"}
         style={{
           ...style,
-          ...(keyboard ? { bottom: keyboard.bottom, maxHeight: keyboard.maxHeight } : {})
+          ...(keyboard ? { bottom: keyboard.bottom, maxHeight: keyboard.maxHeight } : {}),
+          translate: `0 ${dragOffset}px`,
+          transition: dragging ? "none" : "translate 180ms ease-out"
         }}
         className={cn(
           "sheet-content sheet-panel fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[min(90dvh,780px)] w-full max-w-[540px] flex-col overflow-hidden rounded-t-3xl border border-border bg-card text-card-foreground shadow-2xl focus:outline-none",
@@ -125,10 +168,19 @@ function SheetContent({
         )}
         {...props}
       >
-        <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-border" aria-hidden="true" />
+        <div aria-hidden="true"
+          onPointerDown={handleGripPointerDown}
+          onPointerMove={handleGripPointerMove}
+          onPointerUp={finishGripDrag}
+          onPointerCancel={cancelGripDrag}
+          className="mx-auto mt-3 flex h-6 w-12 shrink-0 cursor-grab touch-none items-center justify-center rounded-full active:cursor-grabbing"
+        >
+          <span className="h-1.5 w-10 rounded-full bg-border" aria-hidden="true" />
+        </div>
         {children}
-        <DialogPrimitive.Close className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "tap-target absolute right-3 top-4 rounded-full text-muted-foreground")} aria-label="閉じる">
-          <X className="size-[18px]" />
+        <DialogPrimitive.Close ref={closeTriggerRef}
+          className="sr-only focus:not-sr-only focus:absolute focus:right-4 focus:top-3 focus:z-10 focus:min-h-11 focus:rounded-md focus:bg-card focus:px-3 focus:text-sm focus:font-semibold focus:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+          閉じる
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
