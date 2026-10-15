@@ -1,4 +1,4 @@
-import { motion, useReducedMotion } from "motion/react"
+import { m, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 
 type UndoToastProps = {
@@ -10,7 +10,7 @@ type UndoToastProps = {
 function UndoToast({ message, onUndo, onDismiss }: UndoToastProps) {
   const reduceMotion = useReducedMotion()
   return (
-    <motion.div
+    <m.div
       role="status"
       aria-live="polite"
       initial={reduceMotion ? false : { opacity: 0, y: 12, scale: 0.98 }}
@@ -26,7 +26,7 @@ function UndoToast({ message, onUndo, onDismiss }: UndoToastProps) {
       <Button type="button" variant="ghost" size="icon" onClick={onDismiss} className="size-11 shrink-0 rounded-full text-muted-foreground" aria-label="通知を閉じる">
         <span aria-hidden="true" className="text-xl leading-none">×</span>
       </Button>
-    </motion.div>
+    </m.div>
   )
 }
 

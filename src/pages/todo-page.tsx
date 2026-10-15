@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
+import { AnimatePresence, LayoutGroup, m, useReducedMotion } from "motion/react"
 import { format, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 import { ChevronDown, ChevronRight, Clock3, Sparkles } from "lucide-react"
@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { CategoryBadge, categoryRing, TodoCategoryTile } from "@/components/category-ui"
 import { OwnerAvatar } from "@/components/owner-ui"
 import { cn } from "@/lib/utils"
+import { preloadTodoEditor } from "@/components/editor-loaders"
 
 export function TodoPage() {
   const [filter, setFilter] = useState("すべて")
@@ -40,7 +41,7 @@ export function TodoPage() {
               all={item === "すべて"} categories={categories} onSelect={() => setFilter(item)}
               countId={`todo-filter-count-${item}`} countTestId={`todo-filter-count-${item}`}
               indicator={currentFilter === item && (
-                <motion.span layoutId="filter-indicator" aria-hidden="true"
+                <m.span layoutId="filter-indicator" aria-hidden="true"
                   className={cn("pointer-events-none absolute inset-0 rounded-md",
                     item === "すべて" ? "bg-primary" : cn("ring-2 ring-inset", categoryRing(item, categories)))}
                   transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 440, damping: 38 }} />
@@ -54,14 +55,14 @@ export function TodoPage() {
           <div className="noca-card overflow-hidden rounded-2xl border border-border bg-card">
             <AnimatePresence initial={false} mode="popLayout">
           {active.length === 0 ? (
-            <motion.div key="empty" layout initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }}
+            <m.div key="empty" layout initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }}
               exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.12 }} className="flex flex-col items-center gap-2 px-4 py-11 text-center">
               <div className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-secondary text-primary"><Sparkles className="size-5" /></div>
               <p className="text-sm font-semibold">{tasks.length === 0 ? "タスクはありません" : visible.length === 0 ? "このカテゴリのタスクはありません" : "すべて終わりました"}</p>
-              <Button type="button" variant="secondary" onClick={openCreate} className="mt-3 text-[13px]">＋ タスクを追加</Button>
-            </motion.div>
+              <Button type="button" variant="secondary" onClick={openCreate} onPointerEnter={preloadTodoEditor} onPointerDown={preloadTodoEditor} onFocus={preloadTodoEditor} className="mt-3 text-[13px]">＋ タスクを追加</Button>
+            </m.div>
           ) : active.map((task, index) => (
-            <motion.div key={task.id} layout data-todo-row={task.id}
+            <m.div key={task.id} layout data-todo-row={task.id}
               initial={reduceMotion ? false : { opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, height: 0 }}
@@ -69,7 +70,7 @@ export function TodoPage() {
               className="overflow-hidden">
             <div className={cn("flex min-h-[68px] items-center gap-2.5 px-3.5 py-3", index > 0 && "border-t border-border/70")}>
               <Checkbox checked={false} label={task.title + "を完了"} onCheckedChange={() => toggle(task)} />
-              <Button type="button" variant="ghost" onClick={() => openEdit(task.id)} aria-label={task.title + "を編集"} className="h-auto min-w-0 flex-1 self-stretch flex-col items-start justify-center whitespace-normal rounded-none px-0 py-0 text-left hover:bg-transparent">
+              <Button type="button" variant="ghost" onClick={() => openEdit(task.id)} onPointerEnter={preloadTodoEditor} onPointerDown={preloadTodoEditor} onFocus={preloadTodoEditor} aria-label={task.title + "を編集"} className="h-auto min-w-0 flex-1 self-stretch flex-col items-start justify-center whitespace-normal rounded-none px-0 py-0 text-left hover:bg-transparent">
                 <p className="break-words text-[14px] font-semibold leading-snug">{task.title}</p>
                 {(currentFilter === "すべて" || task.dueDate) && (
                   <div className="mt-0 flex min-h-5 flex-wrap items-center gap-2">
@@ -81,7 +82,7 @@ export function TodoPage() {
               <OwnerAvatar owner={task.by} size="md" />
               <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
             </div>
-            </motion.div>
+            </m.div>
           ))}
             </AnimatePresence>
           </div>
@@ -96,24 +97,24 @@ export function TodoPage() {
             <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showCompleted && "rotate-180")} />
           </Button>
           <AnimatePresence initial={false}>
-          {showCompleted && <motion.div id="completed-tasks" initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+          {showCompleted && <m.div id="completed-tasks" initial={reduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }} exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
             className="overflow-hidden rounded-xl border border-border/75 bg-card/60">
             <AnimatePresence initial={false} mode="popLayout">
             {completed.map((task) => (
-              <motion.div key={task.id} layout initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+              <m.div key={task.id} layout initial={reduceMotion ? false : { opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.15 }} className="overflow-hidden">
               <div className="flex items-center gap-2 px-3.5 py-3">
                 <Checkbox checked label={task.title + "の完了を解除"} onCheckedChange={() => toggle(task)} />
-                <Button type="button" variant="ghost" onClick={() => openEdit(task.id)} aria-label={task.title + "を編集"}
+                <Button type="button" variant="ghost" onClick={() => openEdit(task.id)} onPointerEnter={preloadTodoEditor} onPointerDown={preloadTodoEditor} onFocus={preloadTodoEditor} aria-label={task.title + "を編集"}
                   className="h-auto min-h-11 min-w-0 flex-1 justify-start whitespace-normal break-words rounded-none px-0 py-0 text-left text-[13px] text-muted-foreground line-through hover:bg-transparent">{task.title}</Button>
               </div>
-              </motion.div>
+              </m.div>
             ))}
             </AnimatePresence>
-          </motion.div>}
+          </m.div>}
           </AnimatePresence>
         </section>
       )}

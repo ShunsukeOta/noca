@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react"
+import { lazy, Suspense, useEffect, useState } from "react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Link, NavLink, useLocation, useOutlet } from "react-router-dom"
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
+import { AnimatePresence, LayoutGroup, m, useReducedMotion } from "motion/react"
 import { CalendarDays, ListTodo, NotebookPen, Plus, Settings, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ChunkLoadBoundary } from "@/components/chunk-load-boundary"
 import { OwnerAvatar } from "@/components/owner-ui"
 import { UndoToast } from "@/components/undo-toast"
-import { TodoEditorSheet } from "@/components/todo-editor-sheet"
-import { CalendarEditorSheet } from "@/components/calendar-editor-sheet"
+import { loadCalendarEditor, loadTodoEditor, preloadCalendarEditor, preloadTodoEditor } from "@/components/editor-loaders"
+import { preloadTodoCategorySettings } from "@/components/settings-loaders"
 import { useCalendar } from "@/features/calendar/calendar-store"
 import { useTodos } from "@/features/todos/todo-store"
 import { cn } from "@/lib/utils"
@@ -19,6 +20,33 @@ const tabs: { to: string; label: string; icon: typeof ListTodo; kind: PageKind }
   { to: "/calendar", label: "カレンダー", icon: CalendarDays, kind: "calendar" },
   { to: "/memo", label: "メモ", icon: NotebookPen, kind: "memo" }
 ]
+
+function preloadTab(to: string) {
+  if (to === "/calendar") {
+    void import("@/pages/calendar-page").catch(() => undefined)
+  }
+}
+
+const TodoEditorSheet = lazy(async () => ({ default: (await loadTodoEditor()).TodoEditorSheet }))
+const CalendarEditorSheet = lazy(async () => ({ default: (await loadCalendarEditor()).CalendarEditorSheet }))
+
+function EditorLoadingState() {
+  return (
+    <div role="status" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/20">
+      <span className="sr-only">入力画面を読み込み中</span>
+      <span aria-hidden="true" className="size-7 animate-spin rounded-full border-2 border-primary/20 border-t-primary motion-reduce:animate-none" />
+    </div>
+  )
+}
+
+function EditorLoadError() {
+  return (
+    <div role="alert" className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/95 px-5 text-center">
+      <p className="text-sm text-muted-foreground">入力画面を表示できませんでした。</p>
+      <Button type="button" variant="outline" onClick={() => window.location.reload()}>再読み込み</Button>
+    </div>
+  )
+}
 
 export function AppShell() {
   const location = useLocation()
@@ -65,7 +93,6 @@ export function AppShell() {
     if (background) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background)
   }, [theme])
 
-  // Memo editor owns its discard confirmation; do not close it from route cleanup.
   useEffect(() => { closeEditor(); calendar.closeEditor() }, [location.pathname, closeEditor, calendar.closeEditor])
   const page = useOutlet({ theme, onThemeChange: setTheme })
 
@@ -86,6 +113,9 @@ export function AppShell() {
               <OwnerAvatar owner="B" size="lg" decorative className="border-[3px] border-background" />
             </div>
             <Link to={isSettings ? settingsReturnTo : "/settings"} state={isSettings ? undefined : { from: active?.to ?? "/todo" }}
+              onPointerEnter={isSettings ? undefined : preloadTodoCategorySettings}
+              onPointerDown={isSettings ? undefined : preloadTodoCategorySettings}
+              onFocus={isSettings ? undefined : preloadTodoCategorySettings}
               aria-label={isSettings ? "設定を閉じる" : "設定を開く"} aria-current={isSettings ? "page" : undefined}
               className={cn("tap-target flex items-center justify-center rounded-full transition-colors", isSettings ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary")}>
               {isSettings ? <X className="size-5" /> : <Settings className="size-5" />}
@@ -98,12 +128,12 @@ export function AppShell() {
         className={cn("app-content px-5 pt-5", isSettings && "app-content-settings")}>
         {isSettings ? page : (
           <AnimatePresence initial={false} mode="wait">
-            <motion.div key={location.pathname} data-page-transition={location.pathname}
+            <m.div key={location.pathname} data-page-transition={location.pathname}
               initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }} exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.07, ease: "easeOut" }}>
               {page}
-            </motion.div>
+            </m.div>
           </AnimatePresence>
         )}
       </main>
@@ -116,13 +146,16 @@ export function AppShell() {
             <LayoutGroup id="global-bottom-tabs">
               {tabs.map(({ to, label, icon: Icon }) => (
                 <NavLink key={to} to={to}
+                  onPointerEnter={() => preloadTab(to)}
+                  onPointerDown={() => preloadTab(to)}
+                  onFocus={() => preloadTab(to)}
                   className={({ isActive }) => cn(
                     "relative flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[16px] text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     isActive && "text-primary"
                   )} aria-label={label}>
                   {({ isActive }) => (
                     <>
-                      {isActive && <motion.span layoutId="nav-indicator" aria-hidden="true" className="absolute inset-0 rounded-[16px] bg-secondary"
+                      {isActive && <m.span layoutId="nav-indicator" aria-hidden="true" className="absolute inset-0 rounded-[16px] bg-secondary"
                         transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 470, damping: 38 }} />}
                       <span className="relative z-10 flex h-[27px] w-full max-w-[54px] items-center justify-center rounded-full">
                         <Icon className="size-[21px]" strokeWidth={2} />
@@ -136,16 +169,19 @@ export function AppShell() {
           </div>
         </nav>
         {active && active.kind !== "memo" && (
-          <motion.div className="pointer-events-auto shrink-0"
+          <m.div className="pointer-events-auto shrink-0"
             whileTap={reduceMotion ? undefined : { scale: 0.96 }}
             transition={{ type: "spring", stiffness: 510, damping: 29 }}>
             <Button type="button" size="fab" aria-label={active.label + "を追加"}
               data-testid="dock-add-button"
+              onPointerEnter={active.kind === "todo" ? preloadTodoEditor : preloadCalendarEditor}
+              onPointerDown={active.kind === "todo" ? preloadTodoEditor : preloadCalendarEditor}
+              onFocus={active.kind === "todo" ? preloadTodoEditor : preloadCalendarEditor}
               onClick={() => { if (active.kind === "todo") openCreate(); else calendar.openCreate() }}
               className="dock-create bg-dock-create-bg text-dock-create-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <Plus className="size-[27px] stroke-[2.5px]" />
             </Button>
-          </motion.div>
+          </m.div>
         )}
       </div>}
       <div className="pointer-events-none fixed bottom-[calc(105px+env(safe-area-inset-bottom))] left-1/2 z-40 flex w-full max-w-[540px] -translate-x-1/2 flex-col gap-2 px-5">
@@ -159,8 +195,12 @@ export function AppShell() {
           この端末に保存できません。ブラウザの設定を確認してください。
         </div>
       )}
-      {editor && <TodoEditorSheet key={editor.mode === "edit" ? editor.id : "create"} />}
-      {calendar.editor && <CalendarEditorSheet key={calendar.editor.mode === "edit" ? calendar.editor.id : "create-" + calendar.editor.date} />}
+      <ChunkLoadBoundary fallback={<EditorLoadError />}>
+        <Suspense fallback={<EditorLoadingState />}>
+          {editor && <TodoEditorSheet key={editor.mode === "edit" ? editor.id : "create"} />}
+          {calendar.editor && <CalendarEditorSheet key={calendar.editor.mode === "edit" ? calendar.editor.id : "create-" + calendar.editor.date} />}
+        </Suspense>
+      </ChunkLoadBoundary>
     </div>
   )
 }

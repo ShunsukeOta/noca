@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test"
+import { readFile } from "node:fs/promises"
 
 for (const width of [375, 390, 430]) {
   test("responsive shell and tabs at " + width + "px", async ({ browser }) => {
@@ -159,6 +160,220 @@ test("settings icon opens the page; theme setting persists; back returns to the 
   await expect(page.getByTestId("calendar-page")).toBeVisible()
 })
 
+test("settings exports a versioned local backup without changing stored data", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", { configurable: true, value: undefined })
+  })
+  await page.goto("/settings")
+  await page.evaluate(() => {
+    localStorage.setItem("noca.todos.v1", JSON.stringify([
+      { id: "backup-task", title: "保険の書類", category: "自分用", dueDate: "2026-10-22", memo: "住所確認", done: false, by: "B" }
+    ]))
+    localStorage.setItem("noca.todo.categories.v1", JSON.stringify([
+      { id: "backup-category", name: "自分用", tone: "mint" }
+    ]))
+    localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+      { id: "backup-event", title: "病院", date: "2026-10-22", time: "10:00", endTime: "11:00", address: "中央区", category: "暮らし", by: "both" }
+    ]))
+    localStorage.setItem("noca.calendar.samples.v2", "done")
+    localStorage.setItem("noca.calendar.samples.v3", "done")
+  })
+  await page.reload()
+  await expect(page.getByText("TODO・カテゴリ・予定をJSONで保存・復元できます。TODO・予定の詳細メモや住所も含み、復元時は内容を確認して置き換えます。")).toBeVisible()
+  const before = await page.evaluate(() => [
+    localStorage.getItem("noca.todos.v1"),
+    localStorage.getItem("noca.todo.categories.v1"),
+    localStorage.getItem("noca.calendar.events.v1"),
+    localStorage.getItem("noca.calendar.samples.v2"),
+    localStorage.getItem("noca.calendar.samples.v3")
+  ])
+  const downloadPromise = page.waitForEvent("download")
+  await page.getByRole("button", { name: "バックアップを書き出す" }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toMatch(/^noca-backup-\d{4}-\d{2}-\d{2}\.json$/)
+  const path = await download.path()
+  expect(path).not.toBeNull()
+  const backup = JSON.parse(await readFile(path as string, "utf8"))
+  expect(backup).toMatchObject({ format: "noca.local-backup", version: 1 })
+  expect(backup.exportedAt).toEqual(expect.any(String))
+  expect(backup.localState.calendarSampleMigrations).toEqual({ v2: true, v3: true })
+  expect(backup.data.todos[0]).toMatchObject({ id: "backup-task", title: "保険の書類", memo: "住所確認", by: "B" })
+  expect(backup.data.todoCategories[0]).toMatchObject({ id: "backup-category", name: "自分用", tone: "mint" })
+  expect(backup.data.calendarEvents[0]).toMatchObject({ id: "backup-event", title: "病院", address: "中央区", by: "both" })
+  await expect(page.getByRole("status").first()).toHaveText("バックアップファイルを保存しました。")
+  const after = await page.evaluate(() => [
+    localStorage.getItem("noca.todos.v1"),
+    localStorage.getItem("noca.todo.categories.v1"),
+    localStorage.getItem("noca.calendar.events.v1"),
+    localStorage.getItem("noca.calendar.samples.v2"),
+    localStorage.getItem("noca.calendar.samples.v3")
+  ])
+  expect(after).toEqual(before)
+})
+
+test("backup restore previews counts, preserves data on cancel, and replaces all local records on confirmation", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto("/settings")
+  const today = await page.evaluate(() => {
+    const date = new Date()
+    const pad = (value: number) => String(value).padStart(2, "0")
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  })
+  await page.evaluate(date => {
+    localStorage.setItem("noca.todos.v1", JSON.stringify([
+      { id: "old-task", title: "置き換え前", category: "古い", done: false, by: "A" }
+    ]))
+    localStorage.setItem("noca.todo.categories.v1", JSON.stringify([
+      { id: "old-category", name: "古い", tone: "neutral" }
+    ]))
+    localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+      { id: "old-event", title: "置き換え前の予定", date, category: "暮らし", by: "A" }
+    ]))
+    localStorage.setItem("noca.calendar.samples.v2", "done")
+    localStorage.setItem("noca.calendar.samples.v3", "done")
+  }, today)
+  await page.reload()
+  const storedSnapshot = () => page.evaluate(() => [
+    localStorage.getItem("noca.todos.v1"),
+    localStorage.getItem("noca.todo.categories.v1"),
+    localStorage.getItem("noca.calendar.events.v1"),
+    localStorage.getItem("noca.calendar.samples.v2"),
+    localStorage.getItem("noca.calendar.samples.v3")
+  ])
+  const before = await storedSnapshot()
+  const backup = {
+    format: "noca.local-backup",
+    version: 1,
+    exportedAt: "2026-10-15T01:00:00.000Z",
+    localState: { calendarSampleMigrations: { v2: false, v3: true } },
+    data: {
+      todos: [{ id: "restored-task", title: "復元されたTODO", category: "検証", dueDate: today, memo: "詳細", done: false, by: "B" }],
+      todoCategories: [{ id: "restored-category", name: "検証", tone: "mint" }],
+      calendarEvents: [{ id: "restored-event", title: "復元された予定", date: today, time: "10:00", endTime: "11:00", category: "暮らし", by: "both" }]
+    }
+  }
+  const file = { name: "noca-backup.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(backup)) }
+  const fileInput = page.getByLabel("バックアップファイルを選択")
+  await fileInput.setInputFiles(file)
+  const dialog = page.getByRole("dialog", { name: "バックアップを復元しますか？" })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText("TODO")
+  await expect(dialog).toContainText("カテゴリ")
+  await expect(dialog).toContainText("予定")
+  await page.screenshot({ path: "test-results/screenshots/backup-restore-confirm-320.png" })
+  expect(await storedSnapshot()).toEqual(before)
+  await dialog.getByRole("button", { name: "キャンセル" }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(await storedSnapshot()).toEqual(before)
+
+  await fileInput.setInputFiles(file)
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole("button", { name: "置き換えて復元" }).click()
+  await expect(page.getByRole("status").last()).toHaveText("バックアップを復元しました。")
+  const restored = await page.evaluate(() => ({
+    todos: JSON.parse(localStorage.getItem("noca.todos.v1") || "[]"),
+    categories: JSON.parse(localStorage.getItem("noca.todo.categories.v1") || "[]"),
+    events: JSON.parse(localStorage.getItem("noca.calendar.events.v1") || "[]"),
+    migrationV2: localStorage.getItem("noca.calendar.samples.v2"),
+    migrationV3: localStorage.getItem("noca.calendar.samples.v3")
+  }))
+  expect(restored.todos).toMatchObject([{ id: "restored-task", title: "復元されたTODO", memo: "詳細", by: "B" }])
+  expect(restored.categories).toMatchObject([{ id: "restored-category", name: "検証", tone: "mint" }])
+  expect(restored.events).toMatchObject([{ id: "restored-event", title: "復元された予定", by: "both" }])
+  expect(restored.migrationV2).toBeNull()
+  expect(restored.migrationV3).toBe("done")
+  await page.goto("/todo")
+  await expect(page.getByRole("button", { name: "復元されたTODOを編集" })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole("button", { name: "復元されたTODOを編集" })).toBeVisible()
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
+  await expect(page.getByRole("button", { name: "復元された予定を編集" })).toBeVisible()
+})
+
+test("invalid backup is rejected without changing local data", async ({ page }) => {
+  await page.goto("/settings")
+  const before = await page.evaluate(() => [
+    localStorage.getItem("noca.todos.v1"),
+    localStorage.getItem("noca.todo.categories.v1"),
+    localStorage.getItem("noca.calendar.events.v1")
+  ])
+  const fileInput = page.getByLabel("バックアップファイルを選択")
+  const restoreDialog = page.getByRole("dialog", { name: "バックアップを復元しますか？" })
+  await fileInput.setInputFiles({
+    name: "invalid.json", mimeType: "application/json", buffer: Buffer.from("{broken json")
+  })
+  await expect(page.getByRole("status").last()).toHaveText("JSONファイルを読み取れません。")
+  await expect(restoreDialog).toHaveCount(0)
+  await fileInput.setInputFiles({
+    name: "unsupported.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ format: "noca.local-backup", version: 2 }))
+  })
+  await expect(page.getByRole("status").last()).toHaveText("このバックアップのバージョンには対応していません。")
+  await expect(restoreDialog).toHaveCount(0)
+  const after = await page.evaluate(() => [
+    localStorage.getItem("noca.todos.v1"),
+    localStorage.getItem("noca.todo.categories.v1"),
+    localStorage.getItem("noca.calendar.events.v1")
+  ])
+  expect(after).toEqual(before)
+})
+
+test("failed backup storage write rolls back earlier keys without changing the app state", async ({ page }) => {
+  await page.goto("/settings")
+  await page.evaluate(() => {
+    localStorage.setItem("noca.todos.v1", JSON.stringify([
+      { id: "safe-task", title: "残しておくTODO", category: "保管", done: false, by: "A" }
+    ]))
+    localStorage.setItem("noca.todo.categories.v1", JSON.stringify([
+      { id: "safe-category", name: "保管", tone: "blue" }
+    ]))
+    localStorage.setItem("noca.calendar.events.v1", JSON.stringify([]))
+  })
+  await page.reload()
+  const storedSnapshot = () => page.evaluate(() => [
+    localStorage.getItem("noca.todos.v1"),
+    localStorage.getItem("noca.todo.categories.v1"),
+    localStorage.getItem("noca.calendar.events.v1"),
+    localStorage.getItem("noca.calendar.samples.v2"),
+    localStorage.getItem("noca.calendar.samples.v3")
+  ])
+  const before = await storedSnapshot()
+  await page.evaluate(() => {
+    const originalSetItem = Storage.prototype.setItem
+    let failOnce = true
+    Storage.prototype.setItem = function (key, value) {
+      if (failOnce && key === "noca.calendar.events.v1") {
+        failOnce = false
+        throw new DOMException("Storage is full", "QuotaExceededError")
+      }
+      return originalSetItem.call(this, key, value)
+    }
+  })
+  const backup = {
+    format: "noca.local-backup",
+    version: 1,
+    exportedAt: "2026-10-15T01:00:00.000Z",
+    localState: { calendarSampleMigrations: { v2: false, v3: false } },
+    data: {
+      todos: [{ id: "unsafe-task", title: "適用されないTODO", category: "新規", done: false, by: "B" }],
+      todoCategories: [{ id: "new-category", name: "新規", tone: "mint" }],
+      calendarEvents: []
+    }
+  }
+  await page.getByLabel("バックアップファイルを選択").setInputFiles({
+    name: "noca-backup.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(backup))
+  })
+  const dialog = page.getByRole("dialog", { name: "バックアップを復元しますか？" })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole("button", { name: "置き換えて復元" }).click()
+  await expect(page.getByRole("status").last()).toHaveText("保存に失敗したため、現在のデータを元に戻しました。空き容量を確認して再試行してください。")
+  expect(await storedSnapshot()).toEqual(before)
+  await page.goto("/todo")
+  await expect(page.getByRole("button", { name: "残しておくTODOを編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "適用されないTODOを編集" })).toHaveCount(0)
+})
+
 test("settings is reachable on small iPhone widths with no horizontal overflow", async ({ browser }) => {
   for (const width of [320, 375, 390, 430]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
@@ -169,9 +384,13 @@ test("settings is reachable on small iPhone widths with no horizontal overflow",
     await expect(page.getByText("相手を招待")).toBeVisible()
     await expect(page.getByText("クラウド同期")).toBeVisible()
     await expect(page.locator("main").getByText("準備中")).toHaveCount(7)
+    const backupButton = page.getByRole("button", { name: "バックアップを書き出す" })
+    await expect(backupButton).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     expect(overflow).toBe(false)
     await page.screenshot({ path: "test-results/screenshots/settings-" + width + ".png", fullPage: false })
+    await backupButton.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: "test-results/screenshots/settings-data-" + width + ".png", fullPage: false })
     await page.getByRole("button", { name: "前の画面に戻る" }).click()
     await expect(page.getByTestId("memo-page")).toBeVisible()
     await context.close()
@@ -503,6 +722,10 @@ test("category filter chips match task category tag colors in light and dark mod
       await expect(page.locator("html")).toHaveClass(/dark/)
     }
     const chips = page.getByRole("group", { name: "TODOの絞り込み" })
+    const finishFilterAnimations = () => chips.evaluate(async element => {
+      const animations = element.getAnimations({ subtree: true })
+      await Promise.all(animations.map(animation => animation.finished.catch(() => undefined)))
+    })
     const samples = [
       { category: "おでかけ", task: "週末のカフェを探す" },
       { category: "暮らし", task: "洗剤と柔軟剤を買う" },
@@ -512,17 +735,22 @@ test("category filter chips match task category tag colors in light and dark mod
       const chip = chips.getByRole("button", { name: category, exact: true })
       await chip.click()
       await expect(chip).toHaveAttribute("aria-pressed", "true")
+      await finishFilterAnimations()
       await expect(page.getByRole("button", { name: task + "を編集" }).getByText(category, { exact: true })).toHaveCount(0)
       await page.mouse.move(0, 0)
-      const chipColor = await chip.evaluate(node => ({
-        bg: getComputedStyle(node).backgroundColor,
-        text: getComputedStyle(node).color
-      }))
       await expect(chip.locator('[class*="ring-2"]')).toHaveCount(1)
       await chips.getByRole("button", { name: "すべて", exact: true }).click()
+      await finishFilterAnimations()
       const badge = page.getByRole("button", { name: task + "を編集" }).getByText(category, { exact: true })
       await expect(badge).toBeVisible()
       const badgeColor = await badge.evaluate(node => ({
+        bg: getComputedStyle(node).backgroundColor,
+        text: getComputedStyle(node).color
+      }))
+      // The chip transitions from its hover color after the pointer leaves.
+      // Wait for that transition before comparing its base category tone.
+      await expect.poll(() => chip.evaluate(node => getComputedStyle(node).backgroundColor)).toBe(badgeColor.bg)
+      const chipColor = await chip.evaluate(node => ({
         bg: getComputedStyle(node).backgroundColor,
         text: getComputedStyle(node).color
       }))
@@ -922,6 +1150,7 @@ test("two-column all-day layout and shared spanning strip fit narrow phones", as
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
     const page = await context.newPage()
     await page.goto("/calendar")
+    await expect(page.getByTestId("calendar-page")).toBeVisible()
     await expect(page.getByTestId("person-header-both")).toHaveCount(0)
     const dims = await page.evaluate(() => {
       const strip = document.querySelector<HTMLElement>('[data-testid="all-day-strip"]')!

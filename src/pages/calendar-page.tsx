@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import { AnimatePresence, m, useReducedMotion } from "motion/react"
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns"
 import { ja } from "date-fns/locale"
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react"
+import { preloadCalendarEditor } from "@/components/editor-loaders"
 import { CalendarDayTimeline } from "@/components/calendar-day-timeline"
 import { Button } from "@/components/ui/button"
 import { useTodos } from "@/features/todos/todo-store"
@@ -73,7 +74,7 @@ export function CalendarPage() {
           ))}
         </div>
         <AnimatePresence initial={false} mode="wait" custom={direction}>
-          <motion.div key={monthKey} custom={direction}
+          <m.div key={monthKey} custom={direction}
             initial={reduceMotion ? false : { opacity: 0, x: direction * 12 }}
             animate={{ opacity: 1, x: 0 }}
             exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: -direction * 12 }}
@@ -98,7 +99,7 @@ export function CalendarPage() {
                     !isSameMonth(date, month) && "text-muted-foreground/40",
                     isToday && !selected && "ring-1 ring-primary text-primary",
                     selected && "text-primary-foreground")}>
-                    {selected && <motion.span layoutId="calendar-selected-day" aria-hidden="true"
+                    {selected && <m.span layoutId="calendar-selected-day" aria-hidden="true"
                       className="absolute inset-0 rounded-full bg-primary"
                       transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 480, damping: 40 }} />}
                     <span className="relative z-10">{format(date, "d")}</span>
@@ -111,7 +112,7 @@ export function CalendarPage() {
                 </Button>
               )
             })}
-          </motion.div>
+          </m.div>
         </AnimatePresence>
       </section>
 
@@ -124,20 +125,20 @@ export function CalendarPage() {
         </div>
         <AnimatePresence initial={false} mode="wait">
           {dayEvents.length + dayTasks.length === 0 ? (
-            <motion.div key="empty" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <m.div key="empty" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.1 }}
               className="rounded-2xl border border-dashed border-border bg-card/65 py-9 text-center">
               <CalendarDays className="mx-auto mb-3 size-7 text-muted-foreground/45" strokeWidth={1.5} />
               <p className="text-sm font-semibold">この日の予定はありません</p>
-              <Button type="button" variant="secondary" onClick={() => openCreate(selectedDate)} className="mt-3 text-[13px]">＋ 予定を追加</Button>
-            </motion.div>
+              <Button type="button" variant="secondary" onClick={() => openCreate(selectedDate)} onPointerEnter={preloadCalendarEditor} onPointerDown={preloadCalendarEditor} onFocus={preloadCalendarEditor} className="mt-3 text-[13px]">＋ 予定を追加</Button>
+            </m.div>
           ) : (
-            <motion.div key={selectedDate} initial={reduceMotion ? false : { opacity: 0 }}
+            <m.div key={selectedDate} initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: reduceMotion ? 0 : 0.1 }}>
               <CalendarDayTimeline events={dayEvents} todos={dayTasks}
                 onEditEvent={openEdit} onEditTodo={editTodo} onCreate={() => openCreate(selectedDate)} />
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </section>

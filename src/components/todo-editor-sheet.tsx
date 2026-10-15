@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import { AnimatePresence, m, useReducedMotion } from "motion/react"
 import { CalendarDays, Check, ChevronDown, Link2, MapPin, NotebookPen, Trash2 } from "lucide-react"
 import { type TaskCategory } from "@/app/mock-data"
 import { useTodos, type TodoDraft } from "@/features/todos/todo-store"
@@ -131,7 +131,7 @@ export function TodoEditorSheet() {
               />
               <span className="pointer-events-none absolute right-3 top-1/2 size-[18px] -translate-y-1/2">
                 <AnimatePresence>
-                  {showSavedCheck && <motion.span role="status" aria-live="polite"
+                  {showSavedCheck && <m.span role="status" aria-live="polite"
                     initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }}
@@ -139,7 +139,7 @@ export function TodoEditorSheet() {
                     className="flex size-full items-center justify-center rounded-full border border-emerald-600 bg-emerald-600 text-white">
                     <Check className="size-2.5" strokeWidth={2.5} aria-hidden="true" />
                     <span className="sr-only">タスクを追加しました</span>
-                  </motion.span>}
+                  </m.span>}
                 </AnimatePresence>
               </span>
             </div>

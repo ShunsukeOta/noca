@@ -5,12 +5,12 @@ import { VitePWA } from "vite-plugin-pwa"
 import { fileURLToPath, URL } from "node:url"
 
 export default defineConfig({
+  build: { manifest: true },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["noca-icon.svg"],
       manifest: {
         name: "noca",
         short_name: "noca",
@@ -26,7 +26,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/index.html",
-        globPatterns: ["**/*.{js,css,html,svg,ico,png,webp}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,webp}"],
         cleanupOutdatedCaches: true
       },
       devOptions: { enabled: false }

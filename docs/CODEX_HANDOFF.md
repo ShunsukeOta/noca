@@ -33,14 +33,29 @@ Design decisions established with the maintainer:
 | Memo tab | Retained in global navigation; displays only **「メモ機能は開発中です」** |
 | Memo list/editor/storage | Deferred and removed from the active app; the memo tab has no + action |
 | Shared UI foundation (theme tokens, fields, buttons, checkbox/switch, owner/category controls, confirm/Undo) | Implemented; settings manage TODO categories |
+| Local data backup | **Implemented:** Settings exports and restores TODOs, TODO categories, calendar events and sample-migration flags as versioned JSON. Restore validates the file, previews counts, requires explicit replacement confirmation and rolls back storage writes on failure. |
 | Login, pairing, actual pair sharing, Firebase/Firestore | **NOT implemented** |
 | Push notifications, real iOS Safari/standalone sign-off | **NOT implemented/verified** |
 
-After the shared UI foundation, overlap-summary and category-management changes, `npm run typecheck` and `npm run build` pass. The build reports the existing >500 kB JavaScript chunk warning. Playwright has not been run for the latest category-management changes; the latest recorded CI baseline remains the run linked above. iPhone Safari remains unverified.
+Current local verification: `npm run build`, `npm run check:bundle`, the full `npm run test:e2e` run (**49/49**) and `npm run test:pwa` (**4/4**) pass. The >500 kB chunk warning is gone. The most recent recorded successful GitHub Actions run remains [run 38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) at 43/43; CI for these unpushed changes must still be checked. iPhone Safari/standalone remains unverified.
+
+The performance pass now defers `/calendar`, the two editor sheets, Settings' category manager and Motion's layout feature bundle. Pointer/focus intent preloads interaction chunks. Settings' header and theme appear immediately while categories load; a delayed-chunk production test verifies this. The latest build's synchronous entry is **425.59 kB raw / 136.01 kB gzip**, down from **571.82 kB / 182.96 kB gzip** before this pass (about 26% less gzip). The largest chunk is under 500 kB. The PWA still precaches all chunks for offline use (about 638 KiB); production Chromium tests verify offline calendar, settings and both editors. Bundle budgets are enforced by `npm run check:bundle` in CI. Real iPhone Safari/standalone performance and interaction remain to be measured on a device.
 
 **Files that should be opened first in a relevant task:** `src/styles/globals.css`, `src/components/ui/`, `src/components/category-ui.tsx`, `src/components/todo-category-settings.tsx`, `src/components/owner-ui.tsx`, `src/components/app-shell.tsx`, `src/pages/todo-page.tsx`, `src/pages/calendar-page.tsx`, `src/components/calendar-day-timeline.tsx`, `src/pages/memo-page.tsx`, `src/features/todos/todo-store.tsx`, `src/features/calendar/calendar-store.tsx`, `tests/ui.spec.ts`.
 
-## 3. NEXT: Phase 1E — iPhone Safari/PWA QA
+## 3. NEXT: iPhone validation and shared-data groundwork
+
+The maintainer requested a staged plan for app optimization, real login/two-person operation, and database migration. Firebase Authentication + Firestore is the current documented candidate, not an implemented or final provider decision. Compare it with the relational alternative only against the product's confirmed offline, query, migration and operational needs.
+
+Recommended order:
+1. Verify the optimized production build on an actual iPhone Safari and Home Screen PWA: first launch, settings entry, first editor open, offline reload, keyboard and safe areas. Record device/iOS version and measured behavior.
+2. Establish a repository boundary and formal local-to-cloud migration plan while preserving all current `localStorage` keys and sample migration behavior. The export/restore envelope is `noca.local-backup` v1; restore replaces current TODO, category and event records only after validation and confirmation.
+3. Finalize actual-member versus A/B assignment semantics, login and invite lifecycle, and conflict/Undo behavior.
+4. Build a small authenticated two-member vertical slice with tested security rules before migrating all TODO/calendar data.
+
+Memo CRUD remains deferred until its user workflow is specified.
+
+## 4. Phase 1E — iPhone Safari/PWA QA
 
 Memo CRUD has been deferred. The global memo tab remains and shows only **「メモ機能は開発中です」**; the memo + action, list, editor, sample records, provider and persistence code are removed. Verify that the placeholder and three-tab navigation remain clear at 320/375/390/430px, in light/dark mode and in reduced-motion mode. The memo route is not an editor or storage test target.
 
@@ -50,14 +65,14 @@ Do not silently mark Phase 2 or 3 done.
 
 This is a proposal/acceptance checklist, not an unrequested task authorization.
 
-## 4. Then: Phase 1E and later
+## 5. Later phases
 
 - **1E — actual iPhone Safari + Home Screen PWA QA:** keyboard/sheets, native date/time pickers, safe-area/Dock, system theme, screen reader, offline/reload, 320–430px layouts. Use [UI_QA.md](UI_QA.md) as a checklist; record model, iOS version and mode. Chromium screenshots alone are not iPhone WebKit evidence.
 - **2 — actual identities and invitations:** Google login, a two-member workspace, invite flow and server-validated membership; design Firestore rules and failure states before integrating.
 - **3 — real shared persistence:** Firestore Todo/Event/Note CRUD with secure workspace filtering, data migration/backup, concurrency/conflict handling, sync and error feedback.
 - **4–5 — PWA reliability, notifications only when requested, release QA.**
 
-## 5. Current technical cautions
+## 6. Current technical cautions
 
 - **Source of truth is local:** `noca.todos.v1`, `noca.calendar.events.v1`, `noca.theme`; samples use `noca.calendar.samples.v2/v3` markers. The current app does not use any memo storage key. See [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Samples are not users:** TODO new items still default to A; calendar explicitly supports A/B/both. Actual shared identity requires a later design; do not pass demo IDs straight into security rules.
@@ -71,7 +86,7 @@ This is a proposal/acceptance checklist, not an unrequested task authorization.
 - Existing drawers should remain usable when the iPhone keyboard is raised; preserve `visualViewport`/safe-area behavior and don't forcibly focus inputs when opening.
 - Core user interactions should keep modern transitions but honor Reduced Motion.
 
-## 6. How to prove completion
+## 7. How to prove completion
 
 ```bash
 npm install

@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { mockTasks, type Task, type TaskCategory, type TodoCategory } from "@/app/mock-data"
 
-const STORAGE_KEY = "noca.todos.v1"
-const CATEGORY_STORAGE_KEY = "noca.todo.categories.v1"
+export const TODO_STORAGE_KEY = "noca.todos.v1"
+export const TODO_CATEGORY_STORAGE_KEY = "noca.todo.categories.v1"
 export const DEFAULT_TODO_CATEGORIES: TodoCategory[] = [
   { id: "default-outing", name: "おでかけ", tone: "peach" },
   { id: "default-life", name: "暮らし", tone: "green" },
@@ -48,6 +48,7 @@ type TodoContextValue = {
   updateCategoryTone: (id: string, tone: TodoCategory["tone"]) => void
   deleteCategory: (id: string, moveToId?: string) => void
   setCategoryOrder: (ids: string[]) => void
+  restoreLocalData: (todos: Task[], categories: TodoCategory[]) => void
 }
 
 const TodoContext = createContext<TodoContextValue | null>(null)
@@ -75,7 +76,7 @@ function isTodoCategory(value: unknown): value is StoredTodoCategory {
 
 function loadCategories(): TodoCategory[] {
   try {
-    const raw = localStorage.getItem(CATEGORY_STORAGE_KEY)
+    const raw = localStorage.getItem(TODO_CATEGORY_STORAGE_KEY)
     if (raw === null) return DEFAULT_TODO_CATEGORIES
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.every(isTodoCategory)) return DEFAULT_TODO_CATEGORIES
@@ -90,7 +91,7 @@ function loadCategories(): TodoCategory[] {
 
 function loadTodos(): Task[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(TODO_STORAGE_KEY)
     if (raw === null) return mockTasks
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.every(isTask)) return mockTasks
@@ -115,7 +116,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
+      localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos))
       setTodosStorageError(false)
     } catch {
       setTodosStorageError(true)
@@ -124,7 +125,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories))
+      localStorage.setItem(TODO_CATEGORY_STORAGE_KEY, JSON.stringify(categories))
       setCategoriesStorageError(false)
     } catch {
       setCategoriesStorageError(true)
@@ -133,7 +134,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY && event.key !== CATEGORY_STORAGE_KEY) return
+      if (event.key !== TODO_STORAGE_KEY && event.key !== TODO_CATEGORY_STORAGE_KEY) return
       const nextTodos = loadTodos()
       const nextCategories = loadCategories()
       const missing = nextTodos.map(task => task.category).filter(name => !nextCategories.some(category => category.name === name))
@@ -229,12 +230,19 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const restoreLocalData = useCallback((nextTodos: Task[], nextCategories: TodoCategory[]) => {
+    setTodos(nextTodos)
+    setCategories(nextCategories)
+    setEditor(null)
+    setDeleted(null)
+  }, [])
+
   const storageError = todosStorageError || categoriesStorageError
   const value = useMemo<TodoContextValue>(() => ({
     todos, categories, storageError, editor, deleted,
     openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted,
-    addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder
-  }), [todos, categories, storageError, editor, deleted, openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted, addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder])
+    addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData
+  }), [todos, categories, storageError, editor, deleted, openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted, addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData])
 
   return <TodoContext.Provider value={value}>{children}</TodoContext.Provider>
 }

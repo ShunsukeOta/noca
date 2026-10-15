@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "test:pwa": "playwright test --config playwright.production.config.ts",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc -b",
     "test:e2e": "playwright test"

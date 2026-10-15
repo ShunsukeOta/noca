@@ -9,7 +9,7 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 **開発状況:** TODO・カレンダーの端末内機能とUIを実装済み。メモタブは残し、現在は「メモ機能は開発中です」と案内するプレースホルダーです。
 
 > [!IMPORTANT]
-> **これは「2人で共有できる完成版」ではありません。** 現在は同一ブラウザの `localStorage` を使うUIプレビューです。TODOと予定はこの端末で追加・編集・削除できます。メモ機能は開発中で、ログイン、招待、実際の2端末間同期、Firebase、通知も未実装です。ブラウザの保存データを消すと端末内の編集内容も消えます。
+> **これは「2人で共有できる完成版」ではありません。** 現在は同一ブラウザの `localStorage` を使うUIプレビューです。TODOと予定はこの端末で追加・編集・削除できます。メモ機能は開発中で、ログイン、招待、実際の2端末間同期、Firebase、通知も未実装です。設定からJSONバックアップを書き出して復元できますが、復元は現在のTODO・カテゴリ・予定を置き換えます。ブラウザの保存データを消すと端末内の編集内容も消えます。
 
 ## Codex / AIエージェントへの引き継ぎ
 
@@ -30,7 +30,7 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 | **カレンダー** | **動作**・端末内に保存 | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了・担当A/B/ふたり、期限付きTODOの参照。終日予定がない日は終日欄を省略 |
 | **2人用日別タイムライン** | **動作するUIプレビュー** | A/Bの2列と時間軸、A+B全幅の共有予定、共有の終日予定を2列幅で表示。同じ担当者の重なりはグループ内で最長の予定を表示し、担当色の「他N件」チップから時刻順の一覧を開けます |
 | **メモ** | **開発中** | メモタブを開くと「メモ機能は開発中です」と表示。入力や保存の操作はありません。 |
-| **設定** | テーマ・TODOカテゴリが動作 | ライト／ダークの切替と、TODOカテゴリの管理。共有・招待・通知・クラウド同期は「準備中」 |
+| **設定** | テーマ・TODOカテゴリ・端末内バックアップが動作 | ライト／ダークの切替、TODOカテゴリの管理、TODO・カテゴリ・予定のJSON書き出しと復元。共有・招待・通知・クラウド同期は「準備中」 |
 | **PWA** | 基本構成あり | manifest / service workerの自動更新設定。iPhone Safari・ホーム画面standalone実機QAやオフライン同期は未完了 |
 
 ### UIで守るべき重要な決定
@@ -81,17 +81,21 @@ Viteの開発サーバーが起動します（通常は `http://localhost:5173`�
 | `npm run dev` | Vite開発サーバー（LANからもアクセス可能なhost指定あり） |
 | `npm run typecheck` | TypeScriptプロジェクトの型チェック |
 | `npm run build` | 型チェック + Vite本番ビルド |
+| `npm run check:bundle` | 本番ビルドの初回JS・最大チャンク・PWA保存容量を予算と比較 |
 | `npm run preview` | ビルドのローカルプレビュー |
 | `npx playwright install chromium` | Playwright用ブラウザを準備 |
 | `npm run test:e2e` | Playwrightのブラウザテスト |
+| `npm run test:pwa` | 本番ビルドの遅延読込とオフラインPWAを確認（先にビルド） |
 
-CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → `npm run build` → `npx playwright install --with-deps chromium` → `npm run test:e2e` を実行します。テストのスクリーンショットと診断情報は GitHub Actions アーティファクト `noca-ui-mobile-preview` に保存されます。
+CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → `npm run build` → `npm run check:bundle` → `npx playwright install --with-deps chromium` → `npm run test:e2e` → `npm run test:pwa` を実行します。テストのスクリーンショットと診断情報は GitHub Actions アーティファクト `noca-ui-mobile-preview` に保存されます。
 
 > **依存関係の注意:** `package-lock.json` はコミット済みですが、CIは現在 `npm install` を使っています。CIを `npm ci` に切り替える場合は別途確認してください。
 
 ### テスト状況
 
-このREADME更新前の最新成功ランは [GitHub Actions #38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) で、**ビルド成功・Playwright Chromium 43件すべて成功**です。変更後は必ず新しいCIランを確認してください。
+今回の変更で、ローカルの `npm run build`、`npm run check:bundle`、`npm run test:e2e`（Playwright Chromium **49/49件**）と `npm run test:pwa`（**4/4件**）が成功しました。500 kB超のチャンク警告は解消しています。最新の記録済みGitHub Actionsは [#38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385)（変更前の43/43件）です。今回の変更を含むCIランはまだ確認していません。
+
+初回に同期読み込みするJavaScriptは **571.82 kB / gzip 182.96 kB → 425.59 kB / gzip 136.01 kB** になりました。カレンダー、編集シート、カテゴリ管理とMotionのレイアウト機能を必要時に読み込みます。設定ページの見出しとテーマはカテゴリ管理の読み込みを待たずに表示されます。PWAはオフラインで全画面を使えるよう全チャンクを事前保存するため、保存総量は約638 KiBです。容量の予算は `scripts/check-bundle.mjs` でCIでも確認します。
 
 320 / 375 / 390 / 430pxのモバイル幅や一部のreduced-motion、ダークモードのテストを含みます。**Chromiumのモバイルエミュレーション ≠ iPhone Safari実機/standaloneの合格**です。実機確認は [UIテスト計画](docs/UI_QA.md) に沿って別途行います。
 
@@ -114,9 +118,12 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 │   ├── app/mock-data.ts               # ドメイン型とデモデータ
 │   ├── features/
 │   │   ├── todos/todo-store.tsx       # TODO CRUD
-│   │   └── calendar/calendar-store.tsx # 予定 CRUD
+│   │   ├── calendar/calendar-store.tsx # 予定 CRUD
+│   │   └── data/local-backup.ts       # ローカルデータの書き出し・復元
 │   ├── components/
 │   │   ├── app-shell.tsx              # ヘッダー、Dock、設定、編集シート
+│   │   ├── editor-loaders.ts          # 編集シートの遅延読込
+│   │   ├── settings-loaders.ts        # カテゴリ管理の遅延読込
 │   │   ├── category-ui.tsx            # 共通カテゴリ表示・選択
 │   │   ├── owner-ui.tsx               # 共通担当表示・選択
 │   │   ├── calendar-day-timeline.tsx  # 2人用タイムライン/重なり計算
@@ -127,6 +134,9 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 │   ├── pages/                         # TODO, Calendar, Memo, Settings
 │   └── styles/                        # CSS変数、テーマ、アニメーション
 ├── tests/ui.spec.ts                   # Playwright E2E
+├── tests/production.spec.ts           # 本番ビルド・オフラインPWA検証
+├── scripts/check-bundle.mjs           # 容量予算の検証
+├── playwright.production.config.ts    # 本番PWAテスト設定
 ├── .github/workflows/ui-check.yml    # CI
 ├── vite.config.ts                     # PWA設定/alias
 └── vercel.json                        # SPAのルーティングfallback
@@ -143,6 +153,8 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 | `noca.calendar.events.v1` | 予定配列（A/B/ふたり） |
 | `noca.calendar.samples.v2` / `.v3` | 旧デモ予定からの一度きりのサンプル追加フラグ |
 | `noca.theme` | ライト/ダーク |
+
+設定から、現在のTODO・カテゴリ・予定を版番号付きJSONファイルへ書き出せます。iPhoneなどファイル共有に対応した環境では共有シートを使い、それ以外ではブラウザのファイル保存を使います。住所やメモなどの詳細と、カレンダーのサンプル移行状態も含みます。復元時は形式とデータを検証し、対象件数を確認してから現在のTODO・カテゴリ・予定を置き換えます。対応するバックアップは20MB以下の `noca.local-backup` v1です。
 
 新規端末にはサンプル予定/TODOが表示されます。以前からサンプルが残る端末にはカレンダーの追加デモを一度だけ取り込む処理があります。**有効な保存済みの空配列は空のまま**です。
 
@@ -165,7 +177,7 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 
 以前のプレビューが書き込んだ `noca.notes.v1` がある場合も、この版では読み書きせず、削除もしません。
 
-**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) を必ず参照**し、Phase 1Dは保留、次の対象はPhase 1Eであることを確認してください。
+**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) を必ず参照**し、Phase 1Dは保留、端末内データの復元設計とPhase 1Eの実機QAが残っていることを確認してください。
 
 ## ドキュメント一覧
 

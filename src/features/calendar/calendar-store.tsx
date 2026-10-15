@@ -2,7 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { format, isValid, parseISO } from "date-fns"
 import { mockEvents, type CalendarEvent, type TaskCategory } from "@/app/mock-data"
 
-const STORAGE_KEY = "noca.calendar.events.v1"
+export const CALENDAR_EVENT_STORAGE_KEY = "noca.calendar.events.v1"
+export const CALENDAR_SAMPLE_MIGRATION_KEYS = {
+  v2: "noca.calendar.samples.v2",
+  v3: "noca.calendar.samples.v3"
+} as const
 const categories: TaskCategory[] = ["暮らし", "おでかけ", "ふたり", "その他"]
 const dateFormat = /^\d{4}-\d{2}-\d{2}$/
 const timeFormat = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -39,7 +43,7 @@ function isCalendarEvent(value: unknown): value is CalendarEvent {
 
 function readEvents(): CalendarEvent[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(CALENDAR_EVENT_STORAGE_KEY)
     if (raw === null) return mockEvents
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.every(isCalendarEvent)) return mockEvents
@@ -49,8 +53,8 @@ function readEvents(): CalendarEvent[] {
       ["e1", "e2", "e3", "e4"].includes(event.id) || event.id.startsWith("demo-"))
     if (!hasSamples) return parsed
     const ids = new Set(parsed.map(event => event.id))
-    const wantsV2 = localStorage.getItem("noca.calendar.samples.v2") !== "done"
-    const wantsV3 = localStorage.getItem("noca.calendar.samples.v3") !== "done"
+    const wantsV2 = localStorage.getItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v2) !== "done"
+    const wantsV3 = localStorage.getItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v3) !== "done"
     const additional = mockEvents.filter(event => {
       if (ids.has(event.id)) return false
       if (event.id.startsWith("demo-v3-")) return wantsV3
@@ -77,6 +81,7 @@ type CalendarContextValue = {
   deleteEvent: (id: string) => void
   undoDelete: () => void
   dismissDeleted: () => void
+  restoreLocalData: (events: CalendarEvent[]) => void
 }
 
 const CalendarContext = createContext<CalendarContextValue | null>(null)
@@ -90,14 +95,14 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
+      localStorage.setItem(CALENDAR_EVENT_STORAGE_KEY, JSON.stringify(events))
       // Mark migration only after saving the added samples. React StrictMode can
       // initialize state twice before effects run, so the initializer stays pure.
       if (events.some(event => event.id.startsWith("demo-"))) {
-        localStorage.setItem("noca.calendar.samples.v2", "done")
+        localStorage.setItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v2, "done")
       }
       if (events.some(event => event.id.startsWith("demo-v3-"))) {
-        localStorage.setItem("noca.calendar.samples.v3", "done")
+        localStorage.setItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v3, "done")
       }
       setStorageError(false)
     } catch {
@@ -107,7 +112,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) setEvents(readEvents())
+      if (event.key === CALENDAR_EVENT_STORAGE_KEY) setEvents(readEvents())
     }
     window.addEventListener("storage", sync)
     return () => window.removeEventListener("storage", sync)
@@ -154,12 +159,17 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     setDeleted(null)
   }, [deleted])
   const dismissDeleted = useCallback(() => setDeleted(null), [])
+  const restoreLocalData = useCallback((nextEvents: CalendarEvent[]) => {
+    setEvents(nextEvents)
+    setEditor(null)
+    setDeleted(null)
+  }, [])
 
   const value = useMemo<CalendarContextValue>(() => ({
     events, selectedDate, setSelectedDate, editor, deleted, storageError,
-    openCreate, openEdit, closeEditor, addEvent, updateEvent, deleteEvent, undoDelete, dismissDeleted
+    openCreate, openEdit, closeEditor, addEvent, updateEvent, deleteEvent, undoDelete, dismissDeleted, restoreLocalData
   }), [events, selectedDate, setSelectedDate, editor, deleted, storageError,
-    openCreate, openEdit, closeEditor, addEvent, updateEvent, deleteEvent, undoDelete, dismissDeleted])
+    openCreate, openEdit, closeEditor, addEvent, updateEvent, deleteEvent, undoDelete, dismissDeleted, restoreLocalData])
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>
 }

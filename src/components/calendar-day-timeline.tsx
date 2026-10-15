@@ -1,11 +1,12 @@
 import { useMemo, useState, type CSSProperties } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import { AnimatePresence, m, useReducedMotion } from "motion/react"
 import { Clock3, ListTodo, MapPin, Plus } from "lucide-react"
 import { type CalendarEvent, type Task } from "@/app/mock-data"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { OwnerAvatar, ownerSurfaceTone } from "@/components/owner-ui"
 import { cn } from "@/lib/utils"
+import { preloadCalendarEditor, preloadTodoEditor } from "@/components/editor-loaders"
 
 type EventOwner = CalendarEvent["by"]
 const PEOPLE = [
@@ -145,7 +146,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
       zIndex: 10
     }
     return (
-      <motion.button key={event.id} type="button" onClick={() => onEditEvent(event.id)}
+      <m.button key={event.id} type="button" onClick={() => onEditEvent(event.id)} onPointerEnter={preloadCalendarEditor} onPointerDown={preloadCalendarEditor} onFocus={preloadCalendarEditor}
         aria-label={event.title + "を編集"}
         title={event.title + " " + event.time + (event.endTime ? "–" + event.endTime : "")}
         data-calendar-event={event.id}
@@ -181,7 +182,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
             </span>
           )}
         </span>
-      </motion.button>
+      </m.button>
     )
   }
 
@@ -221,6 +222,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
   }
 
   const editOverlapEvent = (eventId: string) => {
+    preloadCalendarEditor()
     setSelectedOverlap(null)
     window.setTimeout(() => onEditEvent(eventId), reduceMotion ? 0 : 200)
   }
@@ -253,7 +255,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
                   {allDayEvents.length === 0 ? (
                     <span className="m-auto text-[9px] text-muted-foreground/55">—</span>
                   ) : allDayEvents.map(event => (
-                    <Button key={event.id} type="button" variant="ghost" size="sm" onClick={() => onEditEvent(event.id)}
+                    <Button key={event.id} type="button" variant="ghost" size="sm" onClick={() => onEditEvent(event.id)} onPointerEnter={preloadCalendarEditor} onPointerDown={preloadCalendarEditor} onFocus={preloadCalendarEditor}
                       aria-label={event.title + "を編集"} data-calendar-event={event.id} data-owner={event.by}
                       className={cn(
                         "h-auto min-h-9 w-full whitespace-normal rounded-[10px] border-l-[3px] px-1.5 py-1 text-left text-[11px] font-bold leading-snug",
@@ -270,7 +272,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
                 eventsFor("both").length === 0 && "hidden")}>
               <div className="flex flex-col gap-1">
                 {eventsFor("both").map(event => (
-                  <Button key={event.id} type="button" variant="ghost" size="sm" onClick={() => onEditEvent(event.id)}
+                  <Button key={event.id} type="button" variant="ghost" size="sm" onClick={() => onEditEvent(event.id)} onPointerEnter={preloadCalendarEditor} onPointerDown={preloadCalendarEditor} onFocus={preloadCalendarEditor}
                     aria-label={event.title + "を編集"} data-calendar-event={event.id} data-owner={event.by}
                     className={cn(
                       "h-auto min-h-9 w-full whitespace-normal rounded-[10px] border-l-[3px] px-2 py-1 text-left text-[11px] font-bold leading-snug",
@@ -328,7 +330,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
           <div data-testid="timeline-empty" className="flex min-h-24 flex-col items-center justify-center gap-1 px-3 py-5 text-center">
             <Clock3 className="size-4 text-muted-foreground/60" />
             <span className="text-xs text-muted-foreground">時間指定の予定はありません</span>
-            <Button type="button" variant="ghost" onClick={onCreate} className="mt-1 text-[12px] text-primary">
+            <Button type="button" variant="ghost" onClick={onCreate} onPointerEnter={preloadCalendarEditor} onPointerDown={preloadCalendarEditor} onFocus={preloadCalendarEditor} className="mt-1 text-[12px] text-primary">
               <Plus className="mr-1 inline size-3.5" />予定を追加
             </Button>
           </div>
@@ -342,7 +344,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
           </div>
           <AnimatePresence initial={false}>
             {todos.map(task => (
-              <motion.button key={task.id} type="button" onClick={() => onEditTodo(task.id)}
+              <m.button key={task.id} type="button" onClick={() => onEditTodo(task.id)} onPointerEnter={preloadTodoEditor} onPointerDown={preloadTodoEditor} onFocus={preloadTodoEditor}
                 aria-label={task.title + "を編集"}
                 initial={reduceMotion ? false : { opacity: 0, y: 3 }}
                 animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -351,7 +353,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
                 <OwnerAvatar owner={task.by} size="sm" decorative />
                 <span className="min-w-0 flex-1 break-words text-[12px] font-semibold">{task.title}</span>
                 <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-[10px] font-semibold text-primary">TODO</span>
-              </motion.button>
+              </m.button>
             ))}
           </AnimatePresence>
         </section>

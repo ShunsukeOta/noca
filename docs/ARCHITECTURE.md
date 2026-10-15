@@ -29,8 +29,8 @@ Updated: 2026-10-15. Based on the current local implementation. This document de
 ## 3. Routes and composition
 
 `src/main.tsx`:
-- imports global style and Motion stylesheet; invokes `registerSW({ immediate: true })`;
-- mounts `<BrowserRouter><App/></BrowserRouter>` under React StrictMode.
+- imports global styles, then starts service worker registration after the window `load` event so installation does not compete with first-screen resources;
+- mounts `<LazyMotion><BrowserRouter><App/></BrowserRouter></LazyMotion>` under React StrictMode. The Motion layout/drag feature bundle loads asynchronously after the first render.
 
 `src/App.tsx`:
 ```text
@@ -45,12 +45,14 @@ TodoProvider
         *           Navigate("/todo")
 ```
 
+The `/calendar` page module is loaded with `React.lazy` when the route is opened. Global navigation preloads it on pointer intent or keyboard focus. TODO and the Settings page shell remain in the initial bundle. TODO/calendar editor sheets and Settings' category manager load when opened, with pointer/focus preloading. Settings' header and theme render while its category module loads. `motion/react`'s `m` components use an asynchronously loaded `domMax` feature bundle for the existing layout animations. The local providers still initialize on first load. Workbox precaches all built JavaScript, including deferred chunks, so these changes reduce initial parse/evaluation rather than total offline download size. The manifest icon is precached through the PWA manifest without a duplicate SVG glob entry.
+
 `src/components/app-shell.tsx`:
 - sticky header with noca logo, **local today** (updates across midnight and app focus), placeholder A/B avatars and settings link; on `/settings`, the settings icon becomes a close link that returns to the originating tab (or TODO for a direct URL);
 - `<main>` with page enter/exit animation;
 - bottom floating dock on the three main tabs: **3 tabs in a left white card + 16px gap + separate dark + CTA**; the CTA is hidden on the memo placeholder. The entire dock is hidden on `/settings`, which renders without a route transition animation;
 - TODO and calendar editor sheets, shared Undo notices and theme state;
-- `/settings` retains tabs but does not show + button.
+- `/settings` hides the entire dock.
 
 `src/components/ui/sheet.tsx` implements reusable Radix-based mobile drawer, viewport/keyboard handling; do not replace blindly.
 
@@ -83,6 +85,10 @@ Defined in `src/app/mock-data.ts`:
 | `noca.theme` | `AppShell` | `light` or `dark` |
 
 `loadTodos` and `readEvents` validate selected fields and use initial mock arrays only on absent/invalid data. **A legitimately stored empty array remains empty**. Existing TODO records keep their category names in `noca.todos.v1`; the category configuration stores `{ id, name, tone }` items in display order. Existing configurations without `id` receive one during load. On first load, built-in categories are used and any category already referenced by a saved TODO but missing from the configuration is retained with the neutral tone. Renaming a category updates the associated TODO names; deleting one moves its TODOs to a selected remaining category before removing the category. Category tones use eight theme-defined palette choices; earlier `life`/`outing`/`couple` tone keys are normalized to their matching palette choices on load. Browser storage deletion means losing local-only edits. Browser `storage` events update providers across tabs **of the same origin**, not a real shared account or reliable two-device sync.
+
+### Portable local backup
+
+Settings can export and restore the in-memory TODOs, ordered TODO categories and calendar events as a JSON file. `src/features/data/local-backup.ts` defines the stable envelope: `format: "noca.local-backup"`, `version: 1`, an ISO `exportedAt`, the calendar sample-migration flags under `localState`, and the three arrays under `data`. The export includes optional TODO/event details such as memo, URL and address. It does not include theme. On browsers that support file sharing, Settings passes a JSON `File` to the native share sheet; otherwise it downloads the file with a local-date filename. Restore accepts files up to 20 MiB, validates all records and references before showing a count preview, and requires explicit confirmation before replacing current TODOs, categories and events. It writes to the existing storage keys; if a write fails, it attempts to roll back every touched key before reporting the error. Export does not write to or clear any existing storage key. Automatic cloud migration is not implemented.
 
 There is currently no memo model, sample list, store or persistence path. The `/memo` route is a placeholder. If `noca.notes.v1` was written by an earlier local preview, this version intentionally leaves that key untouched and does not read or display it.
 
@@ -132,7 +138,7 @@ This is a sophisticated **preview visualization**, not a general-purpose interva
 - Memo list, editor, sample records, state and persistence code are deferred. There is no currently supported memo CRUD behavior.
 
 ### Settings
-- `src/pages/settings-page.tsx` handles theme through `AppShell` outlet context; appearance is persisted. TODO category management is in `src/components/todo-category-settings.tsx` and backed by `TodoProvider`.
+- `src/pages/settings-page.tsx` handles theme through `AppShell` outlet context; appearance is persisted. TODO category management is in `src/components/todo-category-settings.tsx` and backed by `TodoProvider`. The Data section exports and restores TODOs, TODO categories and calendar events using the versioned envelope in `src/features/data/local-backup.ts`.
 - Sharing, invite, auth, notifications and cloud sync options are labeled **準備中** (no implementation).
 
 ## 6. Design and mobile considerations
@@ -152,11 +158,13 @@ npm install
 npm run dev
 npm run typecheck
 npm run build
+npm run check:bundle
 npx playwright install chromium
 npm run test:e2e
+npm run test:pwa
 ```
 
-Playwright starts its own Vite server at `http://127.0.0.1:5173`; Chromium only. `npm run build` already runs TypeScript project references. CI uploads screenshots and diagnostics from `test-results/` and `playwright-report/` as `noca-ui-mobile-preview`.
+The normal Playwright suite starts a Vite development server at `http://127.0.0.1:5173`; the production PWA suite starts `vite preview` at port 4173 and verifies deferred loading and offline navigation/editing after precache. Both use Chromium. `npm run build` already runs TypeScript project references. `npm run check:bundle` enforces entry JS, largest-chunk and PWA precache budgets from the Vite manifest and generated service worker. CI uploads screenshots and diagnostics from `test-results/` and `playwright-report/` as `noca-ui-mobile-preview`.
 
 Routes use a SPA fallback in `vercel.json`. Deployment at Vercel can occur on main updates, but **a green Actions run does not prove a successful live deployment**.
 
@@ -169,4 +177,4 @@ Routes use a SPA fallback in `vercel.json`. Deployment at Vercel can occur on ma
 - Calendar demo migration and multiple overlapping events require caution; protect user-generated items from any sample reset.
 - Arbitrarily many nested events, very short events, personal/shared collisions and accessibility need dedicated edge tests and iPhone verification.
 - CI has Chromium emulation, not real WebKit/iOS.
-- No committed npm lockfile yet, and no separate lint/unit-test script in `package.json`.
+- `package-lock.json` is committed. There is no separate lint/unit-test script in `package.json`.
