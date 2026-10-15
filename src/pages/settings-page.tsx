@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { useLocation, useNavigate, useOutletContext } from "react-router-dom"
+import { Button } from "@/components/ui/button"
 import {
   ArrowLeft, Bell, CalendarClock, Check, Cloud, Database, Info,
   ListTodo, LockKeyhole, Moon, Palette, ShieldCheck, Sun, UserRoundPlus,
@@ -24,7 +25,7 @@ function SettingsGroup({ title, children, index }: { title: string; children: Re
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: reduceMotion ? 0 : 0.22, delay: reduceMotion ? 0 : index * 0.035, ease: "easeOut" }}>
       <h2 className="px-1 text-[13px] font-bold tracking-wide text-muted-foreground">{title}</h2>
-      <div className="noca-card overflow-hidden rounded-[21px] border border-border bg-card">{children}</div>
+      <div className="noca-card overflow-hidden rounded-2xl border border-border bg-card">{children}</div>
     </motion.section>
   )
 }
@@ -32,10 +33,10 @@ function SettingsGroup({ title, children, index }: { title: string; children: Re
 function IconBox({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "green" | "peach" }) {
   return (
     <span className={cn(
-      "flex size-10 shrink-0 items-center justify-center rounded-[13px]",
+      "flex size-10 shrink-0 items-center justify-center rounded-md",
       tone === "blue" && "bg-secondary text-primary",
-      tone === "green" && "bg-[#e6eee8] text-[#648874] dark:bg-[#2c443a] dark:text-[#a4d1ae]",
-      tone === "peach" && "bg-[#f6e9e1] text-[#956e5b] dark:bg-[#523e35] dark:text-[#f0c5ac]"
+      tone === "green" && "bg-success/15 text-success",
+      tone === "peach" && "bg-owner-b-surface text-owner-b-strong"
     )}>{children}</span>
   )
 }
@@ -64,10 +65,10 @@ export function SettingsPage() {
   return (
     <div data-testid="settings-page" className="space-y-7 pb-4">
       <div className="flex min-h-11 items-center gap-3">
-        <button type="button" onClick={() => navigate(returnTo)} aria-label="前の画面に戻る"
-          className="tap-target flex items-center justify-center rounded-full text-muted-foreground hover:bg-secondary">
+        <Button type="button" variant="ghost" size="icon" onClick={() => navigate(returnTo)} aria-label="前の画面に戻る"
+          className="tap-target rounded-full text-muted-foreground">
           <ArrowLeft className="size-[22px]" />
-        </button>
+        </Button>
         <h1 className="text-[23px] font-bold tracking-[-.035em]">設定</h1>
       </div>
 
@@ -88,14 +89,14 @@ export function SettingsPage() {
               const Icon = option.icon
               const selected = theme === option.value
               return (
-                <button key={option.value} type="button" aria-pressed={selected}
+                <Button key={option.value} type="button" variant="ghost" aria-pressed={selected}
                   onClick={() => onThemeChange(option.value)}
-                  className={cn("flex min-h-11 items-center justify-center gap-2 rounded-xl text-[13px] font-semibold transition-colors",
+                  className={cn("min-h-11 rounded-xl text-[13px]",
                     selected ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
                   <Icon className="size-[17px]" aria-hidden="true" />
                   {option.label}
                   {selected && <Check className="size-[15px] text-primary" aria-hidden="true" />}
-                </button>
+                </Button>
               )
             })}
           </div>

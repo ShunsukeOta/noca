@@ -12,27 +12,30 @@ Design decisions established with the maintainer:
 - **Do not** add a fourth global tab.
 - Tabs TODO / カレンダー / メモ belong to their **own floating white rounded rectangle**. The + button sits **outside the white group**, separated by **16px**, in a dark raised square.
 - TODO begins with color-matched **two-line category tiles + unfinished counts**, without a summary card or “これからすること” section heading.
-- Calendar shows a month grid and a **two-person comparison timeline**, not a conventional list. Personal header = **A and B only**. Shared all-day items extend across both columns; shared timed items span both timeline lanes. The whole daily surface is **transparent**, not an enclosing white card.
-- Long overlapping blocks stay underneath small blocks; visible labels are repositioned to avoid being covered. Even five-minute items need a readable title.
+- Calendar shows a month grid and a **two-person comparison timeline**, not a conventional list. Personal header = **A and B only**. Hide the all-day row if A, B and shared events have no all-day items; shared all-day items extend across both columns when present. Shared timed items span both timeline lanes. The whole daily surface is **transparent**, not an enclosing white card.
+- For a same-owner timed overlap group, keep only the longest appointment as the main block at its true start time. Show the remaining count in an hour-aligned **他N件** chip; tapping it opens an exact-time event list with edit actions. Non-overlapping events remain individual cards, including readable five-minute items.
 - Do not add decorative introductions or large headings to the three main screens. Maintain the current visual language, dark mode and accessibility.
 
 ## 2. Verified baseline (not hypothetical)
 
-**Last successful CI before this documentation update:**
+**Latest recorded successful CI before the current UI changes:**
 [GitHub Actions run 38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) — **43/43 Playwright Chromium tests passed**, TypeScript/Vite build passed. The documentation-only commit may run CI again; check the new run. Prior per-phase reports list old counts.
 
 | Area | Status on this baseline |
 | --- | --- |
 | Shared shell, dock, fixed header, local date, light/dark | Implemented |
 | TODO CRUD, categories and live counts, complete/restore, undo | Implemented with `localStorage` |
-| Calendar month grid, local event CRUD, A/B/both editor, per-person time comparison, overlap display | Implemented with `localStorage` |
+| Calendar month grid, local event CRUD, A/B/both editor, per-person time comparison, overlap summary chips and edit sheet | Implemented with `localStorage` |
 | Date-constrained TODOs shown in calendar | Implemented as references, not separate event copies |
 | Memo list/search/view | Implemented with fixed mock data |
 | Memo create/edit/delete/pin + persistence | **NOT implemented** |
+| Shared UI foundation (theme tokens, fields, buttons, checkbox/switch, owner/category controls, confirm/Undo) | Implemented; memo data behavior remains unchanged |
 | Login, pairing, actual pair sharing, Firebase/Firestore | **NOT implemented** |
 | Push notifications, real iOS Safari/standalone sign-off | **NOT implemented/verified** |
 
-**Files that should be opened first in a relevant task:** `src/components/app-shell.tsx`, `src/pages/todo-page.tsx`, `src/pages/calendar-page.tsx`, `src/components/calendar-day-timeline.tsx`, `src/pages/memo-page.tsx`, `src/features/todos/todo-store.tsx`, `src/features/calendar/calendar-store.tsx`, `tests/ui.spec.ts`.
+After the shared UI foundation and overlap-summary changes, `npm run typecheck` and `npm run build` pass. The build reports the existing >500 kB JavaScript chunk warning. The existing Playwright overlap cases were updated to the new chip/sheet behavior but the E2E suite was not run; the latest recorded CI baseline remains the run linked above, before these changes. Chromium previews at 320px and 390px were visually checked; the 320px page had no horizontal overflow or runtime errors. iPhone Safari remains unverified.
+
+**Files that should be opened first in a relevant task:** `src/styles/globals.css`, `src/components/ui/`, `src/components/category-ui.tsx`, `src/components/owner-ui.tsx`, `src/components/app-shell.tsx`, `src/pages/todo-page.tsx`, `src/pages/calendar-page.tsx`, `src/components/calendar-day-timeline.tsx`, `src/pages/memo-page.tsx`, `src/features/todos/todo-store.tsx`, `src/features/calendar/calendar-store.tsx`, `tests/ui.spec.ts`.
 
 ## 3. NEXT: Phase 1D — Make memos actually work
 
@@ -60,7 +63,7 @@ This is a proposal/acceptance checklist, not an unrequested task authorization.
 
 - **Source of truth is local:** `noca.todos.v1`, `noca.calendar.events.v1`, `noca.theme`; samples use `noca.calendar.samples.v2/v3` markers. See [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Samples are not users:** TODO new items still default to A; calendar explicitly supports A/B/both. Actual shared identity requires a later design; do not pass demo IDs straight into security rules.
-- **The latest calendar redesign is important:** old docs and older images may show three all-day columns. Current UI has **only A/B headers**, a full-width shared all-day bar underneath, a 54px-per-hour transparent timeline, inset overlap cards and readable short-event labels.
+- **The latest calendar redesign is important:** old docs and older images may show three all-day columns. Current UI has **only A/B headers**, conditionally shows the all-day row when any owner has an all-day event, places shared all-day items in a full-width A+B bar, and uses a 54px-per-hour transparent timeline with overlap summary chips and readable standalone short-event cards.
 - **No lockfile is committed.** CI currently uses `npm install` on Node 22; avoid saying reproducible `npm ci` works. Add a lockfile deliberately if assigned.
 - **CI is Chromium**, not real iPhone. WebKit, manual QA, multi-user sync and production availability are unproven.
 - Demo data in `src/app/mock-data.ts` uses today's local date at module load. Tests which need deterministic values must control date or seed localStorage before reload.

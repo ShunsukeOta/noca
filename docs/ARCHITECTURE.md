@@ -49,10 +49,17 @@ TodoProvider
 - sticky header with noca logo, **local today** (updates across midnight and app focus), placeholder A/B avatars and settings link;
 - `<main>` with page enter/exit animation;
 - bottom floating dock: **3 tabs in a left white card + 16px gap + separate dark + CTA**; CTA opens current tab's editor, including a memo *non-saving preview*;
-- TODO and calendar editor sheets, undo notices and theme state;
+- TODO and calendar editor sheets, shared Undo notices and theme state;
 - `/settings` retains tabs but does not show + button.
 
 `src/components/ui/sheet.tsx` implements reusable Radix-based mobile drawer, viewport/keyboard handling; do not replace blindly.
+
+Shared UI foundation:
+- `src/components/ui/`: Button, Input, Textarea, Label, Checkbox, Switch, mobile Sheet and ConfirmDialog. Form controls share typography, borders, focus rings and invalid states.
+- `src/components/category-ui.tsx` and `src/components/owner-ui.tsx`: common category badges/selectors and A/B/both avatars/selectors.
+- `src/components/undo-toast.tsx`: shared delete Undo notice; simultaneous TODO/calendar notices stack in one host.
+- `src/styles/globals.css` is the source of truth for light/dark palette, owner/category meaning colors, weekend/calendar accents and radius steps. Avoid component-local hex values.
+- Motion-driven controls use the shared `buttonVariants` styles where wrapping the Button component would interfere with layout animation.
 
 ## 4. Data and persistence (critical)
 
@@ -108,17 +115,18 @@ Time semantics:
 - Store/editor: `src/features/calendar/calendar-store.tsx`, `src/components/calendar-editor-sheet.tsx`
 
 **Current approved preview layout:**
-- Header and all-day personal lane: **A / B only**, with 42px time/label gutter. **No third “ふたりの予定” column.**
+- Header and all-day personal lane: **A / B only**, with 42px time/label gutter. **No third “ふたりの予定” column.** Hide the all-day row when A, B and shared events have no all-day items.
 - All-day shared (`by:"both"`) appointments are **full-width A+B chips underneath the A/B all-day row**.
 - Timed personal appointments appear in separate A/B lanes; shared appointments stretch across both lanes as a purple layer.
 - The schedule surface is transparent, with only subtle ruler/column borders. Time scale: **54px / hour**.
-- Nested overlapping appointments **do not split lane width**: long event stays behind shorter event, which is slightly inset; the long event's label is repositioned toward the longest available free interval. Compact short events have a **36px minimum rendered height** and prioritize the title over time text.
-- Cards remain editable. Be careful with stacking, hit areas and z-index when adding complex overlaps.
+- Overlapping timed appointments **do not split lane width or stack multiple cards**. For each connected overlap group, the longest appointment remains as the primary card at its true start time; the other items are summarized by an hour-aligned **他N件** chip on its right side. Tapping the chip opens a sheet with every exact time and an edit action.
+- Non-overlapping appointments remain individual cards. Compact short events have a **36px minimum rendered height** and prioritize the title over time text. The shared `both` lane applies the same grouping independently from A and B.
+- Preserve chip hit areas, sheet-to-editor handoff and z-index when changing complex overlaps.
 
 This is a sophisticated **preview visualization**, not a general-purpose interval scheduler with exhaustively verified behavior for many nested/cross-day events. Extend it with focused tests if changing overlap math.
 
 ### Memo
-- `src/pages/memo-page.tsx` uses `mockNotes` directly for **search, list and read-only sheet**.
+- `src/pages/memo-page.tsx` uses `mockNotes` directly for **search, list and read-only sheet**. Search uses the shared Input and the note card uses the common Button variants.
 - `src/components/preview-create-sheet.tsx` is the + CTA preview **without persistence**. No notes Context/store or localStorage key exists yet.
 - **Phase 1D** is to add real memo creation/editing/deletion, validation and persistence.
 

@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
 import { CalendarDays, NotebookPen, ListChecks } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetHeader, SheetBody, SheetFooter, SheetClose } from "@/components/ui/sheet"
 
 export type PageKind = "todo" | "calendar" | "memo"
@@ -27,20 +30,19 @@ export function PreviewCreateSheet({ open, onOpenChange, kind }: { open: boolean
           <SheetDescription className="sr-only">プレビュー画面です。入力内容は保存されません。</SheetDescription>
         </SheetHeader>
         <SheetBody>
-          <label htmlFor="preview-title" className="mb-2 block text-sm font-semibold">タイトル</label>
-          <input id="preview-title" value={title} onChange={(event) => setTitle(event.target.value)}
-            placeholder={config.hint} className="h-12 w-full rounded-xl border border-input bg-background px-4 text-base text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20" />
+          <Label htmlFor="preview-title" className="mb-2 text-sm">タイトル</Label>
+          <Input id="preview-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={config.hint} />
           {kind === "calendar" && (
             <>
-              <label htmlFor="preview-date" className="mb-2 mt-5 block text-sm font-semibold">日付</label>
-              <input id="preview-date" type="date" className="h-12 w-full rounded-xl border border-input bg-background px-4 text-base text-foreground" />
+              <Label htmlFor="preview-date" className="mb-2 mt-5 text-sm">日付</Label>
+              <Input id="preview-date" type="date" />
             </>
           )}
           {kind !== "calendar" && (
             <>
-              <label htmlFor="preview-body" className="mb-2 mt-5 block text-sm font-semibold">{kind === "memo" ? "本文" : "メモ（任意）"}</label>
-              <textarea id="preview-body" value={body} onChange={(event) => setBody(event.target.value)}
-                rows={kind === "memo" ? 5 : 3} placeholder="ここに入力..." className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-base text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20" />
+              <Label htmlFor="preview-body" className="mb-2 mt-5 text-sm">{kind === "memo" ? "本文" : "メモ（任意）"}</Label>
+              <Textarea id="preview-body" value={body} onChange={(event) => setBody(event.target.value)}
+                rows={kind === "memo" ? 5 : 3} placeholder="ここに入力..." className="resize-none" />
             </>
           )}
         </SheetBody>

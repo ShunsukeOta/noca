@@ -12,6 +12,8 @@
   --popover-foreground: #202d42;
   --primary: #304b78;
   --primary-foreground: #ffffff;
+  --dock-create-bg: #304b78;
+  --dock-create-foreground: #ffffff;
   --secondary: #eef2f8;
   --secondary-foreground: #3b5170;
   --muted: #f0f3f8;
@@ -19,13 +21,42 @@
   --accent: #e8eef8;
   --accent-foreground: #304b78;
   --destructive: #b94a54;
+  --destructive-foreground: #ffffff;
   --border: #e5eaf2;
   --input: #e5eaf2;
   --ring: #859fc4;
   --success: #648c78;
+  --success-foreground: #ffffff;
   --peach: #f3e4d9;
   --lavender: #e9e7f5;
-  --radius: 1rem;
+  --selection: #b9cce8;
+  --overlay: #101827;
+  --weekend-sunday: #c28086;
+  --weekend-saturday: #7798be;
+  --calendar-dot: #84a9a0;
+  --pin: #b89a75;
+  --owner-a-avatar: #d7e7ea;
+  --owner-a-avatar-foreground: #3e6470;
+  --owner-a-surface: #e5f1ef;
+  --owner-a-strong: #356d6a;
+  --owner-a-border: #5a9a9b;
+  --owner-b-avatar: #f3dfda;
+  --owner-b-avatar-foreground: #90625a;
+  --owner-b-surface: #faeee8;
+  --owner-b-strong: #9a6654;
+  --owner-b-border: #d59677;
+  --owner-both-avatar: #e7e2f4;
+  --owner-both-avatar-foreground: #70649c;
+  --owner-both-surface: #ece8f8;
+  --owner-both-strong: #63568d;
+  --owner-both-border: #9586c6;
+  --category-life: #e7f2e9;
+  --category-life-foreground: #52785d;
+  --category-outing: #f6e9e1;
+  --category-outing-foreground: #956e5b;
+  --category-couple: #ece9f7;
+  --category-couple-foreground: #756b9c;
+  --radius: 12px;
 }
 
 .dark {
@@ -38,6 +69,8 @@
   --popover-foreground: #eff3f9;
   --primary: #a9bddf;
   --primary-foreground: #182538;
+  --dock-create-bg: #40577c;
+  --dock-create-foreground: #f3f6fc;
   --secondary: #263247;
   --secondary-foreground: #e3ebf7;
   --muted: #253146;
@@ -45,12 +78,36 @@
   --accent: #2d3d55;
   --accent-foreground: #ecf3fe;
   --destructive: #f09ca0;
+  --destructive-foreground: #351b20;
   --border: #344258;
   --input: #344258;
   --ring: #a9bddf;
   --success: #8ab29b;
+  --success-foreground: #14251b;
   --peach: #604f46;
   --lavender: #45445f;
+  --selection: #34445f;
+  --owner-a-avatar: #294535;
+  --owner-a-avatar-foreground: #add6b3;
+  --owner-a-surface: #244145;
+  --owner-a-strong: #a2d7d5;
+  --owner-a-border: #73a2a4;
+  --owner-b-avatar: #523e35;
+  --owner-b-avatar-foreground: #f0c5ac;
+  --owner-b-surface: #48332f;
+  --owner-b-strong: #f3cbb9;
+  --owner-b-border: #d59677;
+  --owner-both-avatar: #403b5c;
+  --owner-both-avatar-foreground: #d5caf6;
+  --owner-both-surface: #383451;
+  --owner-both-strong: #d5caf6;
+  --owner-both-border: #9586c6;
+  --category-life: #294535;
+  --category-life-foreground: #add6b3;
+  --category-outing: #523e35;
+  --category-outing-foreground: #f0c5ac;
+  --category-couple: #3b3655;
+  --category-couple-foreground: #d6cafa;
 }
 
 @theme inline {
@@ -63,6 +120,8 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-dock-create-bg: var(--dock-create-bg);
+  --color-dock-create-foreground: var(--dock-create-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -70,14 +129,44 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-success: var(--success);
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 3px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 5px);
+  --color-success-foreground: var(--success-foreground);
+  --color-overlay: var(--overlay);
+  --color-weekend-sunday: var(--weekend-sunday);
+  --color-weekend-saturday: var(--weekend-saturday);
+  --color-calendar-dot: var(--calendar-dot);
+  --color-pin: var(--pin);
+  --color-owner-a-avatar: var(--owner-a-avatar);
+  --color-owner-a-avatar-foreground: var(--owner-a-avatar-foreground);
+  --color-owner-a-surface: var(--owner-a-surface);
+  --color-owner-a-strong: var(--owner-a-strong);
+  --color-owner-a-border: var(--owner-a-border);
+  --color-owner-b-avatar: var(--owner-b-avatar);
+  --color-owner-b-avatar-foreground: var(--owner-b-avatar-foreground);
+  --color-owner-b-surface: var(--owner-b-surface);
+  --color-owner-b-strong: var(--owner-b-strong);
+  --color-owner-b-border: var(--owner-b-border);
+  --color-owner-both-avatar: var(--owner-both-avatar);
+  --color-owner-both-avatar-foreground: var(--owner-both-avatar-foreground);
+  --color-owner-both-surface: var(--owner-both-surface);
+  --color-owner-both-strong: var(--owner-both-strong);
+  --color-owner-both-border: var(--owner-both-border);
+  --color-category-life: var(--category-life);
+  --color-category-life-foreground: var(--category-life-foreground);
+  --color-category-outing: var(--category-outing);
+  --color-category-outing-foreground: var(--category-outing-foreground);
+  --color-category-couple: var(--category-couple);
+  --color-category-couple-foreground: var(--category-couple-foreground);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 20px;
+  --radius-3xl: 28px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -89,7 +178,7 @@ button { cursor: pointer; }
 button:disabled { cursor: default; }
 a { -webkit-touch-callout: none; }
 #root { min-height: 100svh; }
-::selection { background: #b9cce8; color: #1c2e45; }
+::selection { background: var(--selection); color: var(--foreground); }
 
 .app-shell { min-height: 100svh; max-width: 540px; margin: 0 auto; background: var(--background); }
 /* Keep the header in the document flow and stick it to the visible top.

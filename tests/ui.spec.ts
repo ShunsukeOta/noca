@@ -70,7 +70,7 @@ test("TODO due date appears on calendar, completion removes it", async ({ page }
   await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
   await expect(page.getByRole("button", { name: "旅行の準備をするを編集" })).toBeVisible()
   await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "TODO" }).click()
-  await page.getByRole("button", { name: "旅行の準備をするを完了" }).click()
+  await page.getByRole("checkbox", { name: "旅行の準備をするを完了" }).click()
   await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
   await expect(page.getByRole("button", { name: "旅行の準備をするを編集" })).toHaveCount(0)
 })
@@ -82,9 +82,9 @@ test("theme switch and mock task completion", async ({ page }) => {
   await page.getByRole("group", { name: "テーマ" }).getByRole("button", { name: "ダーク" }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await page.getByRole("button", { name: "前の画面に戻る" }).click()
-  await page.getByRole("button", { name: "週末のカフェを探すを完了" }).click()
+  await page.getByRole("checkbox", { name: "週末のカフェを探すを完了" }).click()
   await page.getByRole("button", { name: /完了したこと/ }).click()
-  await expect(page.getByRole("button", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
+  await expect(page.getByRole("checkbox", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
 })
 
 test("memo search narrows results", async ({ page }) => {
@@ -229,12 +229,12 @@ test("task rows animate out instead of disappearing instantly", async ({ page })
   await page.goto("/todo")
   const row = page.locator('[data-todo-row="t1"]')
   await expect(row).toBeVisible()
-  await page.getByRole("button", { name: "週末のカフェを探すを完了" }).click()
+  await page.getByRole("checkbox", { name: "週末のカフェを探すを完了" }).click()
   // AnimatePresence retains the removed item briefly for its exit animation.
   await expect(row).toHaveCount(1)
   await expect(row).toHaveCount(0)
   await page.getByRole("button", { name: /完了したこと/ }).click()
-  await expect(page.getByRole("button", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
+  await expect(page.getByRole("checkbox", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
 })
 
 test("tab and settings routes transition and remain usable with reduced motion", async ({ page }) => {
@@ -270,7 +270,7 @@ test("calendar events: create, edit, persistent storage and leap day", async ({ 
   await page.locator("#event-end").fill("13:30")
   await page.getByText("詳細を追加（任意）").click()
   await page.locator("#event-address").fill("駅前のカフェ")
-  await page.getByRole("group", { name: "予定のカテゴリ" }).getByRole("button", { name: "おでかけ" }).click()
+  await page.getByRole("group", { name: "カテゴリ" }).getByRole("button", { name: "おでかけ" }).click()
   await page.getByRole("button", { name: "予定を追加" }).last().click()
   await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(page.getByRole("button", { name: "テスト用の予定を編集" })).toBeVisible()
@@ -479,15 +479,14 @@ test("category filter chips match task category tag colors in light and dark mod
       await expect(chip).toHaveAttribute("aria-pressed", "true")
       const badge = page.getByRole("button", { name: task + "を編集" }).getByText(category, { exact: true })
       await expect(badge).toBeVisible()
-      const chipColor = await chip.evaluate(node => ({
-        bg: getComputedStyle(node).backgroundColor,
-        text: getComputedStyle(node).color
-      }))
       const badgeColor = await badge.evaluate(node => ({
         bg: getComputedStyle(node).backgroundColor,
         text: getComputedStyle(node).color
       }))
-      expect(chipColor).toEqual(badgeColor)
+      await expect.poll(() => chip.evaluate(node => ({
+        bg: getComputedStyle(node).backgroundColor,
+        text: getComputedStyle(node).color
+      }))).toEqual(badgeColor)
       await expect(chip.locator('[class*="ring-2"]')).toHaveCount(1)
     }
     const other = chips.getByRole("button", { name: "その他", exact: true })
@@ -530,12 +529,12 @@ test("TODO tile counts respond immediately to creating and completing tasks", as
   await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("1件")
   await expect(page.getByTestId("todo-filter-count-すべて")).toHaveText("5件")
 
-  await page.getByRole("button", { name: "件数のテストを完了" }).click()
+  await page.getByRole("checkbox", { name: "件数のテストを完了" }).click()
   await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("0件")
   await expect(page.getByTestId("todo-filter-count-すべて")).toHaveText("4件")
   await page.getByRole("button", { name: /完了したこと/ }).click()
-  await expect(page.getByRole("button", { name: "件数のテストの完了を解除" })).toBeVisible()
-  await page.getByRole("button", { name: "件数のテストの完了を解除" }).click()
+  await expect(page.getByRole("checkbox", { name: "件数のテストの完了を解除" })).toBeVisible()
+  await page.getByRole("checkbox", { name: "件数のテストの完了を解除" }).click()
   await expect(page.getByTestId("todo-filter-count-その他")).toHaveText("1件")
 })
 
@@ -780,6 +779,31 @@ test("calendar all-day labels are compact, match timed typography, and have no r
   expect(appearance).toEqual({ bg: "rgba(0, 0, 0, 0)", borderTop: "0px", borderLeft: "0px", shadow: "none" })
 })
 
+test("all-day row is omitted when the selected day has no all-day events", async ({ page }) => {
+  await page.goto("/calendar")
+  const today = await page.evaluate(() => {
+    const date = new Date()
+    const pad = (value: number) => String(value).padStart(2, "0")
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  })
+  await page.evaluate(date => localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+    { id: "timed-a", title: "Aの予定", date, time: "09:00", endTime: "10:00", category: "暮らし", by: "A" },
+    { id: "timed-b", title: "Bの予定", date, time: "11:00", endTime: "12:00", category: "暮らし", by: "B" }
+  ])), today)
+  await page.reload()
+
+  await expect(page.getByTestId("all-day-strip")).toHaveCount(0)
+  await expect(page.getByTestId("timeline-lane-A").getByRole("button", { name: "Aの予定を編集" })).toBeVisible()
+  await expect(page.getByTestId("timeline-lane-B").getByRole("button", { name: "Bの予定を編集" })).toBeVisible()
+
+  await page.evaluate(date => localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+    { id: "shared-all-day", title: "ふたりの終日予定", date, category: "ふたり", by: "both" }
+  ])), today)
+  await page.reload()
+  await expect(page.getByTestId("all-day-strip")).toBeVisible()
+  await expect(page.getByTestId("all-day-both").getByRole("button", { name: "ふたりの終日予定を編集" })).toBeVisible()
+})
+
 test("shared events span both personal lanes without a third all-day header", async ({ page }) => {
   await page.goto("/calendar")
   await expect(page.getByTestId("person-header-A")).toContainText("Aの予定")
@@ -803,23 +827,27 @@ test("shared events span both personal lanes without a third all-day header", as
   await expect(page.getByRole("group", { name: "予定の担当" }).getByRole("button", { name: "ふたりの予定" })).toHaveAttribute("aria-pressed", "true")
 })
 
-test("nested schedule overlap paints the shorter appointment above the longer one", async ({ page }) => {
+test("demo overlap keeps the long appointment in place and summarizes the shorter one", async ({ page }) => {
   await page.goto("/calendar")
   const lane = page.getByTestId("timeline-lane-A")
   const long = lane.getByRole("button", { name: "午前の用事を編集" })
-  const short = lane.getByRole("button", { name: "打ち合わせを編集" })
+  const summary = lane.getByTestId("overlap-summary-demo-a-morning")
+  const label = page.getByTestId("event-label-demo-a-morning")
+  await expect(long).toBeVisible()
+  await expect(lane.getByRole("button", { name: "打ち合わせを編集" })).toHaveCount(0)
   await expect(long).toHaveAttribute("data-depth", "0")
-  await expect(short).toHaveAttribute("data-depth", "1")
-  const boxes = await Promise.all([long, short].map(b => b.evaluate(el => {
+  await expect(summary).toHaveAttribute("data-overlap-count", "1")
+  await expect(summary).toContainText("他1件")
+  const boxes = await Promise.all([long, label].map(b => b.evaluate(el => {
     const rect = el.getBoundingClientRect()
-    return { x: rect.left, right: rect.right, y: rect.top, bottom: rect.bottom, height: rect.height, z: Number(getComputedStyle(el).zIndex) }
+    return { top: rect.top, bottom: rect.bottom }
   })))
-  expect(boxes[0].y).toBeLessThan(boxes[1].y)
-  expect(boxes[0].bottom).toBeGreaterThan(boxes[1].bottom)
-  expect(boxes[0].x).toBeLessThan(boxes[1].x)
-  expect(boxes[0].right).toBeGreaterThan(boxes[1].right)
-  expect(boxes[0].z).toBeLessThan(boxes[1].z)
-  await short.click()
+  expect(boxes[1].top - boxes[0].top).toBeLessThan(10)
+  await summary.click()
+  await expect(page.getByTestId("overlap-sheet")).toBeVisible()
+  await expect(page.getByText("打ち合わせ", { exact: true })).toBeVisible()
+  await expect(page.getByText("11:00–12:00 ・ 暮らし", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: /打ち合わせ.*11:00/ }).click()
   await expect(page.getByRole("heading", { name: "予定を編集" })).toBeVisible()
 })
 
@@ -876,7 +904,7 @@ test("two-column all-day layout and shared spanning strip fit narrow phones", as
 })
 
 
-test("a long appointment label moves into a free gap when another appointment covers its start", async ({ page }) => {
+test("overlapping appointments use a summary chip and open the complete event list", async ({ page }) => {
   await page.goto("/calendar")
   await page.evaluate(() => {
     const date = new Date()
@@ -890,17 +918,22 @@ test("a long appointment label moves into a free gap when another appointment co
   await page.reload()
   const lane = page.getByTestId("timeline-lane-A")
   const long = lane.getByRole("button", { name: "仕事を編集" })
-  const short = lane.getByRole("button", { name: "朝の打ち合わせを編集" })
+  const summary = lane.getByTestId("overlap-summary-long")
   const longLabel = page.getByTestId("event-label-long")
-  await expect(long).toHaveAttribute("data-depth", "0")
-  await expect(short).toHaveAttribute("data-depth", "1")
-  const boxes = await Promise.all([long,short,longLabel].map(el => el.evaluate(node => {
+  await expect(long).toBeVisible()
+  await expect(lane.getByRole("button", { name: "朝の打ち合わせを編集" })).toHaveCount(0)
+  await expect(summary).toHaveAttribute("data-overlap-count", "1")
+  await expect(summary).toContainText("他1件")
+  const boxes = await Promise.all([long,longLabel].map(el => el.evaluate(node => {
     const r = node.getBoundingClientRect()
     return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }
   })))
-  expect(boxes[2].top).toBeGreaterThan(boxes[1].bottom + 1)
-  expect(boxes[2].bottom).toBeLessThanOrEqual(boxes[0].bottom)
-  await longLabel.click()
+  expect(boxes[1].top - boxes[0].top).toBeLessThan(10)
+  await summary.click()
+  await expect(page.getByTestId("overlap-sheet")).toBeVisible()
+  await expect(page.getByText("朝の打ち合わせ", { exact: true })).toBeVisible()
+  await expect(page.getByText("09:05–10:15 ・ 暮らし", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: /朝の打ち合わせ.*09:05/ }).click()
   await expect(page.getByRole("heading", { name: "予定を編集" })).toBeVisible()
 })
 

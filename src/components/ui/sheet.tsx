@@ -1,6 +1,7 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
+import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 const Sheet = DialogPrimitive.Root
@@ -101,7 +102,7 @@ function SheetContent({
 
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="sheet-overlay fixed inset-0 z-50 bg-[#101827]/45 backdrop-blur-[2px]" />
+      <DialogPrimitive.Overlay className="sheet-overlay fixed inset-0 z-50 bg-overlay/45 backdrop-blur-[2px]" />
       <DialogPrimitive.Content
         ref={contentRef}
         tabIndex={-1}
@@ -119,14 +120,14 @@ function SheetContent({
           ...(keyboard ? { bottom: keyboard.bottom, maxHeight: keyboard.maxHeight } : {})
         }}
         className={cn(
-          "sheet-content sheet-panel fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[min(90dvh,780px)] w-full max-w-[540px] flex-col overflow-hidden rounded-t-[28px] border border-border bg-card text-card-foreground shadow-2xl focus:outline-none",
+          "sheet-content sheet-panel fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[min(90dvh,780px)] w-full max-w-[540px] flex-col overflow-hidden rounded-t-3xl border border-border bg-card text-card-foreground shadow-2xl focus:outline-none",
           className
         )}
         {...props}
       >
         <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-border" aria-hidden="true" />
         {children}
-        <DialogPrimitive.Close className="tap-target absolute right-3 top-4 flex items-center justify-center rounded-full text-muted-foreground hover:bg-secondary" aria-label="閉じる">
+        <DialogPrimitive.Close className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "tap-target absolute right-3 top-4 rounded-full text-muted-foreground")} aria-label="閉じる">
           <X className="size-[18px]" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>

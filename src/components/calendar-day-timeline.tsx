@@ -1,13 +1,16 @@
-import { useMemo, type CSSProperties } from "react"
+import { useMemo, useState, type CSSProperties } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { Clock3, ListTodo, MapPin, Plus } from "lucide-react"
 import { type CalendarEvent, type Task } from "@/app/mock-data"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { OwnerAvatar, ownerSurfaceTone } from "@/components/owner-ui"
 import { cn } from "@/lib/utils"
 
 type EventOwner = CalendarEvent["by"]
 const PEOPLE = [
-  { id: "A", label: "Aの予定", avatar: "A" },
-  { id: "B", label: "Bの予定", avatar: "B" }
+  { id: "A", label: "Aの予定" },
+  { id: "B", label: "Bの予定" }
 ] as const
 
 const HOUR_HEIGHT = 54
@@ -21,21 +24,33 @@ function minutes(time: string) {
   return hour * 60 + minute
 }
 
+function visualEnd(block: Pick<TimedBlock, "start" | "end">) {
+  const height = Math.max(MIN_BLOCK_PX, (block.end - block.start) * MINUTE_HEIGHT - 3)
+  return Math.max(block.end, block.start + height / MINUTE_HEIGHT)
+}
+
 type TimedBlock = {
   event: CalendarEvent
   start: number
   end: number
-  depth: number
-  labelTop: number
-  labelSpace: number
 }
 
-/** Within overlapping groups, paint longer appointments first, shorter ones
- * on top and slightly inset, rather than splitting already-narrow iPhone lanes. */
-function layoutBlocks(events: CalendarEvent[]): TimedBlock[] {
+type OverlapSummary = {
+  primary: TimedBlock
+  events: TimedBlock[]
+  overlapStart: number
+}
+
+type TimelineLayout = {
+  blocks: TimedBlock[]
+  summaries: OverlapSummary[]
+}
+
+/** Show the longest appointment in each overlap group and summarize the rest. */
+function layoutBlocks(events: CalendarEvent[]): TimelineLayout {
   const items = events.filter(event => event.time).map(event => {
     const start = minutes(event.time!)
-    return { event, start, end: event.endTime ? minutes(event.endTime) : Math.min(start + 60, 1440), depth: 0, labelTop: 5, labelSpace: 999 }
+    return { event, start, end: event.endTime ? minutes(event.endTime) : Math.min(start + 60, 1440) }
   }).sort((a, b) => a.start - b.start || b.end - a.end)
 
   const groups: TimedBlock[][] = []
@@ -48,61 +63,39 @@ function layoutBlocks(events: CalendarEvent[]): TimedBlock[] {
       maxEnd = -1
     }
     group.push(block)
-    maxEnd = Math.max(maxEnd, block.end)
+    maxEnd = Math.max(maxEnd, visualEnd(block))
   }
   if (group.length) groups.push(group)
 
-  return groups.flatMap(itemsInGroup => {
-    const placed: TimedBlock[] = []
+  const blocks: TimedBlock[] = []
+  const summaries: OverlapSummary[] = []
+
+  for (const itemsInGroup of groups) {
     const ordered = [...itemsInGroup].sort(
       (a, b) => (b.end - b.start) - (a.end - a.start) || a.start - b.start || a.event.id.localeCompare(b.event.id)
     )
-    ordered.forEach(block => {
-      // Count overlapping *visible* layers, with a cap so even many events
-      // keep enough width for titles and remain usable.
-      block.depth = Math.min(3, placed.filter(other =>
-        other.start < block.end && block.start < other.end
-      ).reduce((depth, other) => Math.max(depth, other.depth + 1), 0))
-      placed.push(block)
-    })
-    // Keep the title of a long appointment outside intervals covered by
-    // smaller, foreground appointments. Use rendered heights (not just actual
-    // duration) because 5-minute appointments have a readable min-height.
-    for (const block of ordered) {
-      const boundaries = placed.filter(item =>
-        item.depth > block.depth && item.start < block.end && block.start < item.end
-      ).map(item => ({
-        start: Math.max(block.start, item.start),
-        end: Math.min(block.end, item.start + Math.max(item.end - item.start, MIN_BLOCK_PX / MINUTE_HEIGHT))
-      })).sort((a, b) => a.start - b.start)
-      let cursor = block.start
-      let best = { start: block.start, end: block.start }
-      for (const covered of boundaries) {
-        if (covered.start > cursor && covered.start - cursor > best.end - best.start) {
-          best = { start: cursor, end: covered.start }
-        }
-        cursor = Math.max(cursor, covered.end)
-      }
-      if (block.end - cursor > best.end - best.start) best = { start: cursor, end: block.end }
-      block.labelTop = Math.max(5, (best.start - block.start) * MINUTE_HEIGHT + 5)
-      block.labelSpace = (best.end - best.start) * MINUTE_HEIGHT
-      // Very short appointments still have a readable single-line chip.
-      if (block.end - block.start < 45) block.labelTop = 5
+    const [primary, ...overlapping] = ordered
+    if (!primary) continue
+    blocks.push(primary)
+
+    if (overlapping.length > 0) {
+      const primaryVisualEnd = visualEnd(primary)
+      const intersecting = overlapping.filter(item => item.start < primaryVisualEnd && primary.start < visualEnd(item))
+      const overlapStart = intersecting.length > 0
+        ? Math.min(...intersecting.map(item => Math.max(primary.start, item.start)))
+        : Math.max(primary.start, Math.min(...overlapping.map(item => item.start)))
+      summaries.push({
+        primary,
+        events: overlapping.sort((a, b) => a.start - b.start || a.event.title.localeCompare(b.event.title, "ja")),
+        overlapStart
+      })
     }
-    return ordered
-  })
-}
+  }
 
-const ownerTone: Record<EventOwner, string> = {
-  A: "border-[#5a9a9b] bg-[#e5f1ef] text-[#356d6a] dark:bg-[#244145] dark:text-[#a2d7d5]",
-  B: "border-[#d59677] bg-[#faeee8] text-[#9a6654] dark:bg-[#48332f] dark:text-[#f3cbb9]",
-  both: "border-[#9586c6] bg-[#ece8f8] text-[#63568d] dark:bg-[#383451] dark:text-[#d5caf6]"
-}
-
-const ownerAvatar: Record<EventOwner, string> = {
-  A: "bg-[#d7e7ea] text-[#3e6470]",
-  B: "bg-[#f3dfda] text-[#90625a]",
-  both: "bg-[#e7e2f4] text-[#70649c] dark:bg-[#403b5c] dark:text-[#d5caf6]"
+  return {
+    blocks: blocks.sort((a, b) => a.start - b.start || a.end - b.end),
+    summaries
+  }
 }
 
 type DayTimelineProps = {
@@ -115,6 +108,7 @@ type DayTimelineProps = {
 
 export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, onCreate }: DayTimelineProps) {
   const reduceMotion = useReducedMotion()
+  const [selectedOverlap, setSelectedOverlap] = useState<OverlapSummary | null>(null)
   const timed = events.filter(event => Boolean(event.time))
   const timeRange = useMemo(() => {
     if (timed.length === 0) return null
@@ -127,30 +121,36 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
 
   const eventsFor = (owner: EventOwner, timedOnly = false) =>
     events.filter(event => event.by === owner && (timedOnly ? Boolean(event.time) : !event.time))
+  const hasAllDayEvents = events.some(event => !event.time)
 
-  const timedBlock = ({ event, start, end, depth, labelTop, labelSpace }: TimedBlock, owner: EventOwner, shared = false) => {
+  const timelineLayouts = useMemo(() => ({
+    A: layoutBlocks(events.filter(event => event.by === "A" && event.time)),
+    B: layoutBlocks(events.filter(event => event.by === "B" && event.time)),
+    both: layoutBlocks(events.filter(event => event.by === "both" && event.time))
+  }), [events])
+  const selectedOverlapEvents = selectedOverlap
+    ? [selectedOverlap.primary, ...selectedOverlap.events].sort((a, b) => a.start - b.start || a.event.title.localeCompare(b.event.title, "ja"))
+    : []
+
+  const timedBlock = ({ event, start, end }: TimedBlock, owner: EventOwner, shared = false, hasSummary = false) => {
     if (!timeRange) return null
     const top = (start - timeRange.firstHour * 60) * MINUTE_HEIGHT
     const height = Math.min(Math.max(MIN_BLOCK_PX, (end - start) * MINUTE_HEIGHT - 3), timeRange.height - top - 2)
-    const inset = 3 + depth * 8
-    const short = height < 49 || labelSpace < 43
+    const short = height < 49
     const style: CSSProperties = {
       top,
       height,
-      left: inset,
-      right: 3 + depth * 5,
-      zIndex: 10 + depth
+      left: 3,
+      right: 3,
+      zIndex: 10
     }
-    const displayedTop = Math.min(labelTop, Math.max(4, height - (short ? 22 : 39)))
     return (
       <motion.button key={event.id} type="button" onClick={() => onEditEvent(event.id)}
         aria-label={event.title + "を編集"}
         title={event.title + " " + event.time + (event.endTime ? "–" + event.endTime : "")}
         data-calendar-event={event.id}
         data-owner={owner}
-        data-depth={depth}
-        data-label-top={displayedTop}
-        data-label-space={Math.round(labelSpace)}
+        data-depth="0"
         data-compact={short}
         data-start={event.time} data-end={event.endTime ?? ""}
         initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
@@ -159,13 +159,13 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
         transition={{ duration: reduceMotion ? 0 : 0.19 }}
         style={style}
         className={cn(
-          "pointer-events-auto absolute block min-w-0 overflow-hidden rounded-[11px] border-l-[3px] text-left shadow-[0_2px_6px_rgba(30,50,70,.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          ownerTone[owner],
+          buttonVariants({ variant: "ghost", size: "sm", className: "p-0 whitespace-normal" }),
+          "pointer-events-auto absolute block min-w-0 overflow-hidden rounded-[11px] border-l-[3px] text-left shadow-[0_2px_6px_rgba(30,50,70,.12)]",
+          ownerSurfaceTone[owner],
           shared && "shadow-[0_4px_12px_rgba(76,61,113,.17)]"
         )}>
         <span data-testid={"event-label-" + event.id}
-          className="absolute inset-x-1.5 flex min-w-0 flex-col text-[11px] font-bold"
-          style={{ top: displayedTop }}>
+          className={cn("absolute inset-x-1.5 top-1 flex min-w-0 flex-col text-[11px] font-bold", hasSummary && "pr-14")}>
           <span className={cn("block min-w-0 break-words text-[11px] font-bold leading-[14px]",
             short ? "truncate" : "line-clamp-3")}>
             {event.title}
@@ -175,7 +175,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
               {event.time}{event.endTime ? "–" + event.endTime : ""}
             </span>
           )}
-          {!short && event.address && height > 100 && labelSpace > 80 && (
+          {!short && event.address && height > 100 && (
             <span className="mt-1.5 flex items-start gap-0.5 text-[9px] leading-tight opacity-80">
               <MapPin className="mt-0.5 size-2.5 shrink-0" /><span className="line-clamp-2">{event.address}</span>
             </span>
@@ -183,6 +183,46 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
         </span>
       </motion.button>
     )
+  }
+
+  const overlapButton = (summary: OverlapSummary, owner: EventOwner) => {
+    if (!timeRange) return null
+    const eventTop = (summary.primary.start - timeRange.firstHour * 60) * MINUTE_HEIGHT
+    const eventHeight = Math.min(
+      Math.max(MIN_BLOCK_PX, (summary.primary.end - summary.primary.start) * MINUTE_HEIGHT - 3),
+      timeRange.height - eventTop - 2
+    )
+    const snappedMinute = Math.round(summary.overlapStart / 60) * 60
+    const alignedTop = (snappedMinute - timeRange.firstHour * 60) * MINUTE_HEIGHT - 16
+    const minimumOffset = Math.min(32, Math.max(2, eventHeight - 36))
+    const maximumOffset = Math.max(minimumOffset, eventHeight - 38)
+    const top = eventTop + Math.min(Math.max(alignedTop - eventTop, minimumOffset), maximumOffset)
+
+    return (
+      <Button
+        key={`overlap-${summary.primary.event.id}`}
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={`重なっている予定を表示。他${summary.events.length}件`}
+        data-testid={`overlap-summary-${summary.primary.event.id}`}
+        data-overlap-count={summary.events.length}
+        data-owner={owner}
+        onClick={() => setSelectedOverlap(summary)}
+        style={{ top, right: 6, zIndex: 30 }}
+        className={cn(
+          "pointer-events-auto absolute h-7 min-h-7 rounded-sm border px-1 py-0.5 shadow-none hover:brightness-[0.98]",
+          ownerSurfaceTone[owner]
+        )}
+      >
+        <span className="text-xs font-semibold leading-none">他{summary.events.length}件</span>
+      </Button>
+    )
+  }
+
+  const editOverlapEvent = (eventId: string) => {
+    setSelectedOverlap(null)
+    window.setTimeout(() => onEditEvent(eventId), reduceMotion ? 0 : 200)
   }
 
   return (
@@ -194,58 +234,55 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
             <div key={person.id} data-testid={"person-header-" + person.id}
               className="flex min-h-[53px] min-w-0 flex-col items-center justify-center gap-0.5 border-l border-border/50 px-0.5">
               <span className="flex min-w-0 items-center justify-center gap-1">
-                <span className={cn("flex size-[17px] shrink-0 items-center justify-center rounded-full text-[9px] font-bold", ownerAvatar[person.id])}>
-                  {person.avatar}
-                </span>
+                <OwnerAvatar owner={person.id} size="xs" decorative />
                 <span className="truncate text-[10px] font-bold">{person.label}</span>
-              </span>
-              <span className="text-[9px] tabular-nums text-muted-foreground">
-                {events.filter(event => event.by === person.id).length}件
               </span>
             </div>
           ))}
         </div>
 
-        <div className={cn("grid border-b border-border/70", allDayGrid)} data-testid="all-day-strip">
-          <span className={cn("self-start pt-3 text-center text-[10px] font-semibold text-muted-foreground",
-            eventsFor("both").length > 0 && "row-span-2")}>終日</span>
-          {PEOPLE.map(person => {
-            const allDayEvents = eventsFor(person.id)
-            return (
-              <div key={person.id} data-testid={"all-day-" + person.id}
-                className="flex min-h-[56px] min-w-0 flex-col gap-1 border-l border-border/50 px-1 py-1.5">
-                {allDayEvents.length === 0 ? (
-                  <span className="m-auto text-[9px] text-muted-foreground/55">—</span>
-                ) : allDayEvents.map(event => (
-                  <button key={event.id} type="button" onClick={() => onEditEvent(event.id)}
+        {hasAllDayEvents && (
+          <div className={cn("grid border-b border-border/70", allDayGrid)} data-testid="all-day-strip">
+            <span className={cn("self-start pt-3 text-center text-[10px] font-semibold text-muted-foreground",
+              eventsFor("both").length > 0 && "row-span-2")}>終日</span>
+            {PEOPLE.map(person => {
+              const allDayEvents = eventsFor(person.id)
+              return (
+                <div key={person.id} data-testid={"all-day-" + person.id}
+                  className="flex min-h-[56px] min-w-0 flex-col gap-1 border-l border-border/50 px-1 py-1.5">
+                  {allDayEvents.length === 0 ? (
+                    <span className="m-auto text-[9px] text-muted-foreground/55">—</span>
+                  ) : allDayEvents.map(event => (
+                    <Button key={event.id} type="button" variant="ghost" size="sm" onClick={() => onEditEvent(event.id)}
+                      aria-label={event.title + "を編集"} data-calendar-event={event.id} data-owner={event.by}
+                      className={cn(
+                        "h-auto min-h-9 w-full whitespace-normal rounded-[10px] border-l-[3px] px-1.5 py-1 text-left text-[11px] font-bold leading-snug",
+                        ownerSurfaceTone[event.by]
+                      )}>
+                      <span className="block break-words text-[11px] font-bold leading-snug">{event.title}</span>
+                    </Button>
+                  ))}
+                </div>
+              )
+            })}
+            <div data-testid="all-day-both"
+              className={cn("col-start-2 col-span-2 min-w-0 border-l border-t border-border/50 px-1 py-1.5",
+                eventsFor("both").length === 0 && "hidden")}>
+              <div className="flex flex-col gap-1">
+                {eventsFor("both").map(event => (
+                  <Button key={event.id} type="button" variant="ghost" size="sm" onClick={() => onEditEvent(event.id)}
                     aria-label={event.title + "を編集"} data-calendar-event={event.id} data-owner={event.by}
                     className={cn(
-                      "min-h-8 w-full rounded-[10px] border-l-[3px] px-1.5 py-1.5 text-left text-[11px] font-bold leading-snug",
-                      ownerTone[event.by]
+                      "h-auto min-h-9 w-full whitespace-normal rounded-[10px] border-l-[3px] px-2 py-1 text-left text-[11px] font-bold leading-snug",
+                      ownerSurfaceTone.both
                     )}>
                     <span className="block break-words text-[11px] font-bold leading-snug">{event.title}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
-            )
-          })}
-          <div data-testid="all-day-both"
-            className={cn("col-start-2 col-span-2 min-w-0 border-l border-t border-border/50 px-1 py-1.5",
-              eventsFor("both").length === 0 && "hidden")}>
-            <div className="flex flex-col gap-1">
-              {eventsFor("both").map(event => (
-                <button key={event.id} type="button" onClick={() => onEditEvent(event.id)}
-                  aria-label={event.title + "を編集"} data-calendar-event={event.id} data-owner={event.by}
-                  className={cn(
-                    "min-h-8 w-full rounded-[10px] border-l-[3px] px-2 py-1.5 text-left text-[11px] font-bold leading-snug",
-                    ownerTone.both
-                  )}>
-                  <span className="block break-words text-[11px] font-bold leading-snug">{event.title}</span>
-                </button>
-              ))}
             </div>
           </div>
-        </div>
+        )}
 
         {timeRange ? (
           <div data-testid="timeline-grid" className={cn("relative grid", timeGrid)} style={{ height: timeRange.height }}>
@@ -265,23 +302,35 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
             {(["A", "B"] as const).map(person => (
               <div key={person} data-testid={"timeline-lane-" + person}
                 className="pointer-events-none relative z-[2] min-w-0 border-l border-border/50">
-                {layoutBlocks(eventsFor(person, true)).map(block => timedBlock(block, person))}
+                {timelineLayouts[person].blocks.map(block => timedBlock(
+                  block,
+                  person,
+                  false,
+                  timelineLayouts[person].summaries.some(summary => summary.primary.event.id === block.event.id)
+                ))}
+                {timelineLayouts[person].summaries.map(summary => overlapButton(summary, person))}
               </div>
             ))}
             {/* This layer spans A+B, not a third narrow time column. Its blocks
                 sit beneath personal appointments so both remain tappable. */}
             <div data-testid="timeline-lane-both"
               className="pointer-events-none absolute bottom-0 right-0 top-0 z-[1]" style={{ left: 42 }}>
-              {layoutBlocks(eventsFor("both", true)).map(block => timedBlock(block, "both", true))}
+              {timelineLayouts.both.blocks.map(block => timedBlock(
+                block,
+                "both",
+                true,
+                timelineLayouts.both.summaries.some(summary => summary.primary.event.id === block.event.id)
+              ))}
+              {timelineLayouts.both.summaries.map(summary => overlapButton(summary, "both"))}
             </div>
           </div>
         ) : (
           <div data-testid="timeline-empty" className="flex min-h-24 flex-col items-center justify-center gap-1 px-3 py-5 text-center">
             <Clock3 className="size-4 text-muted-foreground/60" />
             <span className="text-xs text-muted-foreground">時間指定の予定はありません</span>
-            <button type="button" onClick={onCreate} className="mt-1 min-h-11 rounded-lg px-3 text-[12px] font-bold text-primary">
+            <Button type="button" variant="ghost" onClick={onCreate} className="mt-1 text-[12px] text-primary">
               <Plus className="mr-1 inline size-3.5" />予定を追加
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -297,11 +346,8 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
                 aria-label={task.title + "を編集"}
                 initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="flex min-h-[58px] w-full items-center gap-3 border-b border-border/70 px-3 py-3 text-left last:border-0">
-                <span className={cn("flex size-[23px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
-                  task.by === "A" ? "bg-[#d7e7ea] text-[#3e6470]" : "bg-[#f3dfda] text-[#90625a]")}>
-                  {task.by}
-                </span>
+                className={cn(buttonVariants({ variant: "ghost", size: "sm", className: "h-auto whitespace-normal" }), "flex min-h-[58px] w-full items-center justify-start gap-3 rounded-none border-b border-border/70 px-3 py-3 text-left last:border-0 hover:bg-accent/50")}>
+                <OwnerAvatar owner={task.by} size="sm" decorative />
                 <span className="min-w-0 flex-1 break-words text-[12px] font-semibold">{task.title}</span>
                 <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-[10px] font-semibold text-primary">TODO</span>
               </motion.button>
@@ -309,6 +355,45 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
           </AnimatePresence>
         </section>
       )}
+
+      <Sheet open={Boolean(selectedOverlap)} onOpenChange={open => { if (!open) setSelectedOverlap(null) }}>
+        <SheetContent data-testid="overlap-sheet">
+          <SheetHeader className="pr-14">
+            <SheetTitle className="text-left text-[20px] font-bold">重なっている予定</SheetTitle>
+            <SheetDescription className="text-left text-xs">
+              {selectedOverlap?.primary.event.title}と同じ時間帯の予定です。時刻を確認して予定を選べます。
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody className="space-y-2">
+            {selectedOverlapEvents.map(block => {
+              const event = block.event
+              const time = `${event.time ?? "時間未定"}${event.endTime ? `–${event.endTime}` : ""}`
+              const owner = event.by === "both" ? "ふたり" : event.by
+              return (
+                <Button
+                  key={event.id}
+                  type="button"
+                  variant="outline"
+                  aria-label={`${event.title}、${time}、${owner}の予定を編集`}
+                  onClick={() => editOverlapEvent(event.id)}
+                  className="h-auto min-h-[60px] w-full justify-start gap-3 whitespace-normal rounded-xl px-3 py-3 text-left"
+                >
+                  <OwnerAvatar owner={event.by} size="sm" decorative />
+                  <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                    <span className="block w-full break-words text-[13px] font-bold leading-snug">{event.title}</span>
+                    <span className="block text-[11px] font-medium text-muted-foreground">
+                      {time} ・ {event.category}{event.address ? ` ・ ${event.address}` : ""}
+                    </span>
+                  </span>
+                  {event.id === selectedOverlap?.primary.event.id && (
+                    <span className="shrink-0 rounded-full bg-secondary px-2 py-1 text-[9px] font-semibold text-secondary-foreground">表示中</span>
+                  )}
+                </Button>
+              )
+            })}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

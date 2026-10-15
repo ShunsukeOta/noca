@@ -5,6 +5,8 @@ import { Link, NavLink, useLocation, useOutlet } from "react-router-dom"
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react"
 import { CalendarDays, ListTodo, NotebookPen, Plus, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { OwnerAvatar } from "@/components/owner-ui"
+import { UndoToast } from "@/components/undo-toast"
 import { PreviewCreateSheet, type PageKind } from "@/components/preview-create-sheet"
 import { TodoEditorSheet } from "@/components/todo-editor-sheet"
 import { CalendarEditorSheet } from "@/components/calendar-editor-sheet"
@@ -58,7 +60,8 @@ export function AppShell() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark")
     localStorage.setItem("noca.theme", theme)
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#111826" : "#f6f8fb")
+    const background = getComputedStyle(document.documentElement).getPropertyValue("--background").trim()
+    if (background) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background)
   }, [theme])
 
   useEffect(() => { setSheetOpen(false); closeEditor(); calendar.closeEditor() }, [location.pathname, closeEditor, calendar.closeEditor])
@@ -76,9 +79,9 @@ export function AppShell() {
             </time>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <div className="mr-1 flex -space-x-2" aria-label="2人の共有スペース（表示用）">
-              <span className="flex size-8 items-center justify-center rounded-full border-[3px] border-background bg-[#d7e7ea] text-[10px] font-bold text-[#3e6470]" aria-hidden="true">A</span>
-              <span className="flex size-8 items-center justify-center rounded-full border-[3px] border-background bg-[#f3dfda] text-[10px] font-bold text-[#90625a]" aria-hidden="true">B</span>
+            <div className="mr-1 flex -space-x-2" role="group" aria-label="表示用の担当サンプル">
+              <OwnerAvatar owner="A" size="lg" decorative className="border-[3px] border-background" />
+              <OwnerAvatar owner="B" size="lg" decorative className="border-[3px] border-background" />
             </div>
             <Link to="/settings" state={{ from: active?.to ?? "/todo" }} aria-label="設定を開く" aria-current={isSettings ? "page" : undefined}
               className={cn("tap-target flex items-center justify-center rounded-full transition-colors", isSettings ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary")}>
@@ -135,54 +138,24 @@ export function AppShell() {
           <motion.div className="pointer-events-auto shrink-0"
             whileTap={reduceMotion ? undefined : { scale: 0.90 }}
             transition={{ type: "spring", stiffness: 510, damping: 29 }}>
-            <Button type="button" size="icon" aria-label={active.label + "を追加"}
+            <Button type="button" size="fab" aria-label={active.label + "を追加"}
               data-testid="dock-add-button"
               onClick={() => { if (active.kind === "todo") openCreate(); else if (active.kind === "calendar") calendar.openCreate(); else setSheetOpen(true) }}
-              className="dock-create relative size-[60px] overflow-hidden rounded-[21px] bg-primary text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              className="dock-create relative overflow-hidden bg-dock-create-bg text-dock-create-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <span className="pointer-events-none absolute inset-x-3 top-[3px] h-px rounded-full bg-white/25" aria-hidden="true" />
               <Plus className="relative size-[27px] stroke-[2.5px]" />
             </Button>
           </motion.div>
         )}
       </div>
-      <div className="pointer-events-none fixed bottom-[calc(105px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
+      <div className="pointer-events-none fixed bottom-[calc(105px+env(safe-area-inset-bottom))] left-1/2 z-40 flex w-full max-w-[540px] -translate-x-1/2 flex-col gap-2 px-5">
         <AnimatePresence initial={false}>
-          {deleted && (
-            <motion.div key={deleted.task.id} role="status" aria-live="polite"
-              initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
-              transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
-              className="pointer-events-auto flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-[13px] shadow-xl">
-              <span className="font-medium">タスクを削除しました</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={undoDelete} className="tap-target px-2 font-bold text-primary">元に戻す</button>
-                <button type="button" onClick={dismissDeleted} className="tap-target px-2 text-muted-foreground" aria-label="通知を閉じる">×</button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-      <div className="pointer-events-none fixed bottom-[calc(105px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-[540px] -translate-x-1/2 px-5">
-        <AnimatePresence initial={false}>
-          {calendar.deleted && (
-            <motion.div key={calendar.deleted.event.id} role="status" aria-live="polite"
-              initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
-              transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
-              className="pointer-events-auto flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-[13px] shadow-xl">
-              <span className="font-medium">予定を削除しました</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={calendar.undoDelete} className="tap-target px-2 font-bold text-primary">元に戻す</button>
-                <button type="button" onClick={calendar.dismissDeleted} className="tap-target px-2 text-muted-foreground" aria-label="通知を閉じる">×</button>
-              </div>
-            </motion.div>
-          )}
+          {deleted && <UndoToast key={"todo-" + deleted.task.id} message="タスクを削除しました" onUndo={undoDelete} onDismiss={dismissDeleted} />}
+          {calendar.deleted && <UndoToast key={"event-" + calendar.deleted.event.id} message="予定を削除しました" onUndo={calendar.undoDelete} onDismiss={calendar.dismissDeleted} />}
         </AnimatePresence>
       </div>
       {(storageError || calendar.storageError) && (
-        <div role="alert" className="fixed left-1/2 top-[calc(60px+env(safe-area-inset-top))] z-40 w-[calc(100%-40px)] max-w-[480px] -translate-x-1/2 rounded-xl bg-destructive px-4 py-3 text-sm font-medium text-white shadow-lg">
+        <div role="alert" className="fixed left-1/2 top-[calc(60px+env(safe-area-inset-top))] z-40 w-[calc(100%-40px)] max-w-[480px] -translate-x-1/2 rounded-xl bg-destructive px-4 py-3 text-sm font-medium text-destructive-foreground shadow-lg">
           この端末に保存できません。ブラウザの設定を確認してください。
         </div>
       )}
