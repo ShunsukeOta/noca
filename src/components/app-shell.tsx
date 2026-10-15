@@ -53,6 +53,7 @@ export function AppShell() {
   const location = useLocation()
   const active = tabs.find((tab) => location.pathname.startsWith(tab.to))
   const isSettings = location.pathname === "/settings"
+  const isJoin = location.pathname === "/join" || location.pathname.startsWith("/join/")
   const requestedSettingsReturn = (location.state as { from?: unknown } | null)?.from
   const settingsReturnTo = tabs.find(tab => tab.to === requestedSettingsReturn)?.to ?? "/todo"
   const reduceMotion = useReducedMotion()
@@ -129,7 +130,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main id="main-content" aria-label={isSettings ? "設定" : active?.label ?? "TODO"}
+      <main id="main-content" aria-label={isSettings ? "設定" : isJoin ? "招待" : active?.label ?? "TODO"}
         className={cn("app-content px-5 pt-5", isSettings && "app-content-settings")}>
         {isSettings ? page : (
           <AnimatePresence initial={false} mode="wait">
@@ -143,7 +144,7 @@ export function AppShell() {
         )}
       </main>
 
-      {!isSettings && <div data-testid="bottom-dock"
+      {!isSettings && !isJoin && <div data-testid="bottom-dock"
         className={cn("bottom-dock pointer-events-none fixed left-1/2 z-30 flex w-[calc(100%-32px)] max-w-[508px] -translate-x-1/2 items-center gap-4", active?.kind === "memo" && "max-w-[360px]")}>
         <nav className={cn("bottom-nav pointer-events-auto flex min-w-0 flex-1 items-center rounded-[25px] border border-border/80 bg-card/95 p-[7px] backdrop-blur-2xl", active?.kind === "memo" && "w-full")}
           aria-label="メインメニュー">

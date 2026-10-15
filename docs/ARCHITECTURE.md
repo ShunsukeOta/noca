@@ -5,9 +5,9 @@ Updated: 2026-10-15. Based on the current local implementation. This document de
 ## 1. Product / runtime boundaries
 
 - iPhone-first Japanese PWA for a pair: TODO, monthly + daily calendar, notes.
-- **Single-browser local preview:** the app starts with one local member named 「自分」. A small membership context controls whether solo or paired UI is shown, but it is not an account, invite, workspace permission or cross-device synchronization system. There is no backend service or Firebase SDK initialization.
+- **Local-first preview with optional Firebase membership:** without Firebase environment values, the app starts with one local member named 「自分」 and uses local preview state. When configured, Firebase Authentication provides Google sign-in and Firestore stores account-to-workspace membership and invitations. TODOs, categories, calendar events and theme still use their existing localStorage keys; there is no cloud CRUD or cross-device item sync yet.
 - UI is constrained to a 540px max-width app shell (`src/styles/globals.css`). Current browser preview: [noca-delta.vercel.app](https://noca-delta.vercel.app); deployed from GitHub/Vercel setup. Deploy success must be checked separately from CI.
-- Phase 1 targets CSS/UX. Security rules, data ownership, cross-user identity and transport are future decisions.
+- Firebase Authentication, workspace membership, invite handling and Firestore Rules have local source implementations. Project connection, Rules deployment and security acceptance checks remain incomplete. TODO/calendar data ownership and cross-device transport are Phase 3 decisions.
 
 ## 2. Technology
 
@@ -20,7 +20,8 @@ Updated: 2026-10-15. Based on the current local implementation. This document de
 | Animation | `motion/react` with `useReducedMotion` and `AnimatePresence` |
 | Icons | `lucide-react` |
 | PWA | `vite-plugin-pwa`, auto-update service worker, manifest in `vite.config.ts` |
-| Persistence | `localStorage` through React Context providers, **not Firestore** |
+| TODO/calendar persistence | `localStorage` through React Context providers; not Firestore |
+| Identity/membership | Firebase Authentication + Firestore when configured; local preview fallback otherwise |
 | Tests | Playwright with Chromium (`tests/ui.spec.ts`) |
 | CI | GitHub Actions `.github/workflows/ui-check.yml`, Node.js 22, `npm install`, build + browser tests |
 
@@ -37,16 +38,18 @@ Updated: 2026-10-15. Based on the current local implementation. This document de
 WorkspaceMembershipProvider  (local preview starts with member A only)
   TodoProvider
     CalendarProvider
-      Routes
+      FirebaseWorkspaceMembershipProvider (loaded only when Firebase config exists)
+        Routes
         AppShell  (common layout)
           /todo       TodoPage
           /calendar   CalendarPage
           /memo       MemoPage
           /settings   SettingsPage
+          /join       JoinWorkspacePage (token in URL fragment)
           *           Navigate("/todo")
 ```
 
-The `/calendar` page module is loaded with `React.lazy` when the route is opened. Global navigation preloads it on pointer intent or keyboard focus. TODO and the Settings page shell remain in the initial bundle. TODO/calendar editor sheets and Settings' category manager load when opened, with pointer/focus preloading. Settings' header and theme render while its category module loads. `motion/react`'s `m` components use an asynchronously loaded `domMax` feature bundle for the existing layout animations. The local providers still initialize on first load. Workbox precaches all built JavaScript, including deferred chunks, so these changes reduce initial parse/evaluation rather than total offline download size. The manifest icon is precached through the PWA manifest without a duplicate SVG glob entry.
+The `/calendar` page module is loaded with `React.lazy` when the route is opened. Global navigation preloads it on pointer intent or keyboard focus. TODO and the Settings page shell remain in the initial bundle. TODO/calendar editor sheets, Settings' category manager and the invite route load when opened. The remote Firebase membership provider is also loaded only when Firebase config exists; it is separate from the local membership context so calendar/editor chunks do not pull the Firestore SDK into offline routes. Settings' header and theme render while its category module loads. `motion/react`'s `m` components use an asynchronously loaded `domMax` feature bundle for the existing layout animations. Workbox precaches local app JavaScript, including deferred TODO/calendar UI chunks, but excludes Firebase SDK/service chunks and the invite route because those flows require a network connection. Local TODO/calendar pages and editors remain cached. The PWA precache budget is 652 KiB; the current measured total is about 650.7 KiB.
 
 `src/components/app-shell.tsx`:
 - sticky header with noca logo, **local today** (updates across midnight and app focus), current-member avatar and settings link; solo preview shows only 「自分」, and a second avatar appears only when membership state contains B. On `/settings`, the settings icon becomes a close link that returns to the originating tab (or TODO for a direct URL);
@@ -60,7 +63,10 @@ The `/calendar` page module is loaded with `React.lazy` when the route is opened
 Shared UI foundation:
 - `src/components/ui/`: Button, Input, Textarea, Label, Checkbox, Switch, mobile Sheet and ConfirmDialog. Form controls share typography, borders, focus rings and invalid states.
 - `src/components/category-ui.tsx` and `src/components/owner-ui.tsx`: common category badges/selectors and A/B/both avatars/selectors. TODO editor uses the horizontally scrolling, palette-filled category tile selector; its 「詳細を入力」 section contains the due date, memo, URL and address fields. Creating a TODO keeps the sheet open, briefly overlays a green check at the title input's right edge, clears the draft fields, retains the selected category and returns focus to the title input; editing a TODO saves and closes the sheet.
-- `src/features/workspace/workspace-membership.tsx`: local preview membership state defaults to one member. The calendar hides owner controls and B labels in solo mode, places saved A/B/both events in one unlabeled personal lane, and restores the comparison layout when two members are supplied. Settings shows the current member count; there is no user-facing way to join a second member until auth/invite work is implemented.
+- `src/features/workspace/workspace-membership.tsx`: defaults to one local member when Firebase is not configured. Configured builds observe Google Auth and current Firestore membership; only a real accepted second account supplies B and activates paired UI. Firebase code is dynamically imported so local preview does not load it in the initial entry chunk.
+- `src/features/workspace/firebase-workspace.ts`: Google redirect sign-in, live membership listeners, workspace creation, SHA-256 invite links and transaction-based acceptance. Invitation IDs store token hashes; links expire in about 24 hours.
+- `firestore.rules`: server-side checks for workspace/member access, one workspace per account, owner-only invite creation, one-use acceptance and the two-member maximum. This phase does not use a callable function.
+- `src/pages/join-workspace-page.tsx`: sign-in and invite-accept route. `docs/FIREBASE_SETUP.md` documents Firebase Console configuration and rules deployment.
 - `src/components/undo-toast.tsx`: shared delete Undo notice; simultaneous TODO/calendar notices stack in one host.
 - `src/styles/globals.css` is the source of truth for light/dark palette, owner/category meaning colors, weekend/calendar accents and radius steps. Avoid component-local hex values.
 - Motion-driven controls use the shared `buttonVariants` styles where wrapping the Button component would interfere with layout animation.
@@ -84,8 +90,10 @@ Defined in `src/app/mock-data.ts`:
 | `noca.calendar.events.v1` | `CalendarProvider` | JSON array of events; loaded on startup |
 | `noca.calendar.samples.v2` | Calendar store | One-time migration marker for old bundled examples |
 | `noca.calendar.samples.v3` | Calendar store | One-time migration marker for shared/overlap example events |
-| `noca.workspace.members.v1` | `WorkspaceMembershipProvider` | Local preview members; defaults to A/「自分」 only and is not an identity or permission record |
+| `noca.workspace.members.v1` | `WorkspaceMembershipProvider` | Local preview fallback only; configured Firebase builds leave this key intact and do not treat it as cloud membership |
 | `noca.theme` | `AppShell` | `light` or `dark` |
+
+Firebase membership documents are stored separately under `users/{uid}`, `workspaces/{workspaceId}` and `workspaces/{workspaceId}/members/{uid}`. Invitation documents use SHA-256 token hashes as IDs. These documents do not contain or migrate TODO/calendar records.
 
 `loadTodos` and `readEvents` validate selected fields and use initial mock arrays only on absent/invalid data. **A legitimately stored empty array remains empty**. Existing TODO records keep their category names in `noca.todos.v1`; the category configuration stores `{ id, name, tone }` items in display order. Existing configurations without `id` receive one during load. On first load, built-in categories are used and any category already referenced by a saved TODO but missing from the configuration is retained with the neutral tone. Renaming a category updates the associated TODO names; deleting one moves its TODOs to a selected remaining category before removing the category. Category tones use eight theme-defined palette choices; earlier `life`/`outing`/`couple` tone keys are normalized to their matching palette choices on load. Browser storage deletion means losing local-only edits. Browser `storage` events update providers across tabs **of the same origin**, not a real shared account or reliable two-device sync.
 
@@ -97,7 +105,7 @@ There is currently no memo model, sample list, store or persistence path. The `/
 
 The calendar initializer can append versioned `demo-*` sample events to existing *sample-containing* calendars once. **This is preview-data migration logic**; do not silently reseed user data, recreate previously deleted samples or treat marker flags as real DB migrations. Preserve local edit/delete/Undo and migration behavior when refactoring. Initial demo dates are relative to the runtime date.
 
-`crypto.randomUUID()` creates TODO and calendar IDs. Both stores implement CRUD and delete/Undo notifications with a roughly 6.5-second window. New TODOs currently default to `by:"A"`. In solo mode the calendar editor hides the owner selector and creates events for A; it also preserves existing B/`both` assignments when editing without exposing those labels. The local membership context starts with A/「自分」 and paired controls/layout activate only when a B member is provided. The invite flow that would provide that member is not implemented.
+`crypto.randomUUID()` creates TODO and calendar IDs. Both stores implement CRUD and delete/Undo notifications with a roughly 6.5-second window. New TODOs currently default to `by:"A"`. In solo mode the calendar editor hides the owner selector and creates events for A; it also preserves existing B/`both` assignments when editing without exposing those labels. Without Firebase configuration, the local membership context starts with A/「自分」. With Firebase, paired controls/layout activate after a real second account accepts an invite. Existing local task/event owner fields remain A/B placeholders and are not mapped to authenticated user IDs; cloud CRUD and mapping are Phase 3.
 
 Time semantics:
 - Date only: local `yyyy-MM-dd`.
@@ -127,7 +135,7 @@ Time semantics:
 
 **Current layout by membership state:**
 - One member: header shows only 「自分」; TODO rows omit owner avatars; calendar has one unlabeled time lane and no owner selector. Existing A/B/`both` records remain visible in that lane without rewriting their stored owner values.
-- Two members: the comparison layout below is used. The local preview currently has no invite/acceptance flow, so real users cannot reach this state through the app UI yet.
+- Two members: the comparison layout below is used. A configured Firebase workspace can now supply two actual members after invite acceptance; the item records displayed in the lanes are still local and are not synchronized.
 - Header and all-day personal lane: **A / B only**, with 42px time/label gutter. **No third “ふたりの予定” column.** Hide the all-day row when A, B and shared events have no all-day items.
 - All-day shared (`by:"both"`) appointments are **full-width A+B chips underneath the A/B all-day row**.
 - Timed personal appointments appear in separate A/B lanes; shared appointments stretch across both lanes as a purple layer.
@@ -143,8 +151,8 @@ This is a sophisticated **preview visualization**, not a general-purpose interva
 - Memo list, editor, sample records, state and persistence code are deferred. There is no currently supported memo CRUD behavior.
 
 ### Settings
-- `src/pages/settings-page.tsx` handles theme through `AppShell` outlet context; appearance is persisted. TODO category management is in `src/components/todo-category-settings.tsx` and backed by `TodoProvider`. The Data section exports and restores TODOs, TODO categories and calendar events using the versioned envelope in `src/features/data/local-backup.ts`.
-- Sharing, invite, auth, notifications and cloud sync options are labeled **準備中** (no implementation).
+- `src/pages/settings-page.tsx` handles theme through `AppShell` outlet context; appearance is persisted. TODO category management is in `src/components/todo-category-settings.tsx` and backed by `TodoProvider`. The Data section exports and restores TODOs, TODO categories and calendar events using the versioned envelope in `src/features/data/local-backup.ts`. When Firebase is configured, this page also provides Google login/logout, workspace creation and invite-link issue/copy actions.
+- Push notifications and cloud CRUD/sync remain **準備中**. Settings explicitly says TODO/calendar data is still stored on this device.
 
 ## 6. Design and mobile considerations
 
@@ -153,7 +161,7 @@ This is a sophisticated **preview visualization**, not a general-purpose interva
 - Input sheet uses `visualViewport` to remain above the keyboard and should not autofocus on open. Memo forms reuse this behavior.
 - Motion is subtle and disabled/reduced when `prefers-reduced-motion` is active.
 - Primary testing widths: 320, 375, 390, 430 CSS px, including dark mode; compare interactive controls and overflow.
-- Real iPhone Safari and Home Screen PWA verification is **NOT complete**.
+- The maintainer reports Phase 1 iPhone Safari and Home Screen PWA verification complete. Device/case details are not recorded. The newer Phase 2 login/invite UI has not been included in that report.
 
 ## 7. Testing, releases, and historical docs
 
@@ -177,7 +185,7 @@ Routes use a SPA fallback in `vercel.json`. Deployment at Vercel can occur on ma
 
 ## 8. Known boundaries / engineering risks
 
-- No auth, database, shared live updates, invitation, permission model or push notifications yet.
+- Firebase Auth/workspace/invite and a Firestore membership permission model are implemented in the local source, but not deployed or live-verified. TODO/calendar cloud CRUD, shared live updates, migration and push notifications are not implemented.
 - Memo CRUD and persistence are currently deferred. A legacy `noca.notes.v1` key may remain in browser storage but this version does not access or delete it.
 - Calendar demo migration and multiple overlapping events require caution; protect user-generated items from any sample reset.
 - Arbitrarily many nested events, very short events, personal/shared collisions and accessibility need dedicated edge tests and iPhone verification.

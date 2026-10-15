@@ -2,8 +2,8 @@
 
 - Version: 0.1
 - Updated: 2026-10-15
-- Current: **Phase 1D（メモ機能）保留** / Next: **Phase 1E（iPhone実機QA、メモは案内画面として確認）**
-- Latest overall verification: [GitHub Actions #38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) — **build PASS / Chromium 43 tests PASS**（2026-10-14、ドキュメント更新前）。実機Safariは未検証
+- Current: **Phase 2（Google認証・workspace・招待）実装中**。Phase 1Eはメンテナーから完了報告あり。メモ機能は保留
+- Current local verification: build + bundle check pass, Playwright **50/50**, production PWA **4/4**. Firebase Google Auth, Firestore/Rules and Vercel Production/Preview client config are prepared; deployed Preview and live account/invite checks remain. Earlier CI baseline: [GitHub Actions #38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243).
 - Product spec: [SPECIFICATION.md](SPECIFICATION.md)
 - UI tokens: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 - UI verification: [UI_QA.md](UI_QA.md)
@@ -11,7 +11,7 @@
 ## 基本原則
 
 - フェーズを跨いだ先行実装を避ける。各フェーズの **DoD (Definition of Done)** を満たし、確認後に次へ進む。
-- **Phase 1A–1EではFirebase・認証・2人間の共有同期を実装しない。** TODO/予定はデモ起点の`localStorage` CRUD。メモ機能は保留中。データの自動共有はできない。
+- **Phase 1A–1Eは完了済みのUIプレビュー段階。** メンテナーからiPhone Safari/ホーム画面PWA QA完了の報告あり（個別記録は未掲載）。TODO/予定はデモ起点の`localStorage` CRUD。メモ機能は保留中。
 - フェーズ1で固定するのは画面の情報設計・外観・タップ操作。公開後のデータモデルまでは凍結しない。
 - 旧realtime-todosのコード・DB・公開環境を変更しない。
 - 作業は原則ブランチ/PRごとに小さく分割。画面キャプチャとテスト結果を残してレビュー可能にする。
@@ -27,8 +27,8 @@
 | **1B** | TODO UIとローカルCRUD・ユーザー管理カテゴリ | 1A | **実装済み**。カテゴリの追加/編集/色/並び順/削除とTODO移動を端末内保存（Safari実機は1E） |
 | **1C** | カレンダーCRUD・メンバー数に応じた時間表示 | 1B | **実装済み**。初期1人状態は1列、2人状態はA/B比較UI。Safari/PWA実機は1E |
 | **1D** | メモ機能 | 1C | **保留**。メモタブは残すが、一覧・作成・保存などは実装しない。用途とTODO/予定との役割を再検討してから再開 |
-| **1E** | iPhone実機・Safari/PWA表示確認、UI最終調整 | 1C | UI_QAの必須ケース合格、開発中メモ画面を含むデザイン承認、Phase 1完了 |
-| **2** | Firebase Auth・workspace・メンバーシップ・招待 | 1E | 1人で利用開始し、招待を承認したときだけ2人状態へ切り替わる。2アカウントの権限をサーバー側で制限 |
+| **1E** | iPhone実機・Safari/PWA表示確認、UI最終調整 | 1C | **完了（メンテナー報告）**。端末・ケース別記録は未掲載 |
+| **2** | Firebase Auth・workspace・メンバーシップ・招待 | 1E | 実装中。Firebase設定後、1人利用→招待→2人参加とサーバー側権限制限を実機確認 |
 | **3** | FirestoreのCRUD・共有同期・競合対策 | 2 | TODO/予定/メモが2端末で安全に同期される |
 | **4** | PWA実運用最適化、オフライン、通知検討 | 3 | ホーム画面PWA・再接続・更新・通知（採用時）を検証 |
 | **5** | 本番QA・リリース・運用 | 4 | リリースチェック合格、データ保護確認 |
@@ -137,14 +137,18 @@
 - [ ] ユーザーによるUI承認（配色・情報量・3タブ構成・編集方法）
 - [ ] README とデザイントークンを実装値で更新
 
-## Phase 2 — 認証・共有スペース
+## Phase 2 — 認証・共有スペース（実装中）
 
 - Google Auth、workspace、最大2人のmembers
-- 招待リンク（必要ならコード）・招待の有効期限・再発行
-- 参加承認の原子的処理、Firestore Security Rules、エラー導線
+- 24時間有効の招待リンク、再発行時の旧リンク失効
+- Firestore transactionとSecurity Rulesで参加処理を原子的に制限
+- 設定にログイン／スペース作成／招待リンク導線を追加。招待URLからGoogleログイン後に参加できる
+- Firebase環境変数がない場合は従来のローカルプレビューで動作する
+- 既存localStorageデータは読み替え・移動しない。TODO/予定の共有同期はPhase 3
+- Firebase Web app/Google Auth/Firestore/RulesとVercel Production/Preview設定は準備済み。アプリPreviewのデプロイと2アカウント受け入れ確認が残る。手順は [FIREBASE_SETUP.md](FIREBASE_SETUP.md)
 - PWA / Safariでログイン挙動が異なる可能性を検証
 
-**DoD:** 2人だけがworkspaceのデータにアクセスでき、第三者はアクセス不可。招待が失効・重複使用・3人目参加を拒否する。
+**DoD:** 2人だけがworkspaceに参加でき、第三者はアクセス不可。招待が失効・重複使用・3人目参加を拒否する。Firebase接続とセキュリティケースの確認を記録する。
 
 ## Phase 3 — リアルタイムデータ連携
 

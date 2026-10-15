@@ -2,10 +2,10 @@
 
 - Document: Product Specification
 - Version: 0.1 (draft)
-- Updated: 2026-10-14
+- Updated: 2026-10-15
 - Target: iPhone Safari / iPhoneホーム画面PWA
 - Source of truth: 本書を基本とし、具体的なUI数値は [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)、フェーズ判定は [ROADMAP.md](ROADMAP.md) を参照
-- Status: **UIプレビュー実装中**。TODO・カレンダーは端末内CRUDに対応。メモ機能は保留中で、タブに開発中の案内だけ表示。認証/共有/同期は未実装
+- Status: **ローカルUIプレビュー + Phase 2認証・メンバー参加を実装中**。TODO・カレンダーは端末内CRUD、メモ機能は保留。Google認証・招待リンク機能の実装を追加したが、Firebaseプロジェクト接続と実アカウント検証は未完了。TODO/予定の共有同期は未実装
 
 ## 1. プロダクト概要
 
@@ -34,16 +34,16 @@ TimeTreeのような多機能カレンダーではなく、**開いたらすぐ�
 - 権限は初期MVPでは両者同等（閲覧・作成・更新・完了・削除）。安全に退出できる管理導線を設ける。
 - 共有スペースは原則最大2人。個人専用/非公開アイテム切替は初期MVP対象外。
 
-### 初回ペアリング案（Phase 2で最終決定）
+### 初回ペアリング（Phase 2で実装中）
 
 1. Googleログイン
 2. 共有スペース作成者が招待リンクを生成
 3. 相手がログインして招待を承諾
 4. 2人目の参加確定で招待を失効し、次回から自動で同じworkspaceを開く
 
-代替導線として短い招待コードを検討。リンクは推測困難なトークン、期限（案: 24時間）、一回限り。コード方式は試行回数制限・レート制限を必須とする。実際の招待確定処理はクライアントだけではなく、信頼できるサーバー上で行う。
+短い招待コードは初期対象外とし、24時間有効・一回限りのリンクを採用する。参加確定はFirestore transactionで行い、人数制限と権限はFirestore Security Rulesでサーバー側から強制する。招待URLはフラグメントを使い、生tokenをFirestoreに保存しない。
 
-※ 現在の招待方式は提案であり、未実装・未承認。
+※ 画面・ソース・Security Rulesは追加済み。Firebase project設定、Rules deploymentと実アカウント受け入れ確認は未完了。
 
 ## 3. 情報設計・ナビゲーション
 
@@ -152,22 +152,34 @@ TimeTreeのような多機能カレンダーではなく、**開いたらすぐ�
 | ホスティング | 現在のプレビュー: Vercel。本番公開先は未決定（Firebase Hosting等が候補） |
 
 - Phase 1: 初期デモデータ + React Context / localStorageでTODO・予定のUIと操作を作る。メモ機能は具体的な利用シーンが決まるまで保留する。バックエンドのモックAPIやFirebase初期化は不要。
-- Phase 2以降: 認証・workspace・招待・Realtime CRUDを段階的に導入。
+- Phase 2: Firebase Authentication / FirestoreでGoogle認証・workspace・招待を実装する。招待の権限と人数制限はFirestore Security Rulesで強制し、クライアントからの状態更新も原子的なtransactionに限定する。
+- Phase 3: 既存localStorageキーを保ちながら、バックアップ仕様と競合・Undo方針を確定してからTODO/予定CRUDをクラウドへ移行する。
 - shadcn/uiを必要な分だけ取り込み、共通トークンを中央管理する。
 - Zustandの導入は本当に必要になった場合のみ。最初からグローバルstate管理を肥大化させない。
 
-## 9. 将来のデータモデル案（Phase 2で検証）
+## 9. Phase 2の実装モデルとPhase 3データ案
+
+Phase 2で実装する認証・メンバー文書:
 
 ~~~text
 users/{uid}
-  displayName, photoURL, workspaceId
+  workspaceId, createdAt
 
 workspaces/{workspaceId}
-  createdBy, createdAt, updatedAt
+  ownerUid, memberUids (1–2 UIDs), activeInviteHash?, createdAt, updatedAt
 
 workspaces/{workspaceId}/members/{uid}
-  joinedAt, role
+  uid, displayName, email?, photoURL?, slot (A|B), role, joinedAt
 
+invitations/{sha256(token)}
+  workspaceId, createdBy, status, expiresAt, acceptedBy?, createdAt
+~~~
+
+招待は24時間有効のリンクを採用する。32-byteのランダムtokenは `/join#…` のURLフラグメントにだけ含め、FirestoreにはSHA-256ハッシュを文書IDとして保存する。新しいリンクを発行すると以前のリンクは失効する。
+
+TODO/予定/メモ文書はまだ作らず、Phase 3で移行・競合方針とあわせて決める。
+
+~~~text
 workspaces/{workspaceId}/todos/{todoId}
   title, memo?, url?, location?, dueDate?, dueTime?
   category?, status, order?, createdBy, updatedBy
@@ -180,8 +192,6 @@ workspaces/{workspaceId}/events/{eventId}
 workspaces/{workspaceId}/notes/{noteId}
   title, body, pinned?, createdBy, updatedBy, createdAt, updatedAt
 
-invitations/{invitationId}
-  workspaceId, tokenHash, expiresAt, usedAt, status
 ~~~
 
 設計上の注意:
@@ -202,7 +212,7 @@ Phase 1では**Firebase認証・共有・保存・デプロイ・プッシュ通
 
 | 項目 | 決定時期 | 現在の方向性 |
 | --- | --- | --- |
-| 招待リンクのみ / コード併用 | Phase 2 | 両方を検討 |
+| 招待方式 | Phase 2 | 24時間有効・一回限りのリンク。短いコードは初期対象外 |
 | 共有解除時のデータ帰属 | Phase 2 | エクスポート/誤削除防止を重視 |
 | TODOカテゴリの初期値 | Phase 1B | おでかけ・暮らし・ふたり・その他。設定から追加/編集可能、未分類は中立色で保持 |
 | メモ自動保存間隔 | Phase 3 | デバウンスと保存状態表示 |

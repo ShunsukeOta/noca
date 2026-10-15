@@ -5,7 +5,18 @@ import { VitePWA } from "vite-plugin-pwa"
 import { fileURLToPath, URL } from "node:url"
 
 export default defineConfig({
-  build: { manifest: true },
+  build: {
+    manifest: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalizedId = id.replace(/\\/g, "/")
+          if (normalizedId.includes("/src/features/workspace/workspace-membership.tsx")) return "workspace-membership"
+          if (normalizedId.includes("/node_modules/@firebase/auth/") || normalizedId.includes("/node_modules/firebase/auth/")) return "firebase-auth-sdk"
+        }
+      }
+    }
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -27,6 +38,8 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         globPatterns: ["**/*.{js,css,html,ico,png,webp}"],
+        // Auth, Firestore and invite acceptance require a connection; cache only the local-first app UI.
+        globIgnores: ["**/firebase-*-sdk-*.js", "**/firebase-workspace-*.js", "**/join-workspace-page-*.js"],
         cleanupOutdatedCaches: true
       },
       devOptions: { enabled: false }

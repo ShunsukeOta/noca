@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ChunkLoadBoundary } from "@/components/chunk-load-boundary"
 import { loadConfirmDialog, loadTodoCategorySettings, preloadConfirmDialog } from "@/components/settings-loaders"
 import {
-  ArrowLeft, Bell, CalendarClock, Check, Cloud, Database, Download, Info, Upload,
+  ArrowLeft, Bell, CalendarClock, Check, Cloud, Copy, Database, Download, Info, LoaderCircle, LogIn, LogOut, Upload,
   ListTodo, LockKeyhole, Moon, Palette, ShieldCheck, Sun, UserRoundPlus,
   UsersRound
 } from "lucide-react"
@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils"
 import { useTodos } from "@/features/todos/todo-store"
 import { CALENDAR_SAMPLE_MIGRATION_KEYS, useCalendar } from "@/features/calendar/calendar-store"
 import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
+import { isFirebaseConfigured } from "@/features/workspace/firebase-env"
+import { workspaceErrorMessage } from "@/features/workspace/workspace-errors"
 import { createLocalBackup, localBackupFilename, MAX_LOCAL_BACKUP_SIZE_BYTES, parseLocalBackup, restoreLocalBackup, type LocalBackup } from "@/features/data/local-backup"
 
 type Theme = "light" | "dark"
@@ -99,8 +101,15 @@ export function SettingsPage() {
   const { theme, onThemeChange } = useOutletContext<ThemeOutlet>()
   const { todos, categories, restoreLocalData: restoreTodos } = useTodos()
   const { events, restoreLocalData: restoreEvents } = useCalendar()
-  const { members } = useWorkspaceMembership()
+  const {
+    members, authStatus, workspaceStatus, authUser, workspace, authError,
+    signInWithGoogle, signOut, createWorkspace, createInvite
+  } = useWorkspaceMembership()
   const [backupState, setBackupState] = useState<"idle" | "saving" | "saved" | "shared" | "error">("idle")
+  const [memberBusy, setMemberBusy] = useState(false)
+  const [memberMessage, setMemberMessage] = useState("")
+  const [inviteLink, setInviteLink] = useState("")
+  const [inviteCopied, setInviteCopied] = useState(false)
   const [isReadingBackup, setIsReadingBackup] = useState(false)
   const [pendingBackup, setPendingBackup] = useState<LocalBackup | null>(null)
   const [restoreMessage, setRestoreMessage] = useState("")
@@ -109,6 +118,45 @@ export function SettingsPage() {
   const requestedFrom = (location.state as { from?: unknown } | null)?.from
   const returnTo = requestedFrom === "/calendar" || requestedFrom === "/memo" || requestedFrom === "/todo"
     ? requestedFrom : "/todo"
+
+  const handleMemberAction = async (action: "sign-in" | "sign-out" | "create-workspace" | "create-invite") => {
+    if (memberBusy) return
+    setMemberBusy(true)
+    setMemberMessage("")
+    try {
+      if (action === "sign-in") await signInWithGoogle()
+      if (action === "sign-out") {
+        await signOut()
+        setInviteLink("")
+        setMemberMessage("ログアウトしました。端末内のTODO・予定はそのまま残っています。")
+      }
+      if (action === "create-workspace") {
+        await createWorkspace()
+        setMemberMessage("共有スペースを作成しました。TODO・予定の共有同期は次の開発段階で追加します。")
+      }
+      if (action === "create-invite") {
+        const invite = await createInvite()
+        setInviteLink(invite.url)
+        setInviteCopied(false)
+        setMemberMessage("招待リンクを作成しました。有効期限は24時間です。")
+      }
+    } catch (error) {
+      setMemberMessage(workspaceErrorMessage(error))
+    } finally {
+      setMemberBusy(false)
+    }
+  }
+
+  const copyInviteLink = async () => {
+    if (!inviteLink) return
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      setInviteCopied(true)
+      setMemberMessage("招待リンクをコピーしました。")
+    } catch {
+      setMemberMessage("リンクを選択してコピーしてください。")
+    }
+  }
 
   const exportBackup = async () => {
     if (backupState === "saving") return
@@ -255,12 +303,87 @@ export function SettingsPage() {
         <div data-testid="workspace-members" className="flex min-h-[76px] items-center gap-3 border-b border-border/70 px-4 py-3">
           <IconBox tone="blue"><UsersRound className="size-[19px]" /></IconBox>
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold">現在のメンバー</p>
+            <p className="text-[14px] font-semibold">{workspace ? "共有スペースのメンバー" : "現在のメンバー"}</p>
             <p className="mt-1 text-[12px] text-muted-foreground">{members.map(member => member.displayName).join("・")}（{members.length}人）</p>
           </div>
         </div>
-        <ComingSoonRow icon={UserRoundPlus} title="相手を招待" description="招待リンク・コード" />
-        <ComingSoonRow icon={LockKeyhole} title="アカウント" description="Googleログイン・プロフィール" />
+
+        {!isFirebaseConfigured ? (
+          <>
+            <ComingSoonRow icon={UserRoundPlus} title="相手を招待" description="Firebase接続設定が必要です" />
+            <ComingSoonRow icon={LockKeyhole} title="Googleログイン" description="認証プロジェクト未設定" />
+          </>
+        ) : authStatus === "loading" ? (
+          <div role="status" className="flex min-h-[64px] items-center gap-3 px-4 py-3 text-[13px] text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> アカウントを確認しています
+          </div>
+        ) : authStatus === "signed-out" ? (
+          <div className="space-y-3 px-4 py-4">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">Googleでログインすると、共有スペースを作成したり招待から参加できます。</p>
+            <Button type="button" className="min-h-11 w-full rounded-xl text-[13px]" disabled={memberBusy}
+              onClick={() => void handleMemberAction("sign-in")}>
+              {memberBusy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <LogIn className="size-4" />}
+              Googleでログイン
+            </Button>
+          </div>
+        ) : authUser ? (
+          <div className="space-y-4 px-4 py-4">
+            <div className="flex items-center gap-3">
+              {authUser.photoURL ? <img src={authUser.photoURL} alt="" className="size-10 rounded-full bg-secondary object-cover" /> : <IconBox><LockKeyhole className="size-[19px]" /></IconBox>}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px] font-semibold">{authUser.displayName}</p>
+                <p className="truncate text-[12px] text-muted-foreground">{authUser.email || "Googleアカウント"}</p>
+              </div>
+            </div>
+
+            {workspaceStatus === "loading" ? (
+              <div role="status" className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> メンバー情報を読み込んでいます
+              </div>
+            ) : workspaceStatus === "none" ? (
+              <>
+                <p className="text-[12px] leading-relaxed text-muted-foreground">招待リンクから参加するか、新しい共有スペースを作成してください。</p>
+                <Button type="button" variant="outline" className="min-h-11 w-full rounded-xl text-[13px]" disabled={memberBusy}
+                  onClick={() => void handleMemberAction("create-workspace")}>
+                  {memberBusy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <UsersRound className="size-4" />}
+                  共有スペースを作成
+                </Button>
+              </>
+            ) : workspace ? (
+              <>
+                {workspace.members.length === 1 && workspace.ownerUid === authUser.uid ? (
+                  <Button type="button" variant="outline" className="min-h-11 w-full rounded-xl text-[13px]" disabled={memberBusy}
+                    onClick={() => void handleMemberAction("create-invite")}>
+                    {memberBusy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <UserRoundPlus className="size-4" />}
+                    招待リンクを作成・再発行
+                  </Button>
+                ) : (
+                  <p className="rounded-xl bg-secondary/70 px-3 py-2.5 text-[12px] leading-relaxed text-muted-foreground">
+                    メンバー参加が完了しました。TODO・予定の共有同期は次の開発段階で追加します。
+                  </p>
+                )}
+                {inviteLink && <div className="flex gap-2">
+                  <input aria-label="招待リンク" readOnly value={inviteLink}
+                    className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-[12px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                  <Button type="button" variant="secondary" size="icon" className="tap-target shrink-0 rounded-xl" onClick={() => void copyInviteLink()} aria-label="招待リンクをコピー">
+                    {inviteCopied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                  </Button>
+                </div>}
+              </>
+            ) : (
+              <p className="text-[12px] text-muted-foreground">共有スペース情報を読み込めませんでした。</p>
+            )}
+
+            <Button type="button" variant="ghost" className="min-h-10 w-full rounded-xl text-[12px] text-muted-foreground" disabled={memberBusy}
+              onClick={() => void handleMemberAction("sign-out")}>
+              <LogOut className="size-4" /> ログアウト
+            </Button>
+          </div>
+        ) : (
+          <div role="alert" className="px-4 py-3 text-[12px] text-destructive">{authError || "アカウント情報を読み込めませんでした。"}</div>
+        )}
+
+        {(memberMessage || authError) && <p role="status" aria-live="polite" className="px-4 pb-3 text-[12px] leading-relaxed text-muted-foreground">{memberMessage || authError}</p>}
       </SettingsGroup>
 
       <SettingsGroup title="通知">
@@ -274,7 +397,7 @@ export function SettingsPage() {
           <IconBox tone="green"><Database className="size-[19px]" /></IconBox>
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold">データの保存先</p>
-            <p className="mt-1 text-[12px] text-muted-foreground">TODO・予定はこの端末内</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">TODO・予定はこの端末内（共有同期は未対応）</p>
           </div>
           <ShieldCheck className="size-[19px] text-success" aria-label="端末内保存" />
         </div>
