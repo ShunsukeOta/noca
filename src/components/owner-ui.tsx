@@ -28,19 +28,21 @@ const avatarSize = {
   lg: "size-8 text-[10px]"
 } as const
 
-function OwnerAvatar({ owner, size = "sm", decorative = false, className }: {
+function OwnerAvatar({ owner, size = "sm", decorative = false, className, label }: {
   owner: Owner
   size?: keyof typeof avatarSize
   decorative?: boolean
   className?: string
+  label?: string
 }) {
-  const content = owner === "both" ? "2" : owner
+  const content = label ? [...label][0] : owner === "both" ? "2" : owner
+  const accessibleLabel = label ?? (owner === "both" ? "ふたり" : `担当 ${owner}`)
   return (
     <span
       data-slot="owner-avatar"
       data-owner={owner}
       role={decorative ? undefined : "img"}
-      aria-label={decorative ? undefined : owner === "both" ? "ふたり" : `担当 ${owner}`}
+      aria-label={decorative ? undefined : accessibleLabel}
       aria-hidden={decorative ? true : undefined}
       className={cn("inline-flex shrink-0 items-center justify-center rounded-full font-bold", avatarSize[size], ownerAvatarTone[owner], className)}
     >

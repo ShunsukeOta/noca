@@ -15,7 +15,7 @@ Design decisions established with the maintainer:
 - TODO categories are user-managed in Settings: add, rename (saved only on changed input blur), choose one of eight design-system tones from the color-dot modal, drag to reorder, and delete. When a category contains TODOs, choose a destination and move them before deletion; an empty category can be deleted directly. Calendar categories remain the built-in set.
 - The sticky header’s settings icon changes to an X on `/settings`; it returns to the originating tab, or TODO when Settings is opened directly.
 - `/settings` hides the entire bottom global menu and renders immediately without a route transition animation.
-- Calendar shows a month grid and a **two-person comparison timeline**, not a conventional list. Personal header = **A and B only**. Hide the all-day row if A, B and shared events have no all-day items; shared all-day items extend across both columns when present. Shared timed items span both timeline lanes. The whole daily surface is **transparent**, not an enclosing white card.
+- Calendar shows a month grid and a timeline that follows the member count. With one member, show one unlabeled personal lane and no B owner UI. With two members, show the **A/B comparison timeline**; hide the all-day row when no owner has all-day events, and span shared events across both columns. The daily surface stays transparent, not an enclosing white card.
 - For a same-owner timed overlap group, keep only the longest appointment as the main block at its true start time. Show the remaining count in an hour-aligned **他N件** chip; tapping it opens an exact-time event list with edit actions. Non-overlapping events remain individual cards, including readable five-minute items.
 - Do not add decorative introductions or large headings to the three main screens. Maintain the current visual language, dark mode and accessibility.
 
@@ -28,16 +28,17 @@ Design decisions established with the maintainer:
 | --- | --- |
 | Shared shell, dock, fixed header, local date, light/dark | Implemented |
 | TODO CRUD, user-managed categories and live counts, complete/restore, undo | Implemented with `localStorage`; category configuration is `noca.todo.categories.v1`. New-task creation keeps the sheet open for consecutive entry, briefly shows a green check over the title input's right edge, clears task details after each save, preserves the selected category and focuses the title field; a valid draft is also added when the sheet closes. Editing saves on submit or on close, without a discard confirmation. |
-| Calendar month grid, local event CRUD, A/B/both editor, per-person time comparison, overlap summary chips and edit sheet | Implemented with `localStorage` |
+| Calendar month grid, local event CRUD, solo-first timeline, paired A/B/both editor, overlap summary chips and edit sheet | Implemented with `localStorage`; no invite flow yet |
 | Date-constrained TODOs shown in calendar | Implemented as references, not separate event copies |
 | Memo tab | Retained in global navigation; displays only **「メモ機能は開発中です」** |
 | Memo list/editor/storage | Deferred and removed from the active app; the memo tab has no + action |
+| Membership display | **Implemented locally:** starts with 「自分」 only; hides B, owner controls and the paired calendar layout until a B member is supplied. No sign-in, invite, acceptance or sharing is implemented. |
 | Shared UI foundation (theme tokens, fields, buttons, checkbox/switch, owner/category controls, confirm/Undo) | Implemented; settings manage TODO categories |
 | Local data backup | **Implemented:** Settings exports and restores TODOs, TODO categories, calendar events and sample-migration flags as versioned JSON. Restore validates the file, previews counts, requires explicit replacement confirmation and rolls back storage writes on failure. |
 | Login, pairing, actual pair sharing, Firebase/Firestore | **NOT implemented** |
 | Push notifications, real iOS Safari/standalone sign-off | **NOT implemented/verified** |
 
-Current local verification: `npm run build`, `npm run check:bundle`, the full `npm run test:e2e` run (**49/49**) and `npm run test:pwa` (**4/4**) pass. The >500 kB chunk warning is gone. The most recent recorded successful GitHub Actions run remains [run 38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) at 43/43; CI for these unpushed changes must still be checked. iPhone Safari/standalone remains unverified.
+The optimization pass passed local build, bundle-budget, E2E (**49/49**) and production PWA (**4/4**) checks before this membership-display change. The optimization commit is on main as `ffc8b7e`; its GitHub Actions run is [run 38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243). On the current solo-first branch, `npm run build` passes and the full Playwright E2E suite passes (**50/50**). iPhone Safari/standalone remains unverified.
 
 The performance pass now defers `/calendar`, the two editor sheets, Settings' category manager and Motion's layout feature bundle. Pointer/focus intent preloads interaction chunks. Settings' header and theme appear immediately while categories load; a delayed-chunk production test verifies this. The latest build's synchronous entry is **425.59 kB raw / 136.01 kB gzip**, down from **571.82 kB / 182.96 kB gzip** before this pass (about 26% less gzip). The largest chunk is under 500 kB. The PWA still precaches all chunks for offline use (about 638 KiB); production Chromium tests verify offline calendar, settings and both editors. Bundle budgets are enforced by `npm run check:bundle` in CI. Real iPhone Safari/standalone performance and interaction remain to be measured on a device.
 
@@ -48,10 +49,10 @@ The performance pass now defers `/calendar`, the two editor sheets, Settings' ca
 The maintainer requested a staged plan for app optimization, real login/two-person operation, and database migration. Firebase Authentication + Firestore is the current documented candidate, not an implemented or final provider decision. Compare it with the relational alternative only against the product's confirmed offline, query, migration and operational needs.
 
 Recommended order:
-1. Verify the optimized production build on an actual iPhone Safari and Home Screen PWA: first launch, settings entry, first editor open, offline reload, keyboard and safe areas. Record device/iOS version and measured behavior.
-2. Establish a repository boundary and formal local-to-cloud migration plan while preserving all current `localStorage` keys and sample migration behavior. The export/restore envelope is `noca.local-backup` v1; restore replaces current TODO, category and event records only after validation and confirmation.
-3. Finalize actual-member versus A/B assignment semantics, login and invite lifecycle, and conflict/Undo behavior.
-4. Build a small authenticated two-member vertical slice with tested security rules before migrating all TODO/calendar data.
+1. Make one short iPhone check of the solo header, one-column calendar and editor. Avoid repeating the full Chromium matrix; it does not prove Safari behavior.
+2. Implement actual account and invite membership so a real accepted second member supplies the paired state. Preserve existing `localStorage` keys and sample migration behavior.
+3. Define local-to-cloud migration and conflict/Undo behavior around the existing `noca.local-backup` v1 envelope.
+4. Build a small authenticated two-member vertical slice with server-enforced membership before migrating all TODO/calendar data.
 
 Memo CRUD remains deferred until its user workflow is specified.
 
@@ -75,8 +76,8 @@ This is a proposal/acceptance checklist, not an unrequested task authorization.
 ## 6. Current technical cautions
 
 - **Source of truth is local:** `noca.todos.v1`, `noca.calendar.events.v1`, `noca.theme`; samples use `noca.calendar.samples.v2/v3` markers. The current app does not use any memo storage key. See [ARCHITECTURE.md](ARCHITECTURE.md).
-- **Samples are not users:** TODO new items still default to A; calendar explicitly supports A/B/both. Actual shared identity requires a later design; do not pass demo IDs straight into security rules.
-- **The latest calendar redesign is important:** old docs and older images may show three all-day columns. Current UI has **only A/B headers**, conditionally shows the all-day row when any owner has an all-day event, places shared all-day items in a full-width A+B bar, and uses a 54px-per-hour transparent timeline with overlap summary chips and readable standalone short-event cards.
+- **Samples are not users:** TODOs and events still store A/B/both placeholder owner values. The current UI defaults to one member, hides owner labels, and displays all saved events in one lane without rewriting them. Actual shared identity requires a later auth/invite flow; do not pass demo IDs straight into security rules.
+- **Paired calendar layout:** when membership contains A and B, show only A/B headers, conditionally show the all-day row, place shared all-day items in a full-width A+B bar, and use the 54px-per-hour transparent timeline with overlap summary chips. The current app does not provide a user flow that joins B yet.
 - `package-lock.json` is committed. CI currently uses `npm install` on Node 22; confirm CI behavior before changing it to `npm ci`.
 - TODO category configuration is stored separately from TODO records. Existing category names absent from that configuration are retained as neutral categories at load; rename updates matching task category strings, while delete moves them to the user-selected destination. Preserve this behavior when changing the task schema.
 - **CI is Chromium**, not real iPhone. WebKit, manual QA, multi-user sync and production availability are unproven.

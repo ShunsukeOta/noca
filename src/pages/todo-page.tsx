@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { CategoryBadge, categoryRing, TodoCategoryTile } from "@/components/category-ui"
 import { OwnerAvatar } from "@/components/owner-ui"
+import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
 import { cn } from "@/lib/utils"
 import { preloadTodoEditor } from "@/components/editor-loaders"
 
 export function TodoPage() {
   const [filter, setFilter] = useState("すべて")
   const { todos: tasks, categories, toggleTodo, openEdit, openCreate } = useTodos()
+  const { isPaired } = useWorkspaceMembership()
   const [showCompleted, setShowCompleted] = useState(false)
   const reduceMotion = useReducedMotion()
   const filters = ["すべて", ...categories.map(category => category.name)]
@@ -79,7 +81,7 @@ export function TodoPage() {
                   </div>
                 )}
               </Button>
-              <OwnerAvatar owner={task.by} size="md" />
+              {isPaired && <OwnerAvatar owner={task.by} size="md" />}
               <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
             </div>
             </m.div>

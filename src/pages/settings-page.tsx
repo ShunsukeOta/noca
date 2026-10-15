@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useTodos } from "@/features/todos/todo-store"
 import { CALENDAR_SAMPLE_MIGRATION_KEYS, useCalendar } from "@/features/calendar/calendar-store"
+import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
 import { createLocalBackup, localBackupFilename, MAX_LOCAL_BACKUP_SIZE_BYTES, parseLocalBackup, restoreLocalBackup, type LocalBackup } from "@/features/data/local-backup"
 
 type Theme = "light" | "dark"
@@ -98,6 +99,7 @@ export function SettingsPage() {
   const { theme, onThemeChange } = useOutletContext<ThemeOutlet>()
   const { todos, categories, restoreLocalData: restoreTodos } = useTodos()
   const { events, restoreLocalData: restoreEvents } = useCalendar()
+  const { members } = useWorkspaceMembership()
   const [backupState, setBackupState] = useState<"idle" | "saving" | "saved" | "shared" | "error">("idle")
   const [isReadingBackup, setIsReadingBackup] = useState(false)
   const [pendingBackup, setPendingBackup] = useState<LocalBackup | null>(null)
@@ -249,8 +251,14 @@ export function SettingsPage() {
         </ChunkLoadBoundary>
       </SettingsGroup>
 
-      <SettingsGroup title="ふたりの共有">
-        <ComingSoonRow icon={UsersRound} title="共有スペース" description="メンバー管理" />
+      <SettingsGroup title="メンバー">
+        <div data-testid="workspace-members" className="flex min-h-[76px] items-center gap-3 border-b border-border/70 px-4 py-3">
+          <IconBox tone="blue"><UsersRound className="size-[19px]" /></IconBox>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold">現在のメンバー</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">{members.map(member => member.displayName).join("・")}（{members.length}人）</p>
+          </div>
+        </div>
         <ComingSoonRow icon={UserRoundPlus} title="相手を招待" description="招待リンク・コード" />
         <ComingSoonRow icon={LockKeyhole} title="アカウント" description="Googleログイン・プロフィール" />
       </SettingsGroup>

@@ -11,9 +11,11 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { CategorySelector } from "@/components/category-ui"
 import { OwnerSelector } from "@/components/owner-ui"
 import { isCalendarDate, useCalendar, type EventDraft } from "@/features/calendar/calendar-store"
+import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
 
 export function CalendarEditorSheet() {
   const { events, editor, closeEditor, addEvent, updateEvent, deleteEvent } = useCalendar()
+  const { isPaired } = useWorkspaceMembership()
   const original = editor?.mode === "edit" ? events.find(event => event.id === editor.id) : undefined
   const initialDate = editor?.mode === "create" ? editor.date : original?.date ?? ""
   const [title, setTitle] = useState(original?.title ?? "")
@@ -92,10 +94,12 @@ export function CalendarEditorSheet() {
               placeholder="予定のタイトル" aria-invalid={!!error && !title.trim()}
             />
 
-            <div className="mt-5">
-              <p className="mb-2 text-[13px] font-semibold">誰の予定？</p>
-              <OwnerSelector value={by} onChange={setBy} />
-            </div>
+            {isPaired && (
+              <div className="mt-5">
+                <p className="mb-2 text-[13px] font-semibold">誰の予定？</p>
+                <OwnerSelector value={by} onChange={setBy} />
+              </div>
+            )}
 
             <div className="mt-6 flex items-center gap-2 text-primary">
               <CalendarDays className="size-[17px]" /><Label htmlFor="event-date">日付</Label>

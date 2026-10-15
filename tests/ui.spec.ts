@@ -1,5 +1,22 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, type Page } from "@playwright/test"
 import { readFile } from "node:fs/promises"
+
+const pairedMembers = [
+  { id: "A", displayName: "A" },
+  { id: "B", displayName: "B" }
+]
+
+async function seedPairedWorkspace(page: Page) {
+  await page.addInitScript(members => {
+    localStorage.setItem("noca.workspace.members.v1", JSON.stringify(members))
+  }, pairedMembers)
+}
+
+// Existing A/B behavior tests explicitly use a paired preview. Solo-first behavior
+// is covered in an isolated, unseeded browser context below.
+test.beforeEach(async ({ page }) => {
+  await seedPairedWorkspace(page)
+})
 
 for (const width of [375, 390, 430]) {
   test("responsive shell and tabs at " + width + "px", async ({ browser }) => {
@@ -383,7 +400,7 @@ test("settings is reachable on small iPhone widths with no horizontal overflow",
     await expect(page.getByTestId("settings-page")).toBeVisible()
     await expect(page.getByText("相手を招待")).toBeVisible()
     await expect(page.getByText("クラウド同期")).toBeVisible()
-    await expect(page.locator("main").getByText("準備中")).toHaveCount(7)
+    await expect(page.locator("main").getByText("準備中")).toHaveCount(6)
     const backupButton = page.getByRole("button", { name: "バックアップを書き出す" })
     await expect(backupButton).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
@@ -928,6 +945,35 @@ test("floating dock maintains create action and contrast in dark mode", async ({
 })
 
 
+test("new local workspace starts with one member and hides B owner UI", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  const page = await context.newPage()
+  await page.goto("/todo")
+
+  const avatars = page.getByTestId("app-header").locator('[data-slot="owner-avatar"]')
+  await expect(avatars).toHaveCount(1)
+  await expect(avatars.first()).toHaveText("自")
+  await expect(page.getByRole("group", { name: "利用中のメンバー: 自分" })).toBeVisible()
+  await page.goto("/calendar")
+  await expect(page.getByTestId("single-person-schedule")).toBeVisible()
+  await expect(page.getByTestId("person-header-A")).toHaveCount(0)
+  await expect(page.getByTestId("person-header-B")).toHaveCount(0)
+  const soloLane = page.getByTestId("timeline-lane-self")
+  const overlapSummary = soloLane.getByTestId("overlap-summary-demo-a-morning")
+  await expect(overlapSummary).toBeVisible()
+  await overlapSummary.click()
+  await expect(page.getByTestId("overlap-sheet").getByText("美容室", { exact: true })).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(page.getByTestId("all-day-self").getByRole("button", { name: "記念日を編集" })).toBeVisible()
+
+  await page.getByRole("button", { name: "カレンダーを追加" }).click()
+  await expect(page.getByRole("group", { name: "予定の担当" })).toHaveCount(0)
+  await page.goto("/settings")
+  await expect(page.getByTestId("workspace-members")).toContainText("自分（1人）")
+
+  await context.close()
+})
+
 test("calendar shows two separate people with all-day and time-proportional blocks", async ({ page }) => {
   await page.goto("/calendar")
   await expect(page.getByTestId("two-person-schedule")).toBeVisible()
@@ -1000,6 +1046,7 @@ test("two-person timeline fits 320px iPhone without horizontal overflow", async 
   for (const width of [320, 375, 390, 430]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
     const page = await context.newPage()
+    await seedPairedWorkspace(page)
     await page.goto("/calendar")
     await expect(page.getByTestId("timeline-lane-A")).toBeVisible()
     await expect(page.getByTestId("timeline-lane-B")).toBeVisible()
@@ -1149,6 +1196,7 @@ test("two-column all-day layout and shared spanning strip fit narrow phones", as
   for (const width of [320, 375, 390, 430]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })
     const page = await context.newPage()
+    await seedPairedWorkspace(page)
     await page.goto("/calendar")
     await expect(page.getByTestId("calendar-page")).toBeVisible()
     await expect(page.getByTestId("person-header-both")).toHaveCount(0)

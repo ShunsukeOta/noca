@@ -12,6 +12,7 @@ import { loadCalendarEditor, loadTodoEditor, preloadCalendarEditor, preloadTodoE
 import { preloadTodoCategorySettings } from "@/components/settings-loaders"
 import { useCalendar } from "@/features/calendar/calendar-store"
 import { useTodos } from "@/features/todos/todo-store"
+import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
 import { cn } from "@/lib/utils"
 
 type PageKind = "todo" | "calendar" | "memo"
@@ -58,6 +59,7 @@ export function AppShell() {
   const [today, setToday] = useState(() => new Date())
   const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
   const calendar = useCalendar()
+  const { members } = useWorkspaceMembership()
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     typeof localStorage !== "undefined" && localStorage.getItem("noca.theme") === "dark" ? "dark" : "light"
   )
@@ -108,9 +110,12 @@ export function AppShell() {
             </time>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <div className="mr-1 flex -space-x-2" role="group" aria-label="表示用の担当サンプル">
-              <OwnerAvatar owner="A" size="lg" decorative className="border-[3px] border-background" />
-              <OwnerAvatar owner="B" size="lg" decorative className="border-[3px] border-background" />
+            <div className={cn("mr-1 flex items-center", members.length > 1 ? "-space-x-2" : "")} role="group"
+              aria-label={`利用中のメンバー: ${members.map(member => member.displayName).join("、")}`}>
+              {members.map(member => (
+                <OwnerAvatar key={member.id} owner={member.id} label={member.displayName}
+                  size="lg" decorative className="border-[3px] border-background" />
+              ))}
             </div>
             <Link to={isSettings ? settingsReturnTo : "/settings"} state={isSettings ? undefined : { from: active?.to ?? "/todo" }}
               onPointerEnter={isSettings ? undefined : preloadTodoCategorySettings}

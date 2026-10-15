@@ -5,7 +5,7 @@ Updated: 2026-10-15. Based on the current local implementation. This document de
 ## 1. Product / runtime boundaries
 
 - iPhone-first Japanese PWA for a pair: TODO, monthly + daily calendar, notes.
-- **Single-browser local preview:** there is no backend service, Firebase SDK initialization, login, workspace, invitation, member identity or real-time cross-device synchronization.
+- **Single-browser local preview:** the app starts with one local member named 「自分」. A small membership context controls whether solo or paired UI is shown, but it is not an account, invite, workspace permission or cross-device synchronization system. There is no backend service or Firebase SDK initialization.
 - UI is constrained to a 540px max-width app shell (`src/styles/globals.css`). Current browser preview: [noca-delta.vercel.app](https://noca-delta.vercel.app); deployed from GitHub/Vercel setup. Deploy success must be checked separately from CI.
 - Phase 1 targets CSS/UX. Security rules, data ownership, cross-user identity and transport are future decisions.
 
@@ -34,21 +34,22 @@ Updated: 2026-10-15. Based on the current local implementation. This document de
 
 `src/App.tsx`:
 ```text
-TodoProvider
-  CalendarProvider
-    Routes
-      AppShell  (common layout)
-        /todo       TodoPage
-        /calendar   CalendarPage
-        /memo       MemoPage
-        /settings   SettingsPage
-        *           Navigate("/todo")
+WorkspaceMembershipProvider  (local preview starts with member A only)
+  TodoProvider
+    CalendarProvider
+      Routes
+        AppShell  (common layout)
+          /todo       TodoPage
+          /calendar   CalendarPage
+          /memo       MemoPage
+          /settings   SettingsPage
+          *           Navigate("/todo")
 ```
 
 The `/calendar` page module is loaded with `React.lazy` when the route is opened. Global navigation preloads it on pointer intent or keyboard focus. TODO and the Settings page shell remain in the initial bundle. TODO/calendar editor sheets and Settings' category manager load when opened, with pointer/focus preloading. Settings' header and theme render while its category module loads. `motion/react`'s `m` components use an asynchronously loaded `domMax` feature bundle for the existing layout animations. The local providers still initialize on first load. Workbox precaches all built JavaScript, including deferred chunks, so these changes reduce initial parse/evaluation rather than total offline download size. The manifest icon is precached through the PWA manifest without a duplicate SVG glob entry.
 
 `src/components/app-shell.tsx`:
-- sticky header with noca logo, **local today** (updates across midnight and app focus), placeholder A/B avatars and settings link; on `/settings`, the settings icon becomes a close link that returns to the originating tab (or TODO for a direct URL);
+- sticky header with noca logo, **local today** (updates across midnight and app focus), current-member avatar and settings link; solo preview shows only 「自分」, and a second avatar appears only when membership state contains B. On `/settings`, the settings icon becomes a close link that returns to the originating tab (or TODO for a direct URL);
 - `<main>` with page enter/exit animation;
 - bottom floating dock on the three main tabs: **3 tabs in a left white card + 16px gap + separate dark + CTA**; the CTA is hidden on the memo placeholder. The entire dock is hidden on `/settings`, which renders without a route transition animation;
 - TODO and calendar editor sheets, shared Undo notices and theme state;
@@ -59,6 +60,7 @@ The `/calendar` page module is loaded with `React.lazy` when the route is opened
 Shared UI foundation:
 - `src/components/ui/`: Button, Input, Textarea, Label, Checkbox, Switch, mobile Sheet and ConfirmDialog. Form controls share typography, borders, focus rings and invalid states.
 - `src/components/category-ui.tsx` and `src/components/owner-ui.tsx`: common category badges/selectors and A/B/both avatars/selectors. TODO editor uses the horizontally scrolling, palette-filled category tile selector; its 「詳細を入力」 section contains the due date, memo, URL and address fields. Creating a TODO keeps the sheet open, briefly overlays a green check at the title input's right edge, clears the draft fields, retains the selected category and returns focus to the title input; editing a TODO saves and closes the sheet.
+- `src/features/workspace/workspace-membership.tsx`: local preview membership state defaults to one member. The calendar hides owner controls and B labels in solo mode, places saved A/B/both events in one unlabeled personal lane, and restores the comparison layout when two members are supplied. Settings shows the current member count; there is no user-facing way to join a second member until auth/invite work is implemented.
 - `src/components/undo-toast.tsx`: shared delete Undo notice; simultaneous TODO/calendar notices stack in one host.
 - `src/styles/globals.css` is the source of truth for light/dark palette, owner/category meaning colors, weekend/calendar accents and radius steps. Avoid component-local hex values.
 - Motion-driven controls use the shared `buttonVariants` styles where wrapping the Button component would interfere with layout animation.
@@ -82,6 +84,7 @@ Defined in `src/app/mock-data.ts`:
 | `noca.calendar.events.v1` | `CalendarProvider` | JSON array of events; loaded on startup |
 | `noca.calendar.samples.v2` | Calendar store | One-time migration marker for old bundled examples |
 | `noca.calendar.samples.v3` | Calendar store | One-time migration marker for shared/overlap example events |
+| `noca.workspace.members.v1` | `WorkspaceMembershipProvider` | Local preview members; defaults to A/「自分」 only and is not an identity or permission record |
 | `noca.theme` | `AppShell` | `light` or `dark` |
 
 `loadTodos` and `readEvents` validate selected fields and use initial mock arrays only on absent/invalid data. **A legitimately stored empty array remains empty**. Existing TODO records keep their category names in `noca.todos.v1`; the category configuration stores `{ id, name, tone }` items in display order. Existing configurations without `id` receive one during load. On first load, built-in categories are used and any category already referenced by a saved TODO but missing from the configuration is retained with the neutral tone. Renaming a category updates the associated TODO names; deleting one moves its TODOs to a selected remaining category before removing the category. Category tones use eight theme-defined palette choices; earlier `life`/`outing`/`couple` tone keys are normalized to their matching palette choices on load. Browser storage deletion means losing local-only edits. Browser `storage` events update providers across tabs **of the same origin**, not a real shared account or reliable two-device sync.
@@ -94,7 +97,7 @@ There is currently no memo model, sample list, store or persistence path. The `/
 
 The calendar initializer can append versioned `demo-*` sample events to existing *sample-containing* calendars once. **This is preview-data migration logic**; do not silently reseed user data, recreate previously deleted samples or treat marker flags as real DB migrations. Preserve local edit/delete/Undo and migration behavior when refactoring. Initial demo dates are relative to the runtime date.
 
-`crypto.randomUUID()` creates TODO and calendar IDs. Both stores implement CRUD and delete/Undo notifications with a roughly 6.5-second window. New TODOs currently default to `by:"A"`; calendar editor allows A, B or `both`.
+`crypto.randomUUID()` creates TODO and calendar IDs. Both stores implement CRUD and delete/Undo notifications with a roughly 6.5-second window. New TODOs currently default to `by:"A"`. In solo mode the calendar editor hides the owner selector and creates events for A; it also preserves existing B/`both` assignments when editing without exposing those labels. The local membership context starts with A/「自分」 and paired controls/layout activate only when a B member is provided. The invite flow that would provide that member is not implemented.
 
 Time semantics:
 - Date only: local `yyyy-MM-dd`.
@@ -119,10 +122,12 @@ Time semantics:
 
 ### Calendar
 - Month UI: `src/pages/calendar-page.tsx`
-- Two-person time grid: `src/components/calendar-day-timeline.tsx`
+- Membership-aware time grid: `src/components/calendar-day-timeline.tsx`
 - Store/editor: `src/features/calendar/calendar-store.tsx`, `src/components/calendar-editor-sheet.tsx`
 
-**Current approved preview layout:**
+**Current layout by membership state:**
+- One member: header shows only 「自分」; TODO rows omit owner avatars; calendar has one unlabeled time lane and no owner selector. Existing A/B/`both` records remain visible in that lane without rewriting their stored owner values.
+- Two members: the comparison layout below is used. The local preview currently has no invite/acceptance flow, so real users cannot reach this state through the app UI yet.
 - Header and all-day personal lane: **A / B only**, with 42px time/label gutter. **No third “ふたりの予定” column.** Hide the all-day row when A, B and shared events have no all-day items.
 - All-day shared (`by:"both"`) appointments are **full-width A+B chips underneath the A/B all-day row**.
 - Timed personal appointments appear in separate A/B lanes; shared appointments stretch across both lanes as a purple layer.

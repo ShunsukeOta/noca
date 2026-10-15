@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ChunkLoadBoundary } from "@/components/chunk-load-boundary"
 import { TodoProvider } from "@/features/todos/todo-store"
 import { CalendarProvider } from "@/features/calendar/calendar-store"
+import { WorkspaceMembershipProvider } from "@/features/workspace/workspace-membership"
 import { TodoPage } from "@/pages/todo-page"
 import { MemoPage } from "@/pages/memo-page"
 import { SettingsPage } from "@/pages/settings-page"
@@ -35,24 +36,26 @@ function CalendarLoadError() {
 
 export default function App() {
   return (
-    <TodoProvider>
-      <CalendarProvider>
-      <Routes>
-      <Route element={<AppShell />}>
-        <Route path="/todo" element={<TodoPage />} />
-        <Route path="/calendar" element={
-          <ChunkLoadBoundary fallback={<CalendarLoadError />}>
-            <Suspense fallback={<CalendarLoadingState />}>
-              <CalendarPage />
-            </Suspense>
-          </ChunkLoadBoundary>
-        } />
-        <Route path="/memo" element={<MemoPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/todo" replace />} />
-      </Route>
-      </Routes>
-      </CalendarProvider>
-    </TodoProvider>
+    <WorkspaceMembershipProvider>
+      <TodoProvider>
+        <CalendarProvider>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/todo" element={<TodoPage />} />
+              <Route path="/calendar" element={
+                <ChunkLoadBoundary fallback={<CalendarLoadError />}>
+                  <Suspense fallback={<CalendarLoadingState />}>
+                    <CalendarPage />
+                  </Suspense>
+                </ChunkLoadBoundary>
+              } />
+              <Route path="/memo" element={<MemoPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/todo" replace />} />
+            </Route>
+          </Routes>
+        </CalendarProvider>
+      </TodoProvider>
+    </WorkspaceMembershipProvider>
   )
 }
