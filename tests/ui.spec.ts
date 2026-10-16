@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test"
 import { readFile } from "node:fs/promises"
+import { shareInviteUrl, type NativeShareHandler } from "../src/lib/web-share"
 
 const pairedMembers = [
   { id: "A", displayName: "A" },
@@ -120,6 +121,49 @@ test("TODO create, edit, delete, undo and persistence", async ({ page }) => {
   await expect(page.getByRole("button", { name: "閉じると追加されるタスクを編集" })).toBeVisible()
 })
 
+test("PWA shortcuts open TODO creation and today's calendar agenda", async ({ page }) => {
+  await page.goto("/todo?shortcut=add-todo")
+  await expect(page.getByRole("dialog", { name: "タスクを追加" })).toBeVisible()
+  await expect(page).toHaveURL(/\/todo$/)
+  await page.keyboard.press("Escape")
+
+  await page.goto("/calendar")
+  const today = await page.evaluate(() => {
+    const value = new Date()
+    const pad = (part: number) => String(part).padStart(2, "0")
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`
+  })
+  const anotherDay = await page.locator("[data-calendar-date]").evaluateAll((elements, currentDate) => {
+    const date = elements.find(element => (element as HTMLButtonElement).getAttribute("data-calendar-date") !== currentDate)
+    return date?.getAttribute("data-calendar-date") ?? null
+  }, today)
+  if (!anotherDay) throw new Error("今日以外の日付が見つかりません。")
+  await page.locator(`[data-calendar-date="${anotherDay}"]`).click()
+
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/calendar?shortcut=today")
+    window.dispatchEvent(new PopStateEvent("popstate"))
+  })
+  await expect(page.locator(`[data-calendar-date="${today}"]`)).toHaveAttribute("aria-pressed", "true")
+  await expect(page).toHaveURL(/\/calendar$/)
+})
+
+test("invite sharing sends the link through the native share sheet and treats dismissal as cancellation", async () => {
+  const payloads: ShareData[] = []
+  const successfulShare: NativeShareHandler = async data => { payloads.push(data) }
+  const inviteUrl = "https://noca.example/join#test-invite-token"
+
+  expect(await shareInviteUrl(inviteUrl, successfulShare)).toBe("shared")
+  expect(payloads).toEqual([{
+    title: "nocaへの招待",
+    text: "nocaの共有スペースに招待します。",
+    url: inviteUrl
+  }])
+
+  const dismissedShare: NativeShareHandler = async () => { throw new DOMException("Share dismissed", "AbortError") }
+  expect(await shareInviteUrl(inviteUrl, dismissedShare)).toBe("cancelled")
+})
+
 test("TODO due date appears on calendar, completion removes it", async ({ page }) => {
   await page.goto("/todo")
   const today = await page.evaluate(() => {
@@ -153,6 +197,23 @@ test("theme switch and task completion", async ({ page }) => {
   await page.getByRole("checkbox", { name: "週末のカフェを探すを完了" }).click()
   await page.getByRole("button", { name: /完了したこと/ }).click()
   await expect(page.getByRole("checkbox", { name: "週末のカフェを探すの完了を解除" })).toBeVisible()
+})
+
+test("completed TODOs can be restored or permanently removed", async ({ page }) => {
+  await page.goto("/todo")
+  await page.getByRole("button", { name: /完了したこと/ }).click()
+
+  await expect(page.getByRole("button", { name: "次のお出かけの候補を送るを未完了に戻す" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "次のお出かけの候補を送るを完全に削除" })).toBeVisible()
+  await page.getByRole("button", { name: "次のお出かけの候補を送るを未完了に戻す" }).click()
+  await expect(page.getByRole("checkbox", { name: "次のお出かけの候補を送るを完了" })).toBeVisible()
+
+  await page.getByRole("checkbox", { name: "次のお出かけの候補を送るを完了" }).click()
+  await page.getByRole("button", { name: "次のお出かけの候補を送るを完全に削除" }).click()
+  await expect(page.getByRole("button", { name: "次のお出かけの候補を送るを編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "元に戻す" })).toHaveCount(0)
+  const storedTodos = await page.evaluate(() => JSON.parse(localStorage.getItem("noca.todos.v1") ?? "[]") as Array<{ id: string }>)
+  expect(storedTodos.some(todo => todo.id === "test-t5")).toBe(false)
 })
 
 test("memo tab remains in navigation and shows only its development notice", async ({ page }) => {

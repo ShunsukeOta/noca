@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "todos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "deleted", "order": "ASCENDING" },
+        { "fieldPath": "record.dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "calendarEvents",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "deleted", "order": "ASCENDING" },
+        { "fieldPath": "record.date", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

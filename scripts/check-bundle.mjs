@@ -59,9 +59,9 @@ const budgets = [
   ["初回JavaScript", initial.raw, 450_000],
   ["初回JavaScript gzip", initial.gzip, 145_000],
   ["最大JavaScriptチャンク", largestChunk, 500_000],
-  // The offline sync provider adds a small local queue/cache runtime to the
-  // installation precache. Firebase SDK/service chunks remain runtime-cached.
-  ["PWA事前保存", precacheBytes, 672 * 1024]
+  // Includes the offline sync queue/cache and permanent-delete revision guard;
+  // Firebase SDK/service chunks remain runtime-cached.
+  ["PWA事前保存", precacheBytes, 682 * 1024]
 ]
 for (const [name, actual, limit] of budgets) {
   if (actual > limit) {

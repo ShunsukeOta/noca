@@ -35,7 +35,7 @@ export type WorkspaceMutation = {
   id: string
   kind: WorkspaceRecordKind
   entityId: string
-  action: "upsert" | "delete"
+  action: "upsert" | "delete" | "purge"
   record: WorkspaceRecord | null
   sortOrder?: number
   baseRevision: number
@@ -47,7 +47,7 @@ export type WorkspaceSyncConflict = {
   kind: WorkspaceRecordKind
   entityId: string
   entityName: string
-  localAction: "upsert" | "delete"
+  localAction: "upsert" | "delete" | "purge"
   localRecord: WorkspaceRecord | null
   remoteRecord: WorkspaceRecord | null
   localSortOrder?: number
@@ -70,6 +70,7 @@ const collectionNames: Record<WorkspaceRecordKind, string> = {
   categories: "todoCategories",
   events: "calendarEvents"
 }
+const todoPurgeMarkerCollection = "todoPurgeMarkers"
 
 const categoryTones = new Set(["peach", "green", "lavender", "blue", "mint", "yellow", "rose", "neutral", "life", "outing", "couple"])
 const todoByValues = new Set(["A", "B"])
@@ -147,8 +148,8 @@ function parseTimestamp(value: unknown) {
 function parseConflict(id: string, data: DocumentData): WorkspaceSyncConflict | null {
   if (data.status !== "unresolved" ||
     (data.kind !== "todos" && data.kind !== "categories" && data.kind !== "events") ||
-    typeof data.entityId !== "string" || (data.localAction !== "upsert" && data.localAction !== "delete")) return null
-  const validLocal = data.localAction === "delete" && data.localRecord === null ||
+    typeof data.entityId !== "string" || (data.localAction !== "upsert" && data.localAction !== "delete" && data.localAction !== "purge")) return null
+  const validLocal = (data.localAction === "delete" || data.localAction === "purge") && data.localRecord === null ||
     (data.kind === "todos" ? isTask(data.localRecord) : data.kind === "events" ? isCalendarEvent(data.localRecord) : isTodoCategory(data.localRecord))
   if (data.remoteAction !== "delete" && data.remoteAction !== "upsert") return null
   const validRemote = data.remoteAction === "delete"
@@ -180,7 +181,7 @@ function parseRecords(kind: WorkspaceRecordKind, docs: Array<{ id: string; data:
     const data = snapshot.data()
     const revision = Number(data.revision)
     if (!Number.isInteger(revision) || revision < 1) continue
-    versions[snapshot.id] = revision
+    versions[snapshot.id] = Math.max(versions[snapshot.id] ?? 0, revision)
     if (data.deleted === true || !isRecord(data.record)) continue
     const record = { ...data.record, id: snapshot.id }
     const sourceRecordId = typeof data.sourceRecordId === "string" ? data.sourceRecordId : data.record.id
@@ -207,14 +208,19 @@ function parseRecords(kind: WorkspaceRecordKind, docs: Array<{ id: string; data:
 async function readSnapshot(workspaceId: string): Promise<WorkspaceDataSnapshot> {
   const db = getDb()
   const workspaceRef = doc(db, "workspaces", workspaceId)
-  const [todoSnapshot, categorySnapshot, eventSnapshot, conflictSnapshot] = await Promise.all([
+  const [todoSnapshot, categorySnapshot, eventSnapshot, conflictSnapshot, purgeMarkerSnapshot] = await Promise.all([
     getDocs(collection(workspaceRef, collectionNames.todos)),
     getDocs(collection(workspaceRef, collectionNames.categories)),
     getDocs(collection(workspaceRef, collectionNames.events)),
-    getDocs(collection(workspaceRef, "syncConflicts"))
+    getDocs(collection(workspaceRef, "syncConflicts")),
+    getDocs(collection(workspaceRef, todoPurgeMarkerCollection))
   ])
   const versions: WorkspaceVersions = { todos: {}, categories: {}, events: {} }
   const todos = parseRecords("todos", todoSnapshot.docs, versions.todos) as Task[]
+  for (const marker of purgeMarkerSnapshot.docs) {
+    const revision = Number(marker.data().revision)
+    if (Number.isInteger(revision) && revision > 0) versions.todos[marker.id] = Math.max(versions.todos[marker.id] ?? 0, revision)
+  }
   const categories = parseRecords("categories", categorySnapshot.docs, versions.categories) as TodoCategory[]
   const events = parseRecords("events", eventSnapshot.docs, versions.events) as CalendarEvent[]
   const conflicts = conflictSnapshot.docs
@@ -224,7 +230,7 @@ async function readSnapshot(workspaceId: string): Promise<WorkspaceDataSnapshot>
     records: { todos, categories: categories.length ? categories : DEFAULT_TODO_CATEGORIES, events },
     versions,
     conflicts,
-    fromCache: todoSnapshot.metadata.fromCache || categorySnapshot.metadata.fromCache || eventSnapshot.metadata.fromCache || conflictSnapshot.metadata.fromCache
+    fromCache: todoSnapshot.metadata.fromCache || categorySnapshot.metadata.fromCache || eventSnapshot.metadata.fromCache || conflictSnapshot.metadata.fromCache || purgeMarkerSnapshot.metadata.fromCache
   }
 }
 
@@ -243,12 +249,17 @@ export function observeWorkspaceData(
   let categories: Array<{ id: string; data: () => DocumentData }> | null = null
   let events: Array<{ id: string; data: () => DocumentData }> | null = null
   let conflicts: WorkspaceSyncConflict[] | null = null
-  const cacheState = { todos: true, categories: true, events: true, conflicts: true }
+  let purgeMarkers: Array<{ id: string; data: () => DocumentData }> | null = null
+  const cacheState = { todos: true, categories: true, events: true, conflicts: true, purgeMarkers: true }
 
   const emit = () => {
-    if (!todos || !categories || !events || !conflicts) return
+    if (!todos || !categories || !events || !conflicts || !purgeMarkers) return
     const versions: WorkspaceVersions = { todos: {}, categories: {}, events: {} }
     const nextTodos = parseRecords("todos", todos, versions.todos) as Task[]
+    for (const marker of purgeMarkers) {
+      const revision = Number(marker.data().revision)
+      if (Number.isInteger(revision) && revision > 0) versions.todos[marker.id] = Math.max(versions.todos[marker.id] ?? 0, revision)
+    }
     const nextCategories = parseRecords("categories", categories, versions.categories) as TodoCategory[]
     const nextEvents = parseRecords("events", events, versions.events) as CalendarEvent[]
     onNext({
@@ -280,6 +291,11 @@ export function observeWorkspaceData(
         .map(item => parseConflict(item.id, item.data()))
         .filter((conflict): conflict is WorkspaceSyncConflict => conflict !== null)
       cacheState.conflicts = snapshot.metadata.fromCache
+      emit()
+    }, onError),
+    onSnapshot(collection(workspaceRef, todoPurgeMarkerCollection), options, snapshot => {
+      purgeMarkers = snapshot.docs
+      cacheState.purgeMarkers = snapshot.metadata.fromCache
       emit()
     }, onError)
   ]
@@ -349,19 +365,26 @@ export async function applyWorkspaceMutation(workspaceId: string, uid: string, m
   if (!uid || !["todos", "categories", "events"].includes(mutation.kind) ||
     !mutation.id || mutation.id.includes("/") || !mutation.entityId || mutation.entityId.includes("/") ||
     !Number.isInteger(mutation.baseRevision) || mutation.baseRevision < 0 ||
-    (mutation.action !== "upsert" && mutation.action !== "delete") ||
+    (mutation.action !== "upsert" && mutation.action !== "delete" && mutation.action !== "purge") ||
+    (mutation.action === "purge" && mutation.kind !== "todos") ||
     (mutation.action === "upsert" && !validRecord) ||
-    (mutation.action === "delete" && mutation.record !== null && !validRecord)) {
+    (mutation.action === "delete" && mutation.record !== null && !validRecord) ||
+    (mutation.action === "purge" && mutation.record !== null)) {
     throw new Error("同期する変更の内容を確認できませんでした。")
   }
   const db = getDb()
   const recordRef = doc(db, "workspaces", workspaceId, collectionNames[mutation.kind], mutation.entityId)
+  const purgeMarkerRef = doc(db, "workspaces", workspaceId, todoPurgeMarkerCollection, mutation.entityId)
   const conflictRef = doc(db, "workspaces", workspaceId, "syncConflicts", mutation.id)
   return runTransaction(db, async transaction => {
-    const [currentSnapshot, conflictSnapshot] = await Promise.all([transaction.get(recordRef), transaction.get(conflictRef)])
+    const [currentSnapshot, conflictSnapshot, purgeMarkerSnapshot] = await Promise.all([
+      transaction.get(recordRef), transaction.get(conflictRef),
+      mutation.kind === "todos" ? transaction.get(purgeMarkerRef) : Promise.resolve(null)
+    ])
     const current = currentSnapshot.exists() ? currentSnapshot.data() : null
-    const currentRevision = Number(current?.revision) || 0
-    if (current?.lastMutationId === mutation.id) return { status: "saved" as const, revision: currentRevision }
+    const purgeMarker = purgeMarkerSnapshot?.exists() ? purgeMarkerSnapshot.data() : null
+    const currentRevision = Math.max(Number(current?.revision) || 0, Number(purgeMarker?.revision) || 0)
+    if (current?.lastMutationId === mutation.id || purgeMarker?.lastMutationId === mutation.id) return { status: "saved" as const, revision: currentRevision }
     if (currentRevision !== mutation.baseRevision) {
       if (!conflictSnapshot.exists()) {
         const remoteRecord: WorkspaceRecord | null = current && current.deleted !== true && isRecord(current.record)
@@ -373,7 +396,7 @@ export async function applyWorkspaceMutation(workspaceId: string, uid: string, m
           entityId: mutation.entityId,
           entityName: workspaceRecordName(localRecord || remoteRecord),
           localAction: mutation.action,
-          localRecord,
+          localRecord: mutation.action === "purge" ? null : localRecord,
           remoteAction: current?.deleted === true || !remoteRecord ? "delete" : "upsert",
           remoteRecord: current?.deleted === true ? null : remoteRecord,
           localSortOrder: mutation.sortOrder ?? null,
@@ -388,7 +411,21 @@ export async function applyWorkspaceMutation(workspaceId: string, uid: string, m
       return { status: "conflict" as const, revision: currentRevision }
     }
 
-    if (mutation.action === "delete" && !currentSnapshot.exists()) return { status: "saved" as const, revision: 0 }
+    if (mutation.action === "purge") {
+      if (current && (current.deleted === true || !isTask(current.record) || !current.record.done)) {
+        throw new Error("完了済みのTODOだけ削除できます。最新の一覧を読み込んで再度お試しください。")
+      }
+      const nextRevision = currentRevision + 1
+      if (currentSnapshot.exists()) transaction.delete(recordRef)
+      transaction.set(purgeMarkerRef, {
+        revision: nextRevision,
+        updatedAt: serverTimestamp(),
+        updatedByUid: uid,
+        lastMutationId: mutation.id
+      })
+      return { status: "saved" as const, revision: nextRevision }
+    }
+    if (mutation.action === "delete" && !currentSnapshot.exists()) return { status: "saved" as const, revision: currentRevision }
     const currentRecord = isRecord(current?.record) ? current.record : null
     const nextRecord = mutation.action === "delete"
       ? currentRecord
@@ -422,7 +459,8 @@ export async function mergeWorkspaceConflictLocalChange(
   const validRecord = mutation.kind === "todos" ? mutation.record === null || isTask(mutation.record)
     : mutation.kind === "categories" ? mutation.record === null || isTodoCategory(mutation.record)
       : mutation.kind === "events" ? mutation.record === null || isCalendarEvent(mutation.record) : false
-  if (!uid || !validRecord || (mutation.action !== "upsert" && mutation.action !== "delete")) {
+  if (!uid || !validRecord || (mutation.action !== "upsert" && mutation.action !== "delete" && mutation.action !== "purge") ||
+    (mutation.action === "purge" && (mutation.kind !== "todos" || mutation.record !== null))) {
     throw new Error("競合している変更を確認できませんでした。")
   }
   const db = getDb()
@@ -438,7 +476,7 @@ export async function mergeWorkspaceConflictLocalChange(
     transaction.update(conflictRef, {
       entityName: workspaceRecordName(localRecord ?? conflict.remoteRecord ?? null),
       localAction: mutation.action,
-      localRecord,
+      localRecord: mutation.action === "purge" ? null : localRecord,
       localSortOrder: mutation.sortOrder ?? null,
       localUpdatedByUid: uid
     })
@@ -479,8 +517,12 @@ async function createImportedRecord<T extends WorkspaceRecord>(
     ? `imported_category_${await hashId((source as TodoCategory).name.trim().normalize("NFKC"))}`
     : await importedRecordId(kind, source.id)
   const ref = recordReference(workspaceId, kind, id)
+  const purgeMarkerRef = doc(getDb(), "workspaces", workspaceId, todoPurgeMarkerCollection, id)
   await runTransaction(getDb(), async transaction => {
-    const snapshot = await transaction.get(ref)
+    const [snapshot, purgeMarkerSnapshot] = await Promise.all([
+      transaction.get(ref),
+      kind === "todos" ? transaction.get(purgeMarkerRef) : Promise.resolve(null)
+    ])
     if (snapshot.exists()) {
       const current = snapshot.data()
       const currentRecord = isRecord(current.record) ? { ...current.record, id } as WorkspaceRecord : null
@@ -509,6 +551,32 @@ async function createImportedRecord<T extends WorkspaceRecord>(
             status: "unresolved"
           })
         }
+      }
+      return
+    }
+    if (kind === "todos" && purgeMarkerSnapshot?.exists()) {
+      const markerRevision = Number(purgeMarkerSnapshot.data().revision) || 0
+      const importedRecord = withoutUndefined({ ...source, id } as WorkspaceRecord)
+      const conflictId = `migration_${await hashId(`${installId}:${kind}:${source.id}:${markerRevision}:${canonicalRecord(importedRecord)}`)}`
+      const conflictRef = doc(getDb(), "workspaces", workspaceId, "syncConflicts", conflictId)
+      const conflictSnapshot = await transaction.get(conflictRef)
+      if (!conflictSnapshot.exists()) {
+        transaction.set(conflictRef, {
+          kind,
+          entityId: id,
+          entityName: workspaceRecordName(importedRecord),
+          localAction: "upsert",
+          localRecord: importedRecord,
+          remoteAction: "delete",
+          remoteRecord: null,
+          localSortOrder: sortOrder ?? null,
+          remoteSortOrder: null,
+          baseRevision: 0,
+          remoteRevision: markerRevision,
+          createdByUid: uid,
+          createdAt: serverTimestamp(),
+          status: "unresolved"
+        })
       }
       return
     }
@@ -603,8 +671,11 @@ export async function resolveWorkspaceConflict(
     const kind = conflict.kind as WorkspaceRecordKind
     const recordRef = doc(db, "workspaces", workspaceId, collectionNames[kind], String(conflict.entityId))
     const recordSnapshot = await transaction.get(recordRef)
+    const purgeMarkerRef = doc(db, "workspaces", workspaceId, todoPurgeMarkerCollection, String(conflict.entityId))
+    const purgeMarkerSnapshot = kind === "todos" ? await transaction.get(purgeMarkerRef) : null
     const current = recordSnapshot.exists() ? recordSnapshot.data() : null
-    const revision = Number(current?.revision) || 0
+    const purgeMarker = purgeMarkerSnapshot?.exists() ? purgeMarkerSnapshot.data() : null
+    const revision = Math.max(Number(current?.revision) || 0, Number(purgeMarker?.revision) || 0)
     if (revision !== Number(conflict.remoteRevision)) {
       const remoteRecord = current && current.deleted !== true && isRecord(current.record)
         ? { ...current.record, id: String(conflict.entityId) } as WorkspaceRecord
@@ -620,6 +691,23 @@ export async function resolveWorkspaceConflict(
       return "changed"
     }
     if (choice === "local") {
+      if (conflict.localAction === "purge") {
+        if (kind !== "todos") throw new Error("削除対象の種類を確認できませんでした。")
+        if (recordSnapshot.exists()) transaction.delete(recordRef)
+        transaction.set(purgeMarkerRef, {
+          revision: revision + 1,
+          updatedAt: serverTimestamp(),
+          updatedByUid: uid,
+          lastMutationId: "conflict_" + conflictId
+        })
+        transaction.update(conflictRef, {
+          status: "resolved",
+          resolution: choice,
+          resolvedByUid: uid,
+          resolvedAt: serverTimestamp()
+        })
+        return "resolved"
+      }
       const record = conflict.localRecord ?? current?.record ?? conflict.remoteRecord
       if (!isRecord(record)) throw new Error("この変更を復元できませんでした。")
       transaction.set(recordRef, {

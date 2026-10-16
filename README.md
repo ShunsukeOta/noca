@@ -9,7 +9,7 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 **開発状況:** TODO・カレンダーの端末内利用と、Googleログイン・共有スペースを使ったPhase 3のFirestore保存・同期・既存データ追加をローカルコードに実装しています。Firebase実環境でのRules反映と二端末受け入れ確認は未完了です。メモタブは残し、「メモ機能は開発中です」と案内するプレースホルダーです。
 
 > [!IMPORTANT]
-> **Phase 3のコードはありますが、共有運用の受け入れ確認は未完了です。** Firebaseの環境変数がない状態では、同一ブラウザの `localStorage` を使う1人用プレビューです。Firebaseを設定してGoogleログインし、共有スペースに参加した後、設定の「データ」から同期開始方法を選ぶとTODO・カテゴリ・予定をFirestoreへ保存し、メンバー間で同期します。移行は既存データを追加する方式で、元の端末内データは残ります。Phase 2の2アカウント確認、今回追加したFirestore Rulesのデプロイ、2端末同期・オフライン復帰・競合の受け入れ確認を終えるまでは完成扱いにしません。初期状態ではBの表示・担当選択・2人比較画面は出ません。メモ機能は開発中で、通知も未実装です。設定からJSONバックアップを書き出して復元できます。ブラウザ保存データを消すと端末内のバックアップ・同期キューも失われるため、消去前にバックアップを書き出してください。Firebaseの設定は[セットアップ手順](docs/FIREBASE_SETUP.md)を参照してください。
+> **共有運用と通知の実環境確認は未完了です。** Firebaseの環境変数がない状態では、同一ブラウザの `localStorage` を使う1人用プレビューです。Firebaseを設定してGoogleログインし、共有スペースに参加した後、設定の「データ」から同期開始方法を選ぶとTODO・カテゴリ・予定をFirestoreへ保存し、メンバー間で同期します。移行は既存データを追加する方式で、元の端末内データは残ります。Phase 2の2アカウント確認、Firestore Rulesのデプロイ、2端末同期・オフライン復帰・競合の受け入れ確認を終えるまでは完成扱いにしません。初期状態ではBの表示・担当選択・2人比較画面は出ません。メモ機能は開発中です。プッシュ通知のクライアントとFirebase Functionsのソースはありますが、VAPIDキー設定、Functions/Rules/indexesのデプロイ、iPhone実機確認は未完了です。Cloud FunctionsのデプロイにはFirebase Blazeプランが必要です。設定からJSONバックアップを書き出して復元できます。ブラウザ保存データを消すと端末内のバックアップ・同期キューも失われるため、消去前にバックアップを書き出してください。Firebaseの設定は[セットアップ手順](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## Codex / AIエージェントへの引き継ぎ
 
@@ -26,11 +26,11 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 
 | 画面・機能 | 現状 | 主な操作・特徴 |
 | --- | --- | --- |
-| **TODO** | **動作**・端末内に保存 | 作成・編集・完了/解除・削除/Undo。カテゴリは設定から追加・名前変更・色変更・並び替え・削除ができ、削除時はTODOを別カテゴリへ移動。 |
+| **TODO** | **動作**・端末内に保存 | 作成・編集・完了/解除・削除/Undo。完了一覧には未完了へ戻すアイコンと完全削除アイコンがあります。共有同期中の完全削除はTODO本文をFirestoreから削除し、古い端末からの復活を防ぐID・版数だけを残します。カテゴリは設定から追加・名前変更・色変更・並び替え・削除ができ、削除時はTODOを別カテゴリへ移動。 |
 | **カレンダー** | **動作** | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了、期限付きTODOの参照。初期状態は担当表示のない1人用タイムライン。共有同期を開始するとTODOと同様にworkspaceへ保存します（実環境検証前） |
 | **メモ** | **開発中** | メモタブを開くと「メモ機能は開発中です」と表示。入力や保存の操作はありません。 |
-| **設定** | テーマ・TODOカテゴリ・バックアップ・共有同期 | Googleログイン、共有スペース作成、24時間招待、TODO・カテゴリ・予定の同期開始、既存データ追加、オフライン保留、競合解決を実装。Rulesのデプロイと実環境の受け入れ確認が残る |
-| **PWA** | 基本構成あり | manifest / service workerの自動更新設定。メンテナーからiPhone Safari・ホーム画面standalone実機QA完了の報告あり（端末と個別結果は未記録）。共有同期のオフラインキューはコード実装済みですが、実機検証前です |
+| **設定** | テーマ・TODOカテゴリ・バックアップ・共有同期・通知 | Googleログイン、共有スペース、同期開始、バックアップに加え、この端末ごとに時刻付き予定30分前・TODO期限当日9:00・相手のTODO/予定追加を切り替え可能。通知サーバー未設定時は操作できず、同期を開始したワークスペースが必要 |
+| **PWA** | 基本構成あり | manifest / service workerの自動更新とプッシュ通知受信を実装。iPhoneはiOS 16.4以降のホーム画面追加アプリから登録します。通知を届けるFirebase Functionsは追加済みですが未デプロイです。共有同期のオフラインキューも実機検証前です |
 
 ### UIで守るべき重要な決定
 
@@ -54,12 +54,12 @@ A・B・`both` はTODO・予定の表示レーンです。Firebaseで実メン�
 | アイコン / モーション | Lucide React / Motion |
 | 日付 | date-fns |
 | 状態・保存 | React Context + `localStorage`（端末内データ・workspace別同期キュー/共有スナップショット・メンバー情報キャッシュ） + Cloud Firestore（共有データ） |
-| 認証・メンバー | Firebase Authentication + Cloud Firestore（Googleログイン、workspace、メンバー、TODO/予定共有データ） |
+| 認証・メンバー・通知 | Firebase Authentication + Cloud Firestore + Cloud Functions（Googleログイン、workspace、共有データ、Web Push送信） |
 | PWA | vite-plugin-pwa（manifest と service worker） |
 | 自動テスト | Playwright + Chromium |
 | CI / プレビュー | GitHub Actions / Vercel |
 
-**未完了:** Phase 2の実環境受け入れ確認、Phase 3のFirestore Rulesデプロイと2端末・オフライン・競合の実地確認、プッシュ通知。本番データベースや認証プロバイダーの設定手順は[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。
+**未完了:** Phase 2の実環境受け入れ確認、Phase 3のFirestore Rulesデプロイと2端末・オフライン・競合の実地確認、VAPID設定・Cloud Functionsデプロイ・通知のiPhone/2端末QA。本番データベースや認証プロバイダーの設定手順は[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## 開発環境と起動
 
@@ -83,21 +83,22 @@ Firebase Auth／Firestoreを使う場合は、`.env.example` を `.env.local` �
 | `npm run dev` | Vite開発サーバー（LANからもアクセス可能なhost指定あり） |
 | `npm run typecheck` | TypeScriptプロジェクトの型チェック |
 | `npm run build` | 型チェック + Vite本番ビルド |
+| `npm run build:functions` | Firebase Cloud Functionsの型チェック・ビルド |
 | `npm run check:bundle` | 本番ビルドの初回JS・最大チャンク・PWA保存容量を予算と比較 |
 | `npm run preview` | ビルドのローカルプレビュー |
 | `npx playwright install chromium` | Playwright用ブラウザを準備 |
 | `npm run test:e2e` | Playwrightのブラウザテスト |
 | `npm run test:pwa` | 本番ビルドの遅延読込とオフラインPWAを確認（先にビルド） |
 
-CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → `npm run build` → `npm run check:bundle` → `npx playwright install --with-deps chromium` → `npm run test:e2e` → `npm run test:pwa` を実行します。テストのスクリーンショットと診断情報は GitHub Actions アーティファクト `noca-ui-mobile-preview` に保存されます。
+CI（`.github/workflows/ui-check.yml`）では Node.js 22 でアプリとFunctionsの依存関係をインストールし、`npm run build` → `npm run build:functions` → `npm run check:bundle` → `npx playwright install --with-deps chromium` → `npm run test:e2e` → `npm run test:pwa` を実行します。テストのスクリーンショットと診断情報は GitHub Actions アーティファクト `noca-ui-mobile-preview` に保存されます。
 
 > **依存関係の注意:** `package-lock.json` はコミット済みですが、CIは現在 `npm install` を使っています。CIを `npm ci` に切り替える場合は別途確認してください。
 
 ### 検証状況
 
-今回のPhase 3変更では `npm run typecheck` と `npm run build` が成功し、`npm run check:bundle` も予算内です。ブラウザテスト、Firestore Rules emulator/deploy、Firebase実環境での二端末確認は未実施です。Phase 2ソースの過去の基準値はPlaywright Chromium **50/50件**、production PWA **4/4件**です（今回変更の合格結果ではありません）。新しいFirestore Rulesをデプロイしてから、二つのGoogleアカウントと別端末で受け入れ確認を行ってください。過去のGitHub Actions記録は [#38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) です。
+今回の変更では `npm run typecheck`、`npm run build`、`npm run build:functions`、`npm run check:bundle` が成功しました。Playwright suites、Firestore Rules emulator/デプロイ、Firebase実環境での二端末・iPhone通知確認は未実施です。Cloud Functionsが実際に通知を送るには、VAPID設定とRules/indexes/Functionsのデプロイが必要です。Phase 2ソースの過去の基準値はPlaywright Chromium **50/50件**、production PWA **4/4件**です（今回変更の合格結果ではありません）。新しいFirestore Rulesをデプロイしてから、二つのGoogleアカウントと別端末で受け入れ確認を行ってください。過去のGitHub Actions記録は [#38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) です。
 
-以前のPhase 2基準では初回JavaScript **436.08 kB / gzip 139.45 kB**、最大チャンク **458.21 kB**、PWA事前保存量 **650.71 KiB / 652 KiB予算**でした。現在は初回JavaScript **444.50 kB / gzip 141.47 kB**、最大チャンク **455.25 kB**、PWA事前保存 **669.58 KiB / 672 KiB予算**です。オフライン同期の端末内キューを事前保存するため、PWA予算を必要な範囲だけ調整しました。Firebase SDK/サービスと招待ルートは事前キャッシュには含めず、Firebaseのコードはオンライン利用時にランタイムキャッシュへ保存します。Firebaseメンバー情報・共有スナップショット・未送信キューを端末に保存し、共有開始後に一度オンライン利用した端末でのオフライン編集を想定します。容量は `scripts/check-bundle.mjs` でCI確認します。
+以前のPhase 2基準では初回JavaScript **436.08 kB / gzip 139.45 kB**、最大チャンク **458.21 kB**、PWA事前保存量 **650.71 KiB / 652 KiB予算**でした。完了TODO削除を含む直近の基準値は初回JavaScript **447.53 kB / gzip 143.04 kB**、最大チャンク **455.25 kB**、PWA事前保存 **674.02 KiB / 676 KiB予算**でした。今回、Web Push UIと受信Service Workerを追加後は初回JavaScript **449.32 kB / gzip 143.45 kB**、最大チャンク **483.56 kB**、PWA事前保存 **677.48 KiB / 682 KiB予算**です。容量チェックは通過しています。通知設定チャンクは遅延読込し、初回オンライン利用後にService Workerのランタイムキャッシュへ保存します。Firebase SDK/サービスと招待ルートは事前キャッシュから除外し、Firebaseコードはオンライン利用時にランタイムキャッシュへ保存します。Firebaseメンバー情報・共有スナップショット・未送信キューを端末に保存し、共有開始後に一度オンライン利用した端末でのオフライン編集を想定します。容量は `scripts/check-bundle.mjs` でCI確認します。
 
 320 / 375 / 390 / 430pxのモバイル幅や一部のreduced-motion、ダークモードのテストを含みます。ChromiumはiPhone Safariの証拠にはなりません。メンテナーから実機Safari/standalone QA完了の報告を受けていますが、端末・iOS版・ケース別結果はリポジトリに記録されていません。
 
@@ -109,19 +110,24 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 ├── README.md                          # プロジェクトの入口（このファイル）
 ├── docs/
 │   ├── CODEX_HANDOFF.md               # 最新の引き継ぎ・次の作業
-│   ├── FIREBASE_SETUP.md               # 認証・招待の接続手順と制約
+│   ├── FIREBASE_SETUP.md               # 認証・招待・通知の接続手順と制約
 │   ├── ARCHITECTURE.md                # 実装・保存・コード地図
 │   ├── DESIGN_SYSTEM.md               # UI設計の決定事項
 │   ├── ROADMAP.md                     # フェーズ計画
 │   ├── SPECIFICATION.md               # 製品全体の構想（将来の項目含む）
 │   ├── UI_QA.md                        # 実機検証計画
 │   └── PHASE1{A,B,C}_REPORT.md        # 各フェーズ当時の記録
+├── functions/
+│   ├── src/index.ts                   # Web Push送信・期限リマインダー
+│   └── .env.example                   # VAPID公開設定の例
+├── firestore.indexes.json             # 通知リマインダー用collection-group index
 ├── src/
 │   ├── App.tsx                         # ルーティング/Provider
 │   ├── app/mock-data.ts               # ドメイン型とデモデータ
 │   ├── features/
 │   │   ├── todos/todo-store.tsx       # TODO CRUD
 │   │   ├── calendar/calendar-store.tsx # 予定 CRUD
+│   │   ├── notifications/             # 端末ごとのWeb Push登録・設定
 │   │   ├── workspace/workspace-membership.tsx # ローカル表示とFirebaseメンバー状態
 │   │   └── data/local-backup.ts       # ローカルデータの書き出し・復元
 │   ├── components/
@@ -140,6 +146,7 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 ├── tests/ui.spec.ts                   # Playwright E2E
 ├── tests/production.spec.ts           # 本番ビルド・オフラインPWA検証
 ├── scripts/check-bundle.mjs           # 容量予算の検証
+├── public/push-handler.js              # Service Workerの通知表示・タップ処理
 ├── playwright.production.config.ts    # 本番PWAテスト設定
 ├── .github/workflows/ui-check.yml    # CI
 ├── vite.config.ts                     # PWA設定/alias

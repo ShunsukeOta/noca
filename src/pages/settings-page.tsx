@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { ChunkLoadBoundary } from "@/components/chunk-load-boundary"
 import { loadConfirmDialog, loadTodoCategorySettings, preloadConfirmDialog } from "@/components/settings-loaders"
 import {
-  ArrowLeft, Bell, CalendarClock, Check, Cloud, Copy, Database, Download, Info, LoaderCircle, LogIn, LogOut, Upload,
-  ListTodo, LockKeyhole, Moon, Palette, ShieldCheck, Sun, UserRoundPlus,
+  ArrowLeft, Bell, Check, Cloud, Copy, Database, Download, Info, LoaderCircle, LogIn, LogOut, Share2, Upload,
+  LockKeyhole, Moon, Palette, ShieldCheck, Sun, UserRoundPlus,
   UsersRound
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,7 @@ import { useWorkspaceMembership } from "@/features/workspace/workspace-membershi
 import { useWorkspaceDataSync } from "@/features/workspace/workspace-data-sync-context"
 import { isFirebaseConfigured } from "@/features/workspace/firebase-env"
 import { workspaceErrorMessage } from "@/features/workspace/workspace-errors"
+import { shareInviteUrl, supportsNativeShare } from "@/lib/web-share"
 import type { WorkspaceSyncConflict } from "@/features/workspace/firebase-workspace-data"
 import { createLocalBackup, localBackupFilename, MAX_LOCAL_BACKUP_SIZE_BYTES, parseLocalBackup, restoreLocalBackup, type LocalBackup } from "@/features/data/local-backup"
 
@@ -25,6 +26,7 @@ type ComingSoonItem = { icon: typeof Bell; title: string; description?: string }
 
 const TodoCategorySettings = lazy(async () => ({ default: (await loadTodoCategorySettings()).TodoCategorySettings }))
 const ConfirmDialog = lazy(async () => ({ default: (await loadConfirmDialog()).ConfirmDialog }))
+const NotificationSettings = lazy(async () => ({ default: (await import("@/features/notifications/notification-settings")).NotificationSettings }))
 
 function CategorySettingsLoading({ count }: { count: number }) {
   return (
@@ -227,6 +229,13 @@ export function SettingsPage() {
     } catch {
       setMemberMessage("リンクを選択してコピーしてください。")
     }
+  }
+
+  const shareInvite = async () => {
+    if (!inviteLink) return
+    const result = await shareInviteUrl(inviteLink)
+    if (result === "failed") setMemberMessage("共有メニューを開けませんでした。招待リンクをコピーしてください。")
+    if (result === "unsupported") setMemberMessage("この端末では共有メニューを使えません。招待リンクをコピーしてください。")
   }
 
   const exportBackup = async () => {
@@ -436,6 +445,9 @@ export function SettingsPage() {
                 {inviteLink && <div className="flex gap-2">
                   <input aria-label="招待リンク" readOnly value={inviteLink}
                     className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-[12px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                  {supportsNativeShare() && <Button type="button" variant="secondary" size="icon" className="tap-target shrink-0 rounded-xl" onClick={() => void shareInvite()} aria-label="招待リンクを共有">
+                    <Share2 className="size-4" aria-hidden="true" />
+                  </Button>}
                   <Button type="button" variant="secondary" size="icon" className="tap-target shrink-0 rounded-xl" onClick={() => void copyInviteLink()} aria-label="招待リンクをコピー">
                     {inviteCopied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
                   </Button>
@@ -458,9 +470,15 @@ export function SettingsPage() {
       </SettingsGroup>
 
       <SettingsGroup title="通知">
-        <ComingSoonRow icon={CalendarClock} title="予定のリマインダー" />
-        <ComingSoonRow icon={ListTodo} title="TODOの期限通知" />
-        <ComingSoonRow icon={Bell} title="共有内容の更新通知" />
+        <ChunkLoadBoundary fallback={<SettingsLoadError label="通知設定" />}>
+          <Suspense fallback={<div role="status" className="min-h-20 px-4 py-6 text-center text-[12px] text-muted-foreground">通知設定を読み込み中…</div>}>
+            <NotificationSettings
+              workspaceId={workspace?.id ?? null}
+              uid={authUser?.uid ?? null}
+              canUseWorkspace={authStatus === "signed-in" && workspaceStatus === "ready" && syncData.isActive}
+            />
+          </Suspense>
+        </ChunkLoadBoundary>
       </SettingsGroup>
 
       <SettingsGroup title="データ">

@@ -2,7 +2,7 @@ import { useState } from "react"
 import { AnimatePresence, LayoutGroup, m, useReducedMotion } from "motion/react"
 import { format, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
-import { ChevronDown, ChevronRight, Clock3, Sparkles } from "lucide-react"
+import { ChevronDown, ChevronRight, Clock3, RotateCcw, Sparkles, Trash2 } from "lucide-react"
 import { type Task } from "@/app/mock-data"
 import { useTodos } from "@/features/todos/todo-store"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import { preloadTodoEditor } from "@/components/editor-loaders"
 
 export function TodoPage() {
   const [filter, setFilter] = useState("すべて")
-  const { todos: tasks, categories, toggleTodo, openEdit, openCreate } = useTodos()
+  const { todos: tasks, categories, toggleTodo, permanentlyDeleteTodo, openEdit, openCreate } = useTodos()
   const { isPaired } = useWorkspaceMembership()
   const [showCompleted, setShowCompleted] = useState(false)
   const reduceMotion = useReducedMotion()
@@ -108,10 +108,17 @@ export function TodoPage() {
               <m.div key={task.id} layout initial={reduceMotion ? false : { opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.15 }} className="overflow-hidden">
-              <div className="flex items-center gap-2 px-3.5 py-3">
-                <Checkbox checked label={task.title + "の完了を解除"} onCheckedChange={() => toggle(task)} />
+              <div className="flex min-h-[68px] items-center gap-2 px-3.5 py-3">
                 <Button type="button" variant="ghost" onClick={() => openEdit(task.id)} onPointerEnter={preloadTodoEditor} onPointerDown={preloadTodoEditor} onFocus={preloadTodoEditor} aria-label={task.title + "を編集"}
                   className="h-auto min-h-11 min-w-0 flex-1 justify-start whitespace-normal break-words rounded-none px-0 py-0 text-left text-[13px] text-muted-foreground line-through hover:bg-transparent">{task.title}</Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => toggle(task)} aria-label={task.title + "を未完了に戻す"}
+                  className="size-11 shrink-0 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                  <RotateCcw className="size-4" aria-hidden="true" />
+                </Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => permanentlyDeleteTodo(task.id)} aria-label={task.title + "を完全に削除"}
+                  className="size-11 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
               </div>
               </m.div>
             ))}

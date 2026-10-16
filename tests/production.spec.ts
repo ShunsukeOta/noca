@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test"
 
+test("installed PWA manifest exposes TODO and today's agenda shortcuts", async ({ page }) => {
+  const response = await page.request.get("/manifest.webmanifest")
+  expect(response.ok()).toBe(true)
+  const manifest = await response.json()
+  expect(manifest.shortcuts).toEqual(expect.arrayContaining([
+    expect.objectContaining({ name: "TODOを追加", url: "/todo?shortcut=add-todo" }),
+    expect.objectContaining({ name: "今日の予定", url: "/calendar?shortcut=today" })
+  ]))
+})
+
 test("cold TODO view defers calendar, editor and category modules", async ({ browser }) => {
   const context = await browser.newContext({ baseURL: "http://127.0.0.1:4173", serviceWorkers: "block" })
   try {

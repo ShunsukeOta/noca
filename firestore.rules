@@ -17,6 +17,14 @@ service cloud.firestore {
       return /databases/$(database)/documents/invitations/$(inviteHash);
     }
 
+    function workspaceTodoPath(workspaceId, recordId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/todos/$(recordId);
+    }
+
+    function todoPurgeMarkerPath(workspaceId, recordId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/todoPurgeMarkers/$(recordId);
+    }
+
     function userPath(uid) {
       return /databases/$(database)/documents/users/$(uid);
     }
@@ -105,8 +113,73 @@ service cloud.firestore {
         && data.updatedAt == request.time;
     }
 
+    function validTodoPurgeMarker(data) {
+      return data is map
+        && data.keys().hasAll(['revision', 'updatedAt', 'updatedByUid', 'lastMutationId'])
+        && data.keys().hasOnly(['revision', 'updatedAt', 'updatedByUid', 'lastMutationId'])
+        && data.revision is int
+        && data.revision > 0
+        && data.revision <= 2147483647
+        && data.updatedAt == request.time
+        && data.updatedByUid == request.auth.uid
+        && data.lastMutationId is string
+        && data.lastMutationId.size() > 0
+        && data.lastMutationId.size() <= 128;
+    }
+
+    function validTodoPurgeMarkerCreate(data, workspaceId, recordId) {
+      return validTodoPurgeMarker(data)
+        && (
+          (!exists(workspaceTodoPath(workspaceId, recordId)) && data.revision == 1)
+          ||
+          (
+            exists(workspaceTodoPath(workspaceId, recordId))
+            && get(workspaceTodoPath(workspaceId, recordId)).data.deleted == false
+            && get(workspaceTodoPath(workspaceId, recordId)).data.record.done == true
+            && data.revision == get(workspaceTodoPath(workspaceId, recordId)).data.revision + 1
+          )
+        );
+    }
+
+    function validTodoPurgeMarkerUpdate(data, workspaceId, recordId) {
+      return validTodoPurgeMarker(data)
+        && resource.data.revision is int
+        && (
+          (
+            !exists(workspaceTodoPath(workspaceId, recordId))
+            && data.revision == resource.data.revision + 1
+          )
+          ||
+          (
+            get(workspaceTodoPath(workspaceId, recordId)).data.deleted == false
+            && get(workspaceTodoPath(workspaceId, recordId)).data.record.done == true
+            && data.revision == get(workspaceTodoPath(workspaceId, recordId)).data.revision + 1
+            && data.revision > resource.data.revision
+          )
+        );
+    }
+
+    function validWorkspaceTodoRestore(data, workspaceId, recordId) {
+      let marker = get(todoPurgeMarkerPath(workspaceId, recordId)).data;
+      return validWorkspaceRecordPayload(data, 'todos', recordId)
+        && data.revision == marker.revision + 1
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function validTodoPurgeDelete(workspaceId, recordId) {
+      let marker = getAfter(todoPurgeMarkerPath(workspaceId, recordId)).data;
+      return isWorkspaceMember(workspaceId)
+        && resource.data.deleted == false
+        && resource.data.record.done == true
+        && marker.revision == resource.data.revision + 1
+        && marker.updatedByUid == request.auth.uid;
+    }
+
     function validConflictSide(kind, action, record, entityId) {
-      return action == 'delete'
+      return action == 'purge'
+        ? (kind == 'todos' && record == null)
+        : action == 'delete'
         ? (record == null || (kind == 'todos' ? validTodoRecord(record, entityId)
           : kind == 'categories' ? validTodoCategory(record, entityId)
             : kind == 'events' && validCalendarEvent(record, entityId)))
@@ -315,15 +388,64 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      match /notificationSubscriptions/{subscriptionId} {
+        function validNotificationSubscription(data) {
+          return data is map
+            && data.keys().hasAll(['uid', 'endpoint', 'keys', 'timezone', 'preferences', 'createdAt', 'updatedAt'])
+            && data.keys().hasOnly(['uid', 'endpoint', 'keys', 'timezone', 'preferences', 'createdAt', 'updatedAt'])
+            && data.uid == request.auth.uid
+            && data.endpoint is string
+            && data.endpoint.size() <= 3000
+            && data.endpoint.matches('^https://.+$')
+            && data.keys is map
+            && data.keys.keys().hasAll(['p256dh', 'auth'])
+            && data.keys.keys().hasOnly(['p256dh', 'auth'])
+            && data.keys.p256dh is string
+            && data.keys.p256dh.size() <= 256
+            && data.keys.auth is string
+            && data.keys.auth.size() <= 128
+            && data.timezone is string
+            && data.timezone.size() > 0
+            && data.timezone.size() <= 128
+            && data.preferences is map
+            && data.preferences.keys().hasAll(['eventReminders', 'todoDeadlines', 'sharedUpdates'])
+            && data.preferences.keys().hasOnly(['eventReminders', 'todoDeadlines', 'sharedUpdates'])
+            && data.preferences.eventReminders is bool
+            && data.preferences.todoDeadlines is bool
+            && data.preferences.sharedUpdates is bool;
+        }
+
+        allow get, list: if isWorkspaceMember(workspaceId) && resource.data.uid == request.auth.uid;
+
+        allow create: if isWorkspaceMember(workspaceId)
+          && validNotificationSubscription(request.resource.data)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
+
+        allow update: if isWorkspaceMember(workspaceId)
+          && resource.data.uid == request.auth.uid
+          && validNotificationSubscription(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['endpoint', 'keys', 'timezone', 'preferences', 'updatedAt']);
+
+        allow delete: if isWorkspaceMember(workspaceId) && resource.data.uid == request.auth.uid;
+      }
+
       match /{dataCollection}/{recordId} {
         allow get: if isWorkspaceMember(workspaceId)
-          && dataCollection in ['todos', 'todoCategories', 'calendarEvents', 'syncConflicts', 'syncDevices'];
+          && dataCollection in ['todos', 'todoCategories', 'calendarEvents', 'syncConflicts', 'syncDevices', 'todoPurgeMarkers'];
         allow list: if isWorkspaceMember(workspaceId)
-          && dataCollection in ['todos', 'todoCategories', 'calendarEvents', 'syncConflicts'];
+          && dataCollection in ['todos', 'todoCategories', 'calendarEvents', 'syncConflicts', 'todoPurgeMarkers'];
 
         allow create: if isWorkspaceMember(workspaceId) && (
           (dataCollection in ['todos', 'todoCategories', 'calendarEvents']
             && validWorkspaceRecordCreate(request.resource.data, dataCollection, recordId))
+          || (dataCollection == 'todos'
+            && exists(todoPurgeMarkerPath(workspaceId, recordId))
+            && validWorkspaceTodoRestore(request.resource.data, workspaceId, recordId))
+          || (dataCollection == 'todoPurgeMarkers'
+            && validTodoPurgeMarkerCreate(request.resource.data, workspaceId, recordId))
           || (dataCollection == 'syncConflicts'
             && validConflictCreate(request.resource.data))
           || (dataCollection == 'syncDevices'
@@ -333,13 +455,15 @@ service cloud.firestore {
         allow update: if isWorkspaceMember(workspaceId) && (
           (dataCollection in ['todos', 'todoCategories', 'calendarEvents']
             && validWorkspaceRecordUpdate(request.resource.data, dataCollection, recordId))
+          || (dataCollection == 'todoPurgeMarkers'
+            && validTodoPurgeMarkerUpdate(request.resource.data, workspaceId, recordId))
           || (dataCollection == 'syncConflicts'
             && (validConflictUpdate(request.resource.data) || validConflictLocalRefresh(request.resource.data) || validConflictResolution(request.resource.data)))
           || (dataCollection == 'syncDevices'
             && validSyncDeviceUpdate(recordId, request.resource.data))
         );
 
-        allow delete: if false;
+        allow delete: if dataCollection == 'todos' && validTodoPurgeDelete(workspaceId, recordId);
       }
     }
 

@@ -78,9 +78,10 @@ function readOutbox(workspaceId: string) {
           !!item && typeof item === "object" && item.kind === kind &&
           typeof item.entityId === "string" && !item.entityId.includes("/") &&
           typeof item.id === "string" && !item.id.includes("/") &&
-          (item.action === "upsert" || item.action === "delete") &&
+          (item.action === "upsert" || item.action === "delete" || item.action === "purge") &&
+          (item.action !== "purge" || (kind === "todos" && item.record === null)) &&
           Number.isInteger(item.baseRevision) && item.baseRevision >= 0 &&
-          (item.action === "delete" || (!!item.record &&
+          (item.action === "delete" || item.action === "purge" || (!!item.record &&
             !(kind === "todos" && isLegacyDemoRecord("todos", item.record)) &&
             !(kind === "todos" && isLegacyDemoWorkspaceRecord("todos", item.record)) &&
             !(kind === "events" && isLegacyDemoRecord("events", item.record)) &&
@@ -111,7 +112,7 @@ function recordsWithMutation(records: WorkspaceRecords, mutation: PendingMutatio
   const next = { ...records, todos: [...records.todos], categories: [...records.categories], events: [...records.events] }
   const list = mutation.kind === "todos" ? next.todos : mutation.kind === "categories" ? next.categories : next.events
   const index = list.findIndex(item => item.id === mutation.entityId)
-  if (mutation.action === "delete") {
+  if (mutation.action === "delete" || mutation.action === "purge") {
     if (index >= 0) list.splice(index, 1)
   } else if (mutation.record) {
     if (index >= 0) list.splice(index, 1)
@@ -457,6 +458,43 @@ export function WorkspaceDataSyncProvider({ children }: { children: ReactNode })
     const next = applyUpdater(previous, updater)
     enqueueChanges("todos", previous, next)
   }, [enqueueChanges])
+  const permanentlyDeleteTodo = useCallback((id: string) => {
+    if (!workspaceId || !isActive) return
+    const task = recordsRef.current.todos.find(item => item.id === id)
+    if (!task?.done) return
+    const prior = [...queueRef.current].reverse().find(item => item.kind === "todos" && item.entityId === id)
+    const mutation: PendingMutation = {
+      id: crypto.randomUUID(),
+      kind: "todos",
+      entityId: id,
+      action: "purge",
+      record: null,
+      baseRevision: prior?.baseRevision ?? versionsRef.current.todos[id] ?? 0,
+      queuedAt: Date.now()
+    }
+    const nextQueue = queueRef.current.filter(item => item.kind !== "todos" || item.entityId !== id)
+    nextQueue.push(mutation)
+    const nextRecords = { ...recordsRef.current, todos: recordsRef.current.todos.filter(item => item.id !== id) }
+    try {
+      persistOutbox(workspaceId, nextQueue)
+      persistCache(workspaceId, {
+        records: nextRecords,
+        versions: versionsRef.current,
+        conflicts: readCache(workspaceId).conflicts,
+        lastSyncedAt: lastSyncedAtRef.current
+      })
+      queueRef.current = nextQueue
+      recordsRef.current = nextRecords
+      setRecords(nextRecords)
+      setPendingCount(nextQueue.length)
+      setStatus(navigator.onLine ? "syncing" : "offline")
+      setErrorMessage(null)
+      if (navigator.onLine) void flushQueue()
+    } catch {
+      setErrorMessage("削除をこの端末に保存できませんでした。空き容量を確認してください。")
+      setStatus("error")
+    }
+  }, [workspaceId, isActive, flushQueue])
   const updateCategories = useCallback((updater: RecordUpdater<TodoCategory>) => {
     const previous = recordsRef.current.categories
     const next = applyUpdater(previous, updater)
@@ -575,11 +613,12 @@ export function WorkspaceDataSyncProvider({ children }: { children: ReactNode })
     startSync,
     importLocalData,
     updateTodos,
+    permanentlyDeleteTodo,
     updateCategories,
     updateEvents,
     retrySync,
     resolveConflict
-  }), [workspaceReady, isActive, status, pendingCount, localDataImported, conflicts, lastSyncedAt, errorMessage, records, startSync, importLocalData, updateTodos, updateCategories, updateEvents, retrySync, resolveConflict])
+  }), [workspaceReady, isActive, status, pendingCount, localDataImported, conflicts, lastSyncedAt, errorMessage, records, startSync, importLocalData, updateTodos, permanentlyDeleteTodo, updateCategories, updateEvents, retrySync, resolveConflict])
 
   return <WorkspaceDataSyncContext.Provider value={value}>{children}</WorkspaceDataSyncContext.Provider>
 }

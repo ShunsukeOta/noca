@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react"
-import { format } from "date-fns"
+import { format, isValid, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
-import { Link, NavLink, useLocation, useOutlet } from "react-router-dom"
+import { Link, NavLink, useLocation, useNavigate, useOutlet } from "react-router-dom"
 import { AnimatePresence, LayoutGroup, m, useReducedMotion } from "motion/react"
 import { CalendarDays, ListTodo, NotebookPen, Plus, Settings, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -51,6 +51,7 @@ function EditorLoadError() {
 
 export function AppShell() {
   const location = useLocation()
+  const navigate = useNavigate()
   const active = tabs.find((tab) => location.pathname.startsWith(tab.to))
   const isSettings = location.pathname === "/settings"
   const isJoin = location.pathname === "/join" || location.pathname.startsWith("/join/")
@@ -97,6 +98,31 @@ export function AppShell() {
   }, [theme])
 
   useEffect(() => { closeEditor(); calendar.closeEditor() }, [location.pathname, closeEditor, calendar.closeEditor])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const shortcut = params.get("shortcut")
+    const dateParam = params.get("date")
+    const parsedDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? parseISO(dateParam) : null
+    const isCalendarDate = location.pathname === "/calendar" && !!parsedDate && isValid(parsedDate) && format(parsedDate, "yyyy-MM-dd") === dateParam
+    const isTodoCreateShortcut = location.pathname === "/todo" && shortcut === "add-todo"
+    const isTodayShortcut = location.pathname === "/calendar" && shortcut === "today"
+    if (!isTodoCreateShortcut && !isTodayShortcut && !isCalendarDate) return
+
+    if (isTodoCreateShortcut) openCreate()
+    if (isTodayShortcut) calendar.setSelectedDate(format(new Date(), "yyyy-MM-dd"))
+    if (isCalendarDate && dateParam) calendar.setSelectedDate(dateParam)
+
+    params.delete("shortcut")
+    params.delete("date")
+    const remainingSearch = params.toString()
+    navigate({
+      pathname: location.pathname,
+      search: remainingSearch ? `?${remainingSearch}` : "",
+      hash: location.hash
+    }, { replace: true, state: location.state })
+  }, [calendar.setSelectedDate, location.hash, location.pathname, location.search, location.state, navigate, openCreate])
+
   const page = useOutlet({ theme, onThemeChange: setTheme })
 
   return (

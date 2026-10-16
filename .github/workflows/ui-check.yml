@@ -21,8 +21,12 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Install notification backend dependencies
+        run: npm --prefix functions install --no-audit --no-fund
       - name: Typecheck and build
-        run: npm run build
+        run: |
+          npm run build
+          npm run build:functions
       - name: Bundle budgets
         run: npm run check:bundle
       - name: Install Chromium

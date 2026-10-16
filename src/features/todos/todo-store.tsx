@@ -41,6 +41,7 @@ type TodoContextValue = {
   updateTodo: (id: string, draft: TodoDraft) => void
   toggleTodo: (id: string) => void
   deleteTodo: (id: string) => void
+  permanentlyDeleteTodo: (id: string) => void
   undoDelete: () => void
   dismissDeleted: () => void
   addCategory: (category: Omit<TodoCategory, "id">) => void
@@ -198,6 +199,16 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     setTodos(previous => previous.filter(task => task.id !== id))
   }, [todos, setTodos])
 
+  const permanentlyDeleteTodo = useCallback((id: string) => {
+    const task = todos.find(item => item.id === id)
+    if (!task?.done) return
+    if (sharedData.isActive) {
+      sharedData.permanentlyDeleteTodo(id)
+      return
+    }
+    setTodos(previous => previous.filter(item => item.id !== id))
+  }, [todos, sharedData.isActive, sharedData.permanentlyDeleteTodo, setTodos])
+
   const undoDelete = useCallback(() => {
     if (!deleted) return
     setTodos(previous => {
@@ -263,9 +274,9 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   const storageError = todosStorageError || categoriesStorageError
   const value = useMemo<TodoContextValue>(() => ({
     todos, categories, deviceTodos, deviceCategories, storageError, editor, deleted,
-    openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted,
+    openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, permanentlyDeleteTodo, undoDelete, dismissDeleted,
     addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData
-  }), [todos, categories, deviceTodos, deviceCategories, storageError, editor, deleted, openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted, addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData])
+  }), [todos, categories, deviceTodos, deviceCategories, storageError, editor, deleted, openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, permanentlyDeleteTodo, undoDelete, dismissDeleted, addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData])
 
   return <TodoContext.Provider value={value}>{children}</TodoContext.Provider>
 }

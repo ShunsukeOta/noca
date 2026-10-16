@@ -58,6 +58,48 @@ Live Firestore listeners refresh both members' views. The last verified workspac
 
 For offline use, first open the configured app online, sign in and activate shared sync on that browser/PWA so its Firebase code, workspace summary and records have been fetched and cached. Google sign-in, new invitations and sending queued edits still require a connection. Validate the target iPhone Safari/PWA separately.
 
+## Push notifications
+
+The Settings notification switches are per device. The app sends event reminders 30 minutes before a timed event (all-day events have no reminder time), TODO deadline reminders at 09:00 in the device's saved timezone on the due date, and a notification to the other workspace member when a new TODO or calendar event is added. Editing or deleting an existing item does not send a shared-update notification. Local-only records are not visible to the server and cannot generate reminders; activate Firestore sync first. Imported batches skip the shared-update notification to avoid sending one alert per migrated record.
+
+Push uses the standard Web Push API and the app service worker. iPhone requires iOS 16.4 or later and the Home Screen installed app; the initial notification permission request happens from a Settings switch tap. The server uses Firebase Cloud Functions, Firestore triggers and one five-minute scheduled job. Deploying Cloud Functions requires Firebase's Blaze plan and a linked billing account; review the [Firebase pricing plan details](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [Cloud Functions quotas and billing notes](https://firebase.google.com/docs/functions/quotas), and set budget alerts before deployment. The scheduled reminders use a single Cloud Scheduler job; Firebase documents the current job allowance and pricing in [scheduled functions](https://firebase.google.com/docs/functions/schedule-functions).
+
+### Configure Web Push keys
+
+1. From `functions/`, install the backend packages and generate one VAPID key pair:
+
+   ```powershell
+   cd functions
+   npm install
+   npx web-push generate-vapid-keys
+   cd ..
+   ```
+
+   Keep the **private key** secret. Do not paste it into `.env.local`, Vercel, source files, or chat.
+
+2. Copy `functions/.env.example` to `functions/.env.YOUR_FIREBASE_PROJECT_ID`. Put the **public key** in `PUSH_VAPID_PUBLIC_KEY`. Keep `PUSH_VAPID_SUBJECT` set to the app's HTTPS origin. This project-specific file is git-ignored.
+
+3. Add the same public key to `.env.local` as `VITE_WEB_PUSH_VAPID_PUBLIC_KEY`, and add that variable to Vercel Production and Preview as a **Config** value. It is public client configuration. The private key belongs in Firebase Secret Manager:
+
+   ```powershell
+   npx firebase-tools functions:secrets:set PUSH_VAPID_PRIVATE_KEY --project YOUR_FIREBASE_PROJECT_ID
+   ```
+
+   Paste the private key at the CLI prompt. Firebase Functions reads it only through the bound Secret Manager parameter.
+
+4. Build and deploy the Rules, collection-group indexes and functions:
+
+   ```powershell
+   npm run build:functions
+   npx firebase-tools deploy --only firestore:rules,firestore:indexes,functions --project YOUR_FIREBASE_PROJECT_ID
+   ```
+
+   The Functions source currently uses `asia-northeast1`, which suits a Japan-hosted project. If the Firestore database is in another region, update `FUNCTION_REGION` in `functions/src/index.ts` to match before deploying. Keep `functions/.env.YOUR_FIREBASE_PROJECT_ID`, the private key and any generated key output out of Git.
+
+5. Redeploy the Vercel app with `VITE_WEB_PUSH_VAPID_PUBLIC_KEY`, open the installed Home Screen app, sign in, activate shared sync, then enable the desired switches under Settings → Notifications. Each device needs its own permission and registration. Check reminders and partner-added notifications on two separate devices; a local browser preview cannot receive server-scheduled reminders.
+
+The latest Firestore Rules allow each signed-in member to read, create, update and remove only their own subscription document. Push endpoints and encryption keys are never readable by the other member from the client. Admin Functions read registrations to deliver notifications and remove expired endpoints. Delivery markers make retrying Firestore event triggers and scheduler runs idempotent.
+
 The repository's current `firestore.rules` includes these data paths. Deploy the latest checked-in Rules before using shared sync:
 
 ```powershell
