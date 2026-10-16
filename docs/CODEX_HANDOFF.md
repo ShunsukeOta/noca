@@ -31,7 +31,7 @@ The previous Phase 2 baseline passed `npm run build`, `npm run check:bundle`, **
 | Date-constrained TODOs shown in calendar | Implemented as references, not separate event copies |
 | Memo tab | Retained in global navigation; displays only **「メモ機能は開発中です」** |
 | Memo list/editor/storage | Deferred and removed from the active app; the memo tab has no + action |
-| Membership display | Starts with 「自分」 in local preview. With Firebase configured, Google-authenticated Firestore members drive the actual A/B count. |
+| Membership display | Starts with 「自分」 in local preview. With Firebase configured, Google-authenticated Firestore members drive the actual A/B count; the header shows each available Google profile photo and falls back to the display-name initial. |
 | Shared UI foundation (theme tokens, fields, buttons, checkbox/switch, owner/category controls, confirm/Undo) | Implemented; settings manage TODO categories |
 | Local data backup | **Implemented:** Settings exports and restores TODOs, TODO categories, calendar events and sample-migration flags as versioned JSON. Restore validates the file, previews counts, requires explicit replacement confirmation and rolls back storage writes on failure. |
 | Google login, workspace creation, invite link and acceptance | Source implemented. Firebase Web app, Google Auth, Firestore and Vercel client configuration were prepared per maintainer; Phase 2 live sign-in/invite/Rules checks remain. The previous Firestore Rules deployment predates the new data paths. |

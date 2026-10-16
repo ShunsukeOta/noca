@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -28,15 +29,18 @@ const avatarSize = {
   lg: "size-8 text-[10px]"
 } as const
 
-function OwnerAvatar({ owner, size = "sm", decorative = false, className, label }: {
+function OwnerAvatar({ owner, size = "sm", decorative = false, className, label, photoURL }: {
   owner: Owner
   size?: keyof typeof avatarSize
   decorative?: boolean
   className?: string
   label?: string
+  photoURL?: string | null
 }) {
   const content = label ? [...label][0] : owner === "both" ? "2" : owner
   const accessibleLabel = label ?? (owner === "both" ? "ふたり" : `担当 ${owner}`)
+  const [failedPhotoURL, setFailedPhotoURL] = useState<string | null>(null)
+  const activePhotoURL = photoURL && failedPhotoURL !== photoURL ? photoURL : null
   return (
     <span
       data-slot="owner-avatar"
@@ -44,9 +48,10 @@ function OwnerAvatar({ owner, size = "sm", decorative = false, className, label 
       role={decorative ? undefined : "img"}
       aria-label={decorative ? undefined : accessibleLabel}
       aria-hidden={decorative ? true : undefined}
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-full font-bold", avatarSize[size], ownerAvatarTone[owner], className)}
+      className={cn("relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold", avatarSize[size], ownerAvatarTone[owner], className)}
     >
-      {content}
+      {activePhotoURL && <img src={activePhotoURL} alt="" aria-hidden="true" className="absolute inset-0 size-full object-cover" onError={() => setFailedPhotoURL(activePhotoURL)} />}
+      <span className={activePhotoURL ? "sr-only" : undefined}>{content}</span>
     </span>
   )
 }

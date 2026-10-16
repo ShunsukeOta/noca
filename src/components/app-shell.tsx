@@ -115,7 +115,7 @@ export function AppShell() {
               aria-label={`利用中のメンバー: ${members.map(member => member.displayName).join("、")}`}>
               {members.map(member => (
                 <OwnerAvatar key={member.id} owner={member.id} label={member.displayName}
-                  size="lg" decorative className="border-[3px] border-background" />
+                  photoURL={member.photoURL} size="lg" decorative className="border-[3px] border-background" />
               ))}
             </div>
             <Link to={isSettings ? settingsReturnTo : "/settings"} state={isSettings ? undefined : { from: active?.to ?? "/todo" }}

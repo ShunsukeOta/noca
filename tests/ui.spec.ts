@@ -974,6 +974,30 @@ test("new local workspace starts with one member and hides B owner UI", async ({
   await context.close()
 })
 
+test("header member avatar uses the available Google profile photo", async ({ page }) => {
+  const profilePhoto = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+  await page.addInitScript(members => {
+    localStorage.setItem("noca.workspace.members.v1", JSON.stringify(members))
+  }, [{ id: "A", displayName: "Taro", photoURL: profilePhoto }])
+  await page.goto("/todo")
+
+  const avatar = page.getByTestId("app-header").locator('[data-slot="owner-avatar"]')
+  await expect(avatar.locator("img")).toHaveAttribute("src", profilePhoto)
+  await expect(avatar).toHaveAttribute("aria-hidden", "true")
+})
+
+test("header member avatar falls back to the display-name initial when the photo fails to load", async ({ page }) => {
+  await page.route("https://example.invalid/**", route => route.abort())
+  await page.addInitScript(members => {
+    localStorage.setItem("noca.workspace.members.v1", JSON.stringify(members))
+  }, [{ id: "A", displayName: "Taro", photoURL: "https://example.invalid/profile.png" }])
+  await page.goto("/todo")
+
+  const avatar = page.getByTestId("app-header").locator('[data-slot="owner-avatar"]')
+  await expect(avatar.locator("img")).toHaveCount(0)
+  await expect(avatar).toContainText("T")
+})
+
 test("calendar shows two separate people with all-day and time-proportional blocks", async ({ page }) => {
   await page.goto("/calendar")
   await expect(page.getByTestId("two-person-schedule")).toBeVisible()
