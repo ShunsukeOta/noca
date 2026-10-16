@@ -1,4 +1,5 @@
 import type { CalendarEvent, Task, TodoCategory } from "@/app/mock-data"
+import { removeLegacyDemoEvents, removeLegacyDemoTasks } from "@/features/data/legacy-demo-data"
 import { isCalendarDate, CALENDAR_EVENT_STORAGE_KEY, CALENDAR_SAMPLE_MIGRATION_KEYS } from "@/features/calendar/calendar-store"
 import { TODO_CATEGORY_STORAGE_KEY, TODO_STORAGE_KEY } from "@/features/todos/todo-store"
 
@@ -140,19 +141,14 @@ export function parseLocalBackup(serialized: string): LocalBackup {
     !hasUniqueValues(validEvents.map(item => item.id))) {
     throw new Error("バックアップ内に重複したIDまたはカテゴリ名があります。")
   }
+  const retainedTodos = removeLegacyDemoTasks(validTodos)
+  const retainedEvents = removeLegacyDemoEvents(validEvents)
   const categoryNames = new Set(validCategories.map(category => category.name))
-  if (validTodos.some(todo => !categoryNames.has(todo.category))) {
+  if (retainedTodos.some(todo => !categoryNames.has(todo.category))) {
     throw new Error("TODOで使われているカテゴリがカテゴリ一覧にありません。")
   }
 
   const migrations = raw.localState.calendarSampleMigrations as { v2: boolean; v3: boolean }
-  const hasLegacySamples = validEvents.some(event => ["e1", "e2", "e3", "e4"].includes(event.id))
-  const hasVersionedSamples = validEvents.some(event => event.id.startsWith("demo-"))
-  const hasV3Samples = validEvents.some(event => event.id.startsWith("demo-v3-"))
-  if (((hasLegacySamples || hasVersionedSamples) && migrations.v2 !== true) ||
-    (hasV3Samples && migrations.v3 !== true)) {
-    throw new Error("カレンダーのサンプル移行状態と予定データが一致しません。")
-  }
 
   return {
     format: LOCAL_BACKUP_FORMAT,
@@ -162,18 +158,18 @@ export function parseLocalBackup(serialized: string): LocalBackup {
       calendarSampleMigrations: { v2: migrations.v2, v3: migrations.v3 }
     },
     data: {
-      todos: validTodos,
+      todos: retainedTodos,
       todoCategories: validCategories,
-      calendarEvents: validEvents
+      calendarEvents: retainedEvents
     }
   }
 }
 
 export function restoreLocalBackup(backup: LocalBackup) {
   const updates: Array<[string, string | null]> = [
-    [TODO_STORAGE_KEY, JSON.stringify(backup.data.todos)],
+    [TODO_STORAGE_KEY, JSON.stringify(removeLegacyDemoTasks(backup.data.todos))],
     [TODO_CATEGORY_STORAGE_KEY, JSON.stringify(backup.data.todoCategories)],
-    [CALENDAR_EVENT_STORAGE_KEY, JSON.stringify(backup.data.calendarEvents)],
+    [CALENDAR_EVENT_STORAGE_KEY, JSON.stringify(removeLegacyDemoEvents(backup.data.calendarEvents))],
     [CALENDAR_SAMPLE_MIGRATION_KEYS.v2, backup.localState.calendarSampleMigrations.v2 ? "done" : null],
     [CALENDAR_SAMPLE_MIGRATION_KEYS.v3, backup.localState.calendarSampleMigrations.v3 ? "done" : null]
   ]
@@ -211,9 +207,9 @@ export function createLocalBackup(
     exportedAt,
     localState,
     data: {
-      todos: data.todos,
+      todos: removeLegacyDemoTasks(data.todos),
       todoCategories: data.todoCategories,
-      calendarEvents: data.calendarEvents
+      calendarEvents: removeLegacyDemoEvents(data.calendarEvents)
     }
   }
 }

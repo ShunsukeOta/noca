@@ -12,6 +12,7 @@ import {
   type Unsubscribe
 } from "firebase/firestore"
 import type { CalendarEvent, Task, TodoCategory } from "@/app/mock-data"
+import { isLegacyDemoRecord, isLegacyDemoWorkspaceRecord, removeLegacyDemoEvents, removeLegacyDemoTasks } from "@/features/data/legacy-demo-data"
 import { DEFAULT_TODO_CATEGORIES } from "@/features/todos/todo-category-defaults"
 import { getFirebaseConfig } from "@/features/workspace/firebase-env"
 
@@ -182,6 +183,11 @@ function parseRecords(kind: WorkspaceRecordKind, docs: Array<{ id: string; data:
     versions[snapshot.id] = revision
     if (data.deleted === true || !isRecord(data.record)) continue
     const record = { ...data.record, id: snapshot.id }
+    const sourceRecordId = typeof data.sourceRecordId === "string" ? data.sourceRecordId : data.record.id
+    if ((kind === "todos" || kind === "events") && (
+      isLegacyDemoRecord(kind, { id: sourceRecordId, title: data.record.title }) ||
+      isLegacyDemoWorkspaceRecord(kind, { id: snapshot.id, title: data.record.title })
+    )) continue
     if ((kind === "todos" && isTask(record)) || (kind === "events" && isCalendarEvent(record))) result.push({
       record: record as Task | CalendarEvent,
       order: typeof data.sortOrder === "number" ? data.sortOrder : result.length
@@ -278,6 +284,58 @@ export function observeWorkspaceData(
     }, onError)
   ]
   return () => unsubscribe.forEach(stop => stop())
+}
+
+export async function removeLegacyDemoDataFromWorkspace(workspaceId: string, uid: string) {
+  const workspaceRef = doc(getDb(), "workspaces", workspaceId)
+  const [todos, events] = await Promise.all([
+    getDocs(collection(workspaceRef, collectionNames.todos)),
+    getDocs(collection(workspaceRef, collectionNames.events))
+  ])
+  if (todos.metadata.fromCache || events.metadata.fromCache) return false
+
+  const candidates = [
+    ...todos.docs.flatMap(snapshot => {
+      const data = snapshot.data()
+      if (data.deleted === true || !isRecord(data.record)) return []
+      const sourceRecordId = typeof data.sourceRecordId === "string" ? data.sourceRecordId : data.record.id
+      return isLegacyDemoRecord("todos", { id: sourceRecordId, title: data.record.title }) ||
+        isLegacyDemoWorkspaceRecord("todos", { id: snapshot.id, title: data.record.title })
+        ? [{ kind: "todos" as const, id: snapshot.id }]
+        : []
+    }),
+    ...events.docs.flatMap(snapshot => {
+      const data = snapshot.data()
+      if (data.deleted === true || !isRecord(data.record)) return []
+      const sourceRecordId = typeof data.sourceRecordId === "string" ? data.sourceRecordId : data.record.id
+      return isLegacyDemoRecord("events", { id: sourceRecordId, title: data.record.title }) ||
+        isLegacyDemoWorkspaceRecord("events", { id: snapshot.id, title: data.record.title })
+        ? [{ kind: "events" as const, id: snapshot.id }]
+        : []
+    })
+  ]
+
+  await withConcurrency(candidates, 4, async candidate => {
+    const reference = recordReference(workspaceId, candidate.kind, candidate.id)
+    await runTransaction(getDb(), async transaction => {
+      const snapshot = await transaction.get(reference)
+      if (!snapshot.exists()) return
+      const current = snapshot.data()
+      if (current.deleted === true || !isRecord(current.record)) return
+      const sourceRecordId = typeof current.sourceRecordId === "string" ? current.sourceRecordId : current.record.id
+      if (!isLegacyDemoRecord(candidate.kind, { id: sourceRecordId, title: current.record.title }) &&
+        !isLegacyDemoWorkspaceRecord(candidate.kind, { id: candidate.id, title: current.record.title })) return
+      const revision = Number(current.revision)
+      if (!Number.isInteger(revision) || revision < 1 || revision >= 2147483647) return
+      transaction.update(reference, {
+        revision: revision + 1,
+        deleted: true,
+        updatedAt: serverTimestamp(),
+        updatedByUid: uid
+      })
+    })
+  })
+  return true
 }
 
 function recordReference(workspaceId: string, kind: WorkspaceRecordKind, id: string) {
@@ -476,6 +534,7 @@ export async function initializeWorkspaceData(
   localData: WorkspaceRecords
 ): Promise<{ snapshot: WorkspaceDataSnapshot; importedLocalData: boolean }> {
   const db = getDb()
+  await removeLegacyDemoDataFromWorkspace(workspaceId, uid)
   const deviceRef = doc(db, "workspaces", workspaceId, "syncDevices", installId)
   const existingDevice = await getDoc(deviceRef)
   let imported = existingDevice.data()?.importedLocalData === true
@@ -497,8 +556,8 @@ export async function initializeWorkspaceData(
       categoryNames.add(name)
       return true
     })
-    const todos = [...new Map(localData.todos.map(task => [task.id, task])).values()]
-    const events = [...new Map(localData.events.map(event => [event.id, event])).values()]
+    const todos = [...new Map(removeLegacyDemoTasks(localData.todos).map(task => [task.id, task])).values()]
+    const events = [...new Map(removeLegacyDemoEvents(localData.events).map(event => [event.id, event])).values()]
     const categoryOffset = (await readSnapshot(workspaceId)).records.categories.length
     await withConcurrency(categories, 4, (category, index) => createImportedRecord(workspaceId, uid, installId, "categories", category, categoryOffset + index))
     const baseOrder = Date.now()

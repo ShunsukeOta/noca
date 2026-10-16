@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react"
 import type { CalendarEvent, Task, TodoCategory } from "@/app/mock-data"
+import { isLegacyDemoRecord, isLegacyDemoWorkspaceRecord, removeLegacyDemoEvents, removeLegacyDemoTasks } from "@/features/data/legacy-demo-data"
 import { DEFAULT_TODO_CATEGORIES } from "@/features/todos/todo-category-defaults"
 import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
 import type { WorkspaceDataSnapshot, WorkspaceMutation, WorkspaceRecord, WorkspaceRecordKind, WorkspaceRecords, WorkspaceSyncConflict, WorkspaceVersions } from "@/features/workspace/firebase-workspace-data"
@@ -11,6 +12,7 @@ const TODO_OUTBOX_KEY = "noca.sync.pending.todos.v1"
 const CATEGORY_OUTBOX_KEY = "noca.sync.pending.categories.v1"
 const EVENT_OUTBOX_KEY = "noca.sync.pending.events.v1"
 const importedKey = (workspaceId: string) => `noca.shared-data.imported.v1:${workspaceId}`
+const legacyDemoCleanupKey = (workspaceId: string) => `noca.shared-data.demo-cleanup.v1:${workspaceId}`
 
 const emptyRecords: WorkspaceRecords = { todos: [], categories: DEFAULT_TODO_CATEGORIES, events: [] }
 const emptyVersions: WorkspaceVersions = { todos: {}, categories: {}, events: {} }
@@ -50,7 +52,11 @@ function readCache(workspaceId: string): CacheState {
       return { records: emptyRecords, versions: emptyVersions, conflicts: [], lastSyncedAt: null }
     }
     return {
-      records: parsed.records as WorkspaceRecords,
+      records: {
+        todos: removeLegacyDemoTasks(parsed.records.todos as Task[]),
+        categories: parsed.records.categories as TodoCategory[],
+        events: removeLegacyDemoEvents(parsed.records.events as CalendarEvent[])
+      },
       versions: parsed.versions ?? emptyVersions,
       conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts as WorkspaceSyncConflict[] : [],
       lastSyncedAt: typeof parsed.lastSyncedAt === "number" ? parsed.lastSyncedAt : null
@@ -74,7 +80,11 @@ function readOutbox(workspaceId: string) {
           typeof item.id === "string" && !item.id.includes("/") &&
           (item.action === "upsert" || item.action === "delete") &&
           Number.isInteger(item.baseRevision) && item.baseRevision >= 0 &&
-          (item.action === "delete" || !!item.record)
+          (item.action === "delete" || (!!item.record &&
+            !(kind === "todos" && isLegacyDemoRecord("todos", item.record)) &&
+            !(kind === "todos" && isLegacyDemoWorkspaceRecord("todos", item.record)) &&
+            !(kind === "events" && isLegacyDemoRecord("events", item.record)) &&
+            !(kind === "events" && isLegacyDemoWorkspaceRecord("events", item.record))))
         ))
       }
     }
@@ -360,8 +370,25 @@ export function WorkspaceDataSyncProvider({ children }: { children: ReactNode })
   }, [isActive, workspaceId, uid, scope, loadService, setSnapshot])
 
   useEffect(() => {
-    if (!isActive || !workspaceId) return
+    if (!isActive || !workspaceId || !uid) return
     let disposed = false
+    const cleanupLegacyDemoData = () => {
+      if (!navigator.onLine) return
+      try {
+        if (localStorage.getItem(legacyDemoCleanupKey(workspaceId)) === "done") return
+      } catch {
+        return
+      }
+      void loadService().then(service => service.removeLegacyDemoDataFromWorkspace(workspaceId, uid)).then(completed => {
+        if (disposed || !completed) return
+        try { localStorage.setItem(legacyDemoCleanupKey(workspaceId), "done") } catch { /* Cleanup is idempotent. */ }
+      }).catch(() => {
+        // The UI and offline cache already hide the old records. Retry on the
+        // next online event if a remote cleanup could not complete.
+      })
+    }
+    cleanupLegacyDemoData()
+    window.addEventListener("online", cleanupLegacyDemoData)
     void loadService().then(service => {
       if (disposed) return
       unsubscribeRef.current?.()
@@ -383,10 +410,11 @@ export function WorkspaceDataSyncProvider({ children }: { children: ReactNode })
     })
     return () => {
       disposed = true
+      window.removeEventListener("online", cleanupLegacyDemoData)
       unsubscribeRef.current?.()
       unsubscribeRef.current = null
     }
-  }, [isActive, workspaceId, loadService, setSnapshot, flushQueue])
+  }, [isActive, workspaceId, uid, loadService, setSnapshot, flushQueue])
 
   useEffect(() => {
     if (!isActive) return

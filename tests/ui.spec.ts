@@ -12,10 +12,49 @@ async function seedPairedWorkspace(page: Page) {
   }, pairedMembers)
 }
 
+async function seedPreviewFixtures(page: Page) {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("noca-test-fixtures-seeded") === "yes") return
+    sessionStorage.setItem("noca-test-fixtures-seeded", "yes")
+    const date = (offset: number) => {
+      const value = new Date()
+      value.setDate(value.getDate() + offset)
+      const pad = (part: number) => String(part).padStart(2, "0")
+      return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`
+    }
+    localStorage.setItem("noca.todos.v1", JSON.stringify([
+      { id: "test-t1", title: "週末のカフェを探す", category: "おでかけ", dueDate: date(0), done: false, by: "A" },
+      { id: "test-t2", title: "洗剤と柔軟剤を買う", category: "暮らし", dueDate: date(1), done: false, by: "B" },
+      { id: "test-t3", title: "旅行の宿泊先を決める", category: "ふたり", dueDate: date(4), done: false, by: "A" },
+      { id: "test-t4", title: "部屋の片付け", category: "暮らし", done: false, by: "B" },
+      { id: "test-t5", title: "次のお出かけの候補を送る", category: "おでかけ", done: true, by: "B" }
+    ]))
+    localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
+      { id: "test-e1", title: "夜ごはん", date: date(0), time: "19:00", endTime: "20:30", category: "ふたり", by: "A" },
+      { id: "test-e2", title: "ランチに行く", date: date(2), time: "12:30", category: "おでかけ", by: "B" },
+      { id: "test-e3", title: "買い出し", date: date(4), time: "15:00", category: "暮らし", by: "A" },
+      { id: "test-e4", title: "映画を観る", date: date(9), time: "18:00", category: "おでかけ", by: "B" },
+      { id: "test-demo-a-morning", title: "午前の用事", date: date(0), time: "09:00", endTime: "14:00", category: "暮らし", address: "駅前", by: "A" },
+      { id: "test-demo-b-hair", title: "美容室", date: date(0), time: "11:00", endTime: "14:40", category: "おでかけ", by: "B" },
+      { id: "test-demo-a-payday", title: "給料日", date: date(0), category: "暮らし", by: "A" },
+      { id: "test-demo-b-dayoff", title: "お休み", date: date(0), category: "ふたり", by: "B" },
+      { id: "test-demo-next-a", title: "買い物に行く", date: date(1), time: "09:30", endTime: "13:30", category: "暮らし", by: "A" },
+      { id: "test-demo-next-b", title: "友だちとランチ", date: date(1), time: "11:15", endTime: "14:40", category: "おでかけ", by: "B" },
+      { id: "test-demo-next-a-all", title: "在宅の日", date: date(1), category: "暮らし", by: "A" },
+      { id: "test-demo-next-b-all", title: "休暇", date: date(1), category: "ふたり", by: "B" },
+      { id: "test-demo-v3-a-meeting", title: "打ち合わせ", date: date(0), time: "11:00", endTime: "12:00", category: "暮らし", by: "A" },
+      { id: "test-demo-v3-both-all", title: "記念日", date: date(0), category: "ふたり", by: "both" },
+      { id: "test-demo-v3-both-timed", title: "ふたりで買い物", date: date(0), time: "15:00", endTime: "16:30", category: "ふたり", by: "both" },
+      { id: "test-demo-v3-next-both", title: "夜の散歩", date: date(1), time: "19:00", endTime: "20:00", category: "ふたり", by: "both" }
+    ]))
+  })
+}
+
 // Existing A/B behavior tests explicitly use a paired preview. Solo-first behavior
 // is covered in an isolated, unseeded browser context below.
 test.beforeEach(async ({ page }) => {
   await seedPairedWorkspace(page)
+  await seedPreviewFixtures(page)
 })
 
 for (const width of [375, 390, 430]) {
@@ -104,7 +143,7 @@ test("TODO due date appears on calendar, completion removes it", async ({ page }
   await expect(page.getByRole("button", { name: "旅行の準備をするを編集" })).toHaveCount(0)
 })
 
-test("theme switch and mock task completion", async ({ page }) => {
+test("theme switch and task completion", async ({ page }) => {
   await page.goto("/todo")
   await expect(page.getByRole("button", { name: "ダークモードに切り替え" })).toHaveCount(0)
   await page.getByRole("link", { name: "設定を開く" }).click()
@@ -959,12 +998,15 @@ test("new local workspace starts with one member and hides B owner UI", async ({
   await expect(page.getByTestId("person-header-A")).toHaveCount(0)
   await expect(page.getByTestId("person-header-B")).toHaveCount(0)
   const soloLane = page.getByTestId("timeline-lane-self")
-  const overlapSummary = soloLane.getByTestId("overlap-summary-demo-a-morning")
-  await expect(overlapSummary).toBeVisible()
-  await overlapSummary.click()
-  await expect(page.getByTestId("overlap-sheet").getByText("美容室", { exact: true })).toBeVisible()
-  await page.keyboard.press("Escape")
-  await expect(page.getByTestId("all-day-self").getByRole("button", { name: "記念日を編集" })).toBeVisible()
+  await expect(soloLane.getByRole("button", { name: "午前の用事を編集" })).toHaveCount(0)
+  await expect(page.getByTestId("all-day-strip")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "記念日を編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "週末のカフェを探すを編集" })).toHaveCount(0)
+  const initialStorage = await page.evaluate(() => ({
+    todos: localStorage.getItem("noca.todos.v1"),
+    events: localStorage.getItem("noca.calendar.events.v1")
+  }))
+  expect(initialStorage).toEqual({ todos: "[]", events: "[]" })
 
   await page.getByRole("button", { name: "カレンダーを追加" }).click()
   await expect(page.getByRole("group", { name: "予定の担当" })).toHaveCount(0)
@@ -1043,27 +1085,47 @@ test("calendar can create and edit a B person's event including an all-day switc
   await expect(page.getByTestId("timeline-lane-B").getByRole("button", { name: "Bの新しい予定を編集" })).toHaveCount(0)
 })
 
-test("calendar upgrades existing preview samples once and preserves edited entries", async ({ page }) => {
+test("old exact demo records are removed while edited and user records remain", async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem("seed-test")) return
     sessionStorage.setItem("seed-test", "yes")
     const date = new Date()
     const pad = (x: number) => String(x).padStart(2, "0")
     const d = date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate())
+    localStorage.setItem("noca.todos.v1", JSON.stringify([
+      { id: "t1", title: "週末のカフェを探す", category: "おでかけ", dueDate: d, done: false, by: "A" },
+      { id: "t2", title: "洗剤と柔軟剤を買う（変更済み）", category: "暮らし", done: false, by: "B" },
+      { id: "user-task", title: "自分で追加したTODO", category: "暮らし", done: false, by: "A" }
+    ]))
     localStorage.setItem("noca.calendar.events.v1", JSON.stringify([
-      { id: "e1", title: "夜ごはん（変更済み）", date: d, category: "ふたり", by: "A", time: "19:00" }
+      { id: "e1", title: "夜ごはん", date: d, category: "ふたり", by: "A", time: "19:00" },
+      { id: "e2", title: "ランチに行く", date: d, category: "おでかけ", by: "B", time: "12:30" },
+      { id: "demo-v3-both-all", title: "記念日", date: d, category: "ふたり", by: "both" },
+      { id: "demo-a-morning", title: "午前の用事（変更済み）", date: d, time: "09:00", endTime: "14:00", category: "暮らし", by: "A" },
+      { id: "user-event", title: "自分で追加した予定", date: d, category: "暮らし", by: "A", time: "16:00" }
     ]))
     localStorage.removeItem("noca.calendar.samples.v2")
+    localStorage.removeItem("noca.calendar.samples.v3")
   })
+  await page.goto("/todo")
+  await expect(page.getByRole("button", { name: "週末のカフェを探すを編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "洗剤と柔軟剤を買う（変更済み）を編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "自分で追加したTODOを編集" })).toBeVisible()
+  const storedTodos = await page.evaluate(() => JSON.parse(localStorage.getItem("noca.todos.v1") || "[]"))
+  expect(storedTodos.map((task: { id: string }) => task.id)).toEqual(["t2", "user-task"])
+
   await page.goto("/calendar")
-  await expect(page.getByRole("button", { name: "夜ごはん（変更済み）を編集" })).toBeVisible()
-  await expect(page.getByTestId("all-day-A").getByRole("button", { name: "給料日を編集" })).toBeVisible()
-  await page.getByRole("button", { name: "給料日を編集" }).click()
-  await page.getByRole("button", { name: "この予定を削除" }).click()
-  await expect(page.getByRole("button", { name: "給料日を編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "夜ごはんを編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "ランチに行くを編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "記念日を編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "午前の用事（変更済み）を編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "自分で追加した予定を編集" })).toBeVisible()
+  const storedEvents = await page.evaluate(() => JSON.parse(localStorage.getItem("noca.calendar.events.v1") || "[]"))
+  expect(storedEvents.map((event: { id: string }) => event.id)).toEqual(["demo-a-morning", "user-event"])
   await page.reload()
-  await expect(page.getByRole("button", { name: "給料日を編集" })).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "夜ごはん（変更済み）を編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "夜ごはんを編集" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "午前の用事（変更済み）を編集" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "自分で追加した予定を編集" })).toBeVisible()
 })
 
 test("two-person timeline fits 320px iPhone without horizontal overflow", async ({ browser }) => {
@@ -1179,8 +1241,8 @@ test("demo overlap keeps the long appointment in place and summarizes the shorte
   await page.goto("/calendar")
   const lane = page.getByTestId("timeline-lane-A")
   const long = lane.getByRole("button", { name: "午前の用事を編集" })
-  const summary = lane.getByTestId("overlap-summary-demo-a-morning")
-  const label = page.getByTestId("event-label-demo-a-morning")
+  const summary = lane.getByTestId("overlap-summary-test-demo-a-morning")
+  const label = page.getByTestId("event-label-test-demo-a-morning")
   await expect(long).toBeVisible()
   await expect(lane.getByRole("button", { name: "打ち合わせを編集" })).toHaveCount(0)
   await expect(long).toHaveAttribute("data-depth", "0")

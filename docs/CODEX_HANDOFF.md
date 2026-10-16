@@ -28,6 +28,7 @@ The previous Phase 2 baseline passed `npm run build`, `npm run check:bundle`, **
 | Shared shell, dock, fixed header, local date, light/dark | Implemented |
 | TODO CRUD, user-managed categories and live counts, complete/restore, undo | Implemented with `localStorage`; category configuration is `noca.todo.categories.v1`. New-task creation keeps the sheet open for consecutive entry, briefly shows a green check over the title input's right edge, clears task details after each save, preserves the selected category and focuses the title field; a valid draft is also added when the sheet closes. Editing saves on submit or on close, without a discard confirmation. |
 | Calendar month grid, event CRUD, solo-first timeline, paired A/B/both editor, overlap summary chips and edit sheet | Device-local with `localStorage` until shared sync activation; then workspace Firestore CRUD/live updates |
+| Initial TODO/calendar data | Starts empty. A load filter removes exact untouched legacy demo ID/title pairs from local data, backups and shared caches; edited titles and unrelated user records are preserved. Online shared workspaces also soft-delete matching imported demo records. |
 | Date-constrained TODOs shown in calendar | Implemented as references, not separate event copies |
 | Memo tab | Retained in global navigation; displays only **「メモ機能は開発中です」** |
 | Memo list/editor/storage | Deferred and removed from the active app; the memo tab has no + action |
@@ -78,13 +79,13 @@ Do not silently mark Phase 2 or 3 done. Firebase environment configuration was p
 
 ## 6. Current technical cautions
 
-- **Source of truth depends on explicit activation:** before activation, TODO/categories/events use legacy local keys; after activation, active stores use workspace Firestore with per-workspace cache/outbox keys. Logout returns to original device-local data. Theme remains `noca.theme`; samples use `noca.calendar.samples.v2/v3`. The app does not use a memo storage key. See [ARCHITECTURE.md](ARCHITECTURE.md).
+- **Source of truth depends on explicit activation:** before activation, TODO/categories/events use legacy local keys; after activation, active stores use workspace Firestore with per-workspace cache/outbox keys. Logout returns to original device-local data. Theme remains `noca.theme`; `noca.calendar.samples.v2/v3` remain only for old backup-format compatibility and no longer trigger sample insertion. The app does not use a memo storage key. See [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Local records are not users:** TODOs and events store A/B/both owner values. Accepted workspace members supply A/B for display, but these values are not mapped to authenticated user IDs and must not be used as authorization. After sync activation, item data is shared through workspace membership.
 - **Paired calendar layout:** when membership contains A and B, show only A/B headers, conditionally show the all-day row, place shared all-day items in a full-width A+B bar, and use the 54px-per-hour transparent timeline with overlap summary chips. Firebase membership can supply B after invite acceptance; shared event data requires explicit sync activation.
 - `package-lock.json` is committed. CI currently uses `npm install` on Node 22; confirm CI behavior before changing it to `npm ci`.
 - TODO category configuration is stored separately from TODO records. Existing category names absent from that configuration are retained as neutral categories at load; rename updates matching task category strings, while delete moves them to the user-selected destination. Preserve this behavior when changing the task schema.
 - **CI is Chromium**, not real iPhone. WebKit, manual QA, multi-user sync and production availability are unproven.
-- Demo data in `src/app/mock-data.ts` uses today's local date at module load. Tests which need deterministic values must control date or seed localStorage before reload.
+- Runtime demo records were removed. UI tests seed separate fixtures with IDs that cannot be mistaken for legacy production samples.
 - `docs/PHASE1*_REPORT.md` are old snapshots; read current stores/components rather than copying their old feature inventory or counts.
 - Preserve user local data when updating the store. Existing calendar sample migrations are subtle: version markers and `demo-*` IDs must not produce duplicate/reappearing deleted items.
 - Existing drawers should remain usable when the iPhone keyboard is raised; preserve `visualViewport`/safe-area behavior and don't forcibly focus inputs when opening.

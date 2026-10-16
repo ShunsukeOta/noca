@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, type SetStateAction } from "react"
 import { format, isValid, parseISO } from "date-fns"
-import { mockEvents, type CalendarEvent, type TaskCategory } from "@/app/mock-data"
+import { type CalendarEvent, type TaskCategory } from "@/app/mock-data"
+import { removeLegacyDemoEvents } from "@/features/data/legacy-demo-data"
 import { useWorkspaceDataSync } from "@/features/workspace/workspace-data-sync-context"
 
 export const CALENDAR_EVENT_STORAGE_KEY = "noca.calendar.events.v1"
@@ -42,28 +43,20 @@ function isCalendarEvent(value: unknown): value is CalendarEvent {
     (item.memo === undefined || typeof item.memo === "string")
 }
 
-function readEvents(): CalendarEvent[] {
+function readEvents(): { records: CalendarEvent[]; shouldPersist: boolean } {
+  let raw: string | null
   try {
-    const raw = localStorage.getItem(CALENDAR_EVENT_STORAGE_KEY)
-    if (raw === null) return mockEvents
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed) || !parsed.every(isCalendarEvent)) return mockEvents
-    // One-time upgrades for calendars still containing bundled sample IDs.
-    // Merge v2 and v3 in the SAME initialization, without touching user items.
-    const hasSamples = parsed.some(event =>
-      ["e1", "e2", "e3", "e4"].includes(event.id) || event.id.startsWith("demo-"))
-    if (!hasSamples) return parsed
-    const ids = new Set(parsed.map(event => event.id))
-    const wantsV2 = localStorage.getItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v2) !== "done"
-    const wantsV3 = localStorage.getItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v3) !== "done"
-    const additional = mockEvents.filter(event => {
-      if (ids.has(event.id)) return false
-      if (event.id.startsWith("demo-v3-")) return wantsV3
-      return event.id.startsWith("demo-") && wantsV2
-    })
-    return [...parsed, ...additional]
+    raw = localStorage.getItem(CALENDAR_EVENT_STORAGE_KEY)
   } catch {
-    return mockEvents
+    return { records: [], shouldPersist: false }
+  }
+  if (raw === null) return { records: [], shouldPersist: true }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed) || !parsed.every(isCalendarEvent)) return { records: [], shouldPersist: false }
+    return { records: removeLegacyDemoEvents(parsed), shouldPersist: true }
+  } catch {
+    return { records: [], shouldPersist: false }
   }
 }
 
@@ -90,11 +83,16 @@ const CalendarContext = createContext<CalendarContextValue | null>(null)
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
   const sharedData = useWorkspaceDataSync()
-  const [deviceEvents, setDeviceEvents] = useState<CalendarEvent[]>(readEvents)
+  const [initialEvents] = useState(readEvents)
+  const [deviceEvents, setDeviceEvents] = useState<CalendarEvent[]>(initialEvents.records)
+  const [shouldPersistEvents, setShouldPersistEvents] = useState(initialEvents.shouldPersist)
   const events = sharedData.isActive ? sharedData.events : deviceEvents
   const setEvents = useCallback((updater: SetStateAction<CalendarEvent[]>) => {
     if (sharedData.isActive) sharedData.updateEvents(updater)
-    else setDeviceEvents(updater)
+    else {
+      setShouldPersistEvents(true)
+      setDeviceEvents(updater)
+    }
   }, [sharedData.isActive, sharedData.updateEvents])
   const [selectedDate, setSelectedDateState] = useState(() => format(new Date(), "yyyy-MM-dd"))
   const [editor, setEditor] = useState<EventEditor | null>(null)
@@ -102,26 +100,23 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const [storageError, setStorageError] = useState(false)
 
   useEffect(() => {
+    if (!shouldPersistEvents) return
     try {
       localStorage.setItem(CALENDAR_EVENT_STORAGE_KEY, JSON.stringify(deviceEvents))
-      // Mark migration only after saving the added samples. React StrictMode can
-      // initialize state twice before effects run, so the initializer stays pure.
-      if (deviceEvents.some(event => event.id.startsWith("demo-"))) {
-        localStorage.setItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v2, "done")
-      }
-      if (deviceEvents.some(event => event.id.startsWith("demo-v3-"))) {
-        localStorage.setItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v3, "done")
-      }
       setStorageError(false)
     } catch {
       setStorageError(true)
     }
-  }, [deviceEvents])
+  }, [deviceEvents, shouldPersistEvents])
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (sharedData.isActive) return
-      if (event.key === CALENDAR_EVENT_STORAGE_KEY) setDeviceEvents(readEvents())
+      if (event.key === CALENDAR_EVENT_STORAGE_KEY) {
+        const next = readEvents()
+        setDeviceEvents(next.records)
+        setShouldPersistEvents(next.shouldPersist)
+      }
     }
     window.addEventListener("storage", sync)
     return () => window.removeEventListener("storage", sync)
@@ -169,7 +164,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   }, [deleted, setEvents])
   const dismissDeleted = useCallback(() => setDeleted(null), [])
   const restoreLocalData = useCallback((nextEvents: CalendarEvent[]) => {
-    setEvents(nextEvents)
+    setEvents(removeLegacyDemoEvents(nextEvents))
     setEditor(null)
     setDeleted(null)
   }, [setEvents])

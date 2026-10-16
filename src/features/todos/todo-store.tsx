@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, type SetStateAction } from "react"
-import { mockTasks, type Task, type TaskCategory, type TodoCategory } from "@/app/mock-data"
+import { type Task, type TaskCategory, type TodoCategory } from "@/app/mock-data"
 import { DEFAULT_TODO_CATEGORIES } from "@/features/todos/todo-category-defaults"
+import { removeLegacyDemoTasks } from "@/features/data/legacy-demo-data"
 import { useWorkspaceDataSync } from "@/features/workspace/workspace-data-sync-context"
 
 export const TODO_STORAGE_KEY = "noca.todos.v1"
@@ -88,32 +89,41 @@ function loadCategories(): TodoCategory[] {
   }
 }
 
-function loadTodos(): Task[] {
+function loadTodos(): { records: Task[]; shouldPersist: boolean } {
+  let raw: string | null
   try {
-    const raw = localStorage.getItem(TODO_STORAGE_KEY)
-    if (raw === null) return mockTasks
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed) || !parsed.every(isTask)) return mockTasks
-    return parsed
+    raw = localStorage.getItem(TODO_STORAGE_KEY)
   } catch {
-    return mockTasks
+    return { records: [], shouldPersist: false }
+  }
+  if (raw === null) return { records: [], shouldPersist: true }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed) || !parsed.every(isTask)) return { records: [], shouldPersist: false }
+    return { records: removeLegacyDemoTasks(parsed), shouldPersist: true }
+  } catch {
+    return { records: [], shouldPersist: false }
   }
 }
 
 export function TodoProvider({ children }: { children: ReactNode }) {
   const sharedData = useWorkspaceDataSync()
   const [initial] = useState(() => ({ todos: loadTodos(), categories: loadCategories() }))
-  const [deviceTodos, setDeviceTodos] = useState<Task[]>(initial.todos)
+  const [deviceTodos, setDeviceTodos] = useState<Task[]>(initial.todos.records)
+  const [shouldPersistTodos, setShouldPersistTodos] = useState(initial.todos.shouldPersist)
   const [deviceCategories, setDeviceCategories] = useState<TodoCategory[]>(() => {
     const configured = initial.categories
-    const missing = initial.todos.map(task => task.category).filter(name => !configured.some(category => category.name === name))
+    const missing = initial.todos.records.map(task => task.category).filter(name => !configured.some(category => category.name === name))
     return [...configured, ...[...new Set(missing)].map(name => ({ id: crypto.randomUUID(), name, tone: "neutral" as const }))]
   })
   const todos = sharedData.isActive ? sharedData.todos : deviceTodos
   const categories = sharedData.isActive ? sharedData.categories : deviceCategories
   const setTodos = useCallback((updater: SetStateAction<Task[]>) => {
     if (sharedData.isActive) sharedData.updateTodos(updater)
-    else setDeviceTodos(updater)
+    else {
+      setShouldPersistTodos(true)
+      setDeviceTodos(updater)
+    }
   }, [sharedData.isActive, sharedData.updateTodos])
   const setCategories = useCallback((updater: SetStateAction<TodoCategory[]>) => {
     if (sharedData.isActive) sharedData.updateCategories(updater)
@@ -125,13 +135,14 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   const [deleted, setDeleted] = useState<DeletedTodo | null>(null)
 
   useEffect(() => {
+    if (!shouldPersistTodos) return
     try {
       localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(deviceTodos))
       setTodosStorageError(false)
     } catch {
       setTodosStorageError(true)
     }
-  }, [deviceTodos])
+  }, [deviceTodos, shouldPersistTodos])
 
   useEffect(() => {
     try {
@@ -148,8 +159,9 @@ export function TodoProvider({ children }: { children: ReactNode }) {
       if (event.key !== TODO_STORAGE_KEY && event.key !== TODO_CATEGORY_STORAGE_KEY) return
       const nextTodos = loadTodos()
       const nextCategories = loadCategories()
-      const missing = nextTodos.map(task => task.category).filter(name => !nextCategories.some(category => category.name === name))
-      setDeviceTodos(nextTodos)
+      const missing = nextTodos.records.map(task => task.category).filter(name => !nextCategories.some(category => category.name === name))
+      setDeviceTodos(nextTodos.records)
+      setShouldPersistTodos(nextTodos.shouldPersist)
       setDeviceCategories([...nextCategories, ...[...new Set(missing)].map(name => ({ id: crypto.randomUUID(), name, tone: "neutral" as const }))])
     }
     window.addEventListener("storage", sync)
@@ -242,7 +254,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   }, [setCategories])
 
   const restoreLocalData = useCallback((nextTodos: Task[], nextCategories: TodoCategory[]) => {
-    setTodos(nextTodos)
+    setTodos(removeLegacyDemoTasks(nextTodos))
     setCategories(nextCategories)
     setEditor(null)
     setDeleted(null)
