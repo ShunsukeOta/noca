@@ -6,7 +6,7 @@
 
 ## 1. Project goal and design intent
 
-A minimalist, visually polished iPhone PWA for **two people** to manage TODOs, plans and memos. The long-term purpose is to share data between two users; **the current app is a one-device local preview**. Japanese copy, low information clutter, consistent category tones, sticky header, safe-area-aware floating bottom dock, fast but restrained Motion animation.
+A minimalist, visually polished iPhone PWA for **two people** to manage TODOs, plans and memos. Without Firebase configuration, the app is a one-device local preview; configured builds now support real Google accounts and workspace membership, while TODO/calendar data remains local. Japanese copy, low information clutter, consistent category tones, sticky header, safe-area-aware floating bottom dock, fast but restrained Motion animation.
 
 Design decisions established with the maintainer:
 - **Do not** add a fourth global tab.
@@ -19,65 +19,64 @@ Design decisions established with the maintainer:
 - For a same-owner timed overlap group, keep only the longest appointment as the main block at its true start time. Show the remaining count in an hour-aligned **他N件** chip; tapping it opens an exact-time event list with edit actions. Non-overlapping events remain individual cards, including readable five-minute items.
 - Do not add decorative introductions or large headings to the three main screens. Maintain the current visual language, dark mode and accessibility.
 
-## 2. Verified baseline (not hypothetical)
+## 2. Current verified state
 
-**Latest recorded successful CI before the current UI changes:**
-[GitHub Actions run 38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385) — **43/43 Playwright Chromium tests passed**, TypeScript/Vite build passed. The documentation-only commit may run CI again; check the new run. Prior per-phase reports list old counts.
+The current Phase 2 source passes `npm run build`, `npm run check:bundle`, **50/50 Playwright Chromium tests**, and **4/4 production PWA tests**. E2E coverage is local-preview mode because `.env.local` has no Firebase values. Firebase-backed login and invitation behavior still needs a deployed Preview and two-account verification. Older per-phase reports contain stale counts.
 
 | Area | Status on this baseline |
 | --- | --- |
 | Shared shell, dock, fixed header, local date, light/dark | Implemented |
 | TODO CRUD, user-managed categories and live counts, complete/restore, undo | Implemented with `localStorage`; category configuration is `noca.todo.categories.v1`. New-task creation keeps the sheet open for consecutive entry, briefly shows a green check over the title input's right edge, clears task details after each save, preserves the selected category and focuses the title field; a valid draft is also added when the sheet closes. Editing saves on submit or on close, without a discard confirmation. |
-| Calendar month grid, local event CRUD, solo-first timeline, paired A/B/both editor, overlap summary chips and edit sheet | Implemented with `localStorage`; no invite flow yet |
+| Calendar month grid, local event CRUD, solo-first timeline, paired A/B/both editor, overlap summary chips and edit sheet | Implemented with `localStorage`; Firebase membership can switch the UI to A/B, but event data is not shared |
 | Date-constrained TODOs shown in calendar | Implemented as references, not separate event copies |
 | Memo tab | Retained in global navigation; displays only **「メモ機能は開発中です」** |
 | Memo list/editor/storage | Deferred and removed from the active app; the memo tab has no + action |
-| Membership display | **Implemented locally:** starts with 「自分」 only; hides B, owner controls and the paired calendar layout until a B member is supplied. No sign-in, invite, acceptance or sharing is implemented. |
+| Membership display | Starts with 「自分」 in local preview. With Firebase configured, Google-authenticated Firestore members drive the actual A/B count. |
 | Shared UI foundation (theme tokens, fields, buttons, checkbox/switch, owner/category controls, confirm/Undo) | Implemented; settings manage TODO categories |
 | Local data backup | **Implemented:** Settings exports and restores TODOs, TODO categories, calendar events and sample-migration flags as versioned JSON. Restore validates the file, previews counts, requires explicit replacement confirmation and rolls back storage writes on failure. |
-| Login, pairing, actual pair sharing, Firebase/Firestore | **NOT implemented** |
-| Push notifications, real iOS Safari/standalone sign-off | **NOT implemented/verified** |
+| Google login, workspace creation, invite link and acceptance | Source implemented. The maintainer registered the Firebase Web app, enabled Google Auth, created Firestore, deployed the Rules, authorized `noca-delta.vercel.app`, and added the four client config values to Vercel Production and Preview. Live sign-in/invite checks remain. |
+| TODO/calendar sharing and local-to-cloud migration | **NOT implemented.** Both stores remain local; existing localStorage keys/data are unchanged. |
+| Push notifications | Not implemented |
+| iPhone Safari/standalone QA | Maintainer reports Phase 1E complete; device and case details are not in the repository. New Phase 2 screens have not been checked on iPhone. |
 
-The optimization pass passed local build, bundle-budget, E2E (**49/49**) and production PWA (**4/4**) checks before this membership-display change. The optimization commit is on main as `ffc8b7e`; its GitHub Actions run is [run 38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243). On the current solo-first branch, `npm run build` passes and the full Playwright E2E suite passes (**50/50**). iPhone Safari/standalone remains unverified.
+The earlier optimization commit `ffc8b7e` passed build, bundle, E2E (**49/49**) and production PWA (**4/4**) checks; GitHub Actions run [38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) is recorded. The current Phase 2 tree also passes build, bundle, **50/50 E2E**, and **4/4 PWA**. The maintainer reports Phase 1 iPhone Safari/standalone QA complete; new Phase 2 screens remain unverified on-device.
 
-The performance pass now defers `/calendar`, the two editor sheets, Settings' category manager and Motion's layout feature bundle. Pointer/focus intent preloads interaction chunks. Settings' header and theme appear immediately while categories load; a delayed-chunk production test verifies this. The latest build's synchronous entry is **425.59 kB raw / 136.01 kB gzip**, down from **571.82 kB / 182.96 kB gzip** before this pass (about 26% less gzip). The largest chunk is under 500 kB. The PWA still precaches all chunks for offline use (about 638 KiB); production Chromium tests verify offline calendar, settings and both editors. Bundle budgets are enforced by `npm run check:bundle` in CI. Real iPhone Safari/standalone performance and interaction remain to be measured on a device.
+The performance pass defers `/calendar`, both editor sheets, Settings' category manager, the Firebase membership bridge and Motion's layout feature bundle. The current initial JavaScript is **436.08 kB raw / 139.45 kB gzip**; the largest chunk is **458.21 kB**. The PWA precache is **650.71 KiB** against a **652 KiB** budget. Network-only Firebase SDK/service and invitation-route chunks are excluded from offline precache; local TODO/calendar pages and editors remain offline-capable (PWA 4/4).
 
 **Files that should be opened first in a relevant task:** `src/styles/globals.css`, `src/components/ui/`, `src/components/category-ui.tsx`, `src/components/todo-category-settings.tsx`, `src/components/owner-ui.tsx`, `src/components/app-shell.tsx`, `src/pages/todo-page.tsx`, `src/pages/calendar-page.tsx`, `src/components/calendar-day-timeline.tsx`, `src/pages/memo-page.tsx`, `src/features/todos/todo-store.tsx`, `src/features/calendar/calendar-store.tsx`, `tests/ui.spec.ts`.
 
-## 3. NEXT: iPhone validation and shared-data groundwork
+## 3. NEXT: connect and verify Phase 2
 
-The maintainer requested a staged plan for app optimization, real login/two-person operation, and database migration. Firebase Authentication + Firestore is the current documented candidate, not an implemented or final provider decision. Compare it with the relational alternative only against the product's confirmed offline, query, migration and operational needs.
+The product specification selects Firebase Authentication + Firestore. Current Phase 2 source uses Firestore rules and atomic client transactions for membership and does not add a callable backend function.
 
-Recommended order:
-1. Make one short iPhone check of the solo header, one-column calendar and editor. Avoid repeating the full Chromium matrix; it does not prove Safari behavior.
-2. Implement actual account and invite membership so a real accepted second member supplies the paired state. Preserve existing `localStorage` keys and sample migration behavior.
-3. Define local-to-cloud migration and conflict/Undo behavior around the existing `noca.local-backup` v1 envelope.
-4. Build a small authenticated two-member vertical slice with server-enforced membership before migrating all TODO/calendar data.
+Current order:
+1. Deploy the current source to a Vercel Preview using the configured Firebase environment values; add that exact Preview hostname to Firebase Authentication's authorized domains if required.
+2. Verify sign-in, workspace creation, invite acceptance, reissue/expiry, one-use behavior, third-member denial and non-member read denial with separate accounts. Record the results before marking Phase 2 complete.
+3. Check the new Settings and invite screens in Safari/PWA; the maintainer's earlier Phase 1E check predates these screens.
+4. Plan Phase 3 local-to-cloud migration and conflict/Undo behavior around the existing `noca.local-backup` v1 envelope before moving any data.
 
 Memo CRUD remains deferred until its user workflow is specified.
 
-## 4. Phase 1E — iPhone Safari/PWA QA
+## 4. Phase 1E — iPhone Safari/PWA QA (maintainer-confirmed)
 
-Memo CRUD has been deferred. The global memo tab remains and shows only **「メモ機能は開発中です」**; the memo + action, list, editor, sample records, provider and persistence code are removed. Verify that the placeholder and three-tab navigation remain clear at 320/375/390/430px, in light/dark mode and in reduced-motion mode. The memo route is not an editor or storage test target.
+The maintainer reports the original Phase 1E device QA complete. Device, OS version and per-case evidence were not added to the repository. The newer Phase 2 Settings and invite screens were not part of that earlier QA. Memo CRUD remains deferred. The global memo tab remains and shows only **「メモ機能は開発中です」**; memo list/editor/storage code is deferred.
 
 If an earlier app version wrote `noca.notes.v1`, leave the key untouched. The current app neither reads nor removes that local data.
 
-Do not silently mark Phase 2 or 3 done.
-
-This is a proposal/acceptance checklist, not an unrequested task authorization.
+Do not silently mark Phase 2 or 3 done. Firebase Rules and environment configuration are prepared, but the current app source still needs a Preview deployment and live account/invitation verification. TODO/calendar sharing and migration remain Phase 3.
 
 ## 5. Later phases
 
-- **1E — actual iPhone Safari + Home Screen PWA QA:** keyboard/sheets, native date/time pickers, safe-area/Dock, system theme, screen reader, offline/reload, 320–430px layouts. Use [UI_QA.md](UI_QA.md) as a checklist; record model, iOS version and mode. Chromium screenshots alone are not iPhone WebKit evidence.
-- **2 — actual identities and invitations:** Google login, a two-member workspace, invite flow and server-validated membership; design Firestore rules and failure states before integrating.
+- **1E — actual iPhone Safari + Home Screen PWA QA:** maintainer reports completion; device/case details are not recorded. The Phase 2 screens still need a focused device check.
+- **2 — actual identities and invitations:** Google login, one workspace per account, invite flow and server-validated membership. Source, Firebase project setup, deployed Rules and Vercel config are ready; Preview and live acceptance checks remain.
 - **3 — real shared persistence:** Firestore Todo/Event/Note CRUD with secure workspace filtering, data migration/backup, concurrency/conflict handling, sync and error feedback.
 - **4–5 — PWA reliability, notifications only when requested, release QA.**
 
 ## 6. Current technical cautions
 
-- **Source of truth is local:** `noca.todos.v1`, `noca.calendar.events.v1`, `noca.theme`; samples use `noca.calendar.samples.v2/v3` markers. The current app does not use any memo storage key. See [ARCHITECTURE.md](ARCHITECTURE.md).
-- **Samples are not users:** TODOs and events still store A/B/both placeholder owner values. The current UI defaults to one member, hides owner labels, and displays all saved events in one lane without rewriting them. Actual shared identity requires a later auth/invite flow; do not pass demo IDs straight into security rules.
-- **Paired calendar layout:** when membership contains A and B, show only A/B headers, conditionally show the all-day row, place shared all-day items in a full-width A+B bar, and use the 54px-per-hour transparent timeline with overlap summary chips. The current app does not provide a user flow that joins B yet.
+- **TODO/calendar source of truth is still local:** `noca.todos.v1`, `noca.calendar.events.v1`, `noca.theme`; samples use `noca.calendar.samples.v2/v3` markers. The current app does not use any memo storage key. See [ARCHITECTURE.md](ARCHITECTURE.md).
+- **Local records are not users:** TODOs and events still store A/B/both owner values. With Firebase configured, accepted workspace members supply A/B for display, but existing records are not mapped to authenticated user IDs and are not shared. Do not use local owner values as authorization.
+- **Paired calendar layout:** when membership contains A and B, show only A/B headers, conditionally show the all-day row, place shared all-day items in a full-width A+B bar, and use the 54px-per-hour transparent timeline with overlap summary chips. Firebase membership can now supply B after an invite is accepted; item data is still local.
 - `package-lock.json` is committed. CI currently uses `npm install` on Node 22; confirm CI behavior before changing it to `npm ci`.
 - TODO category configuration is stored separately from TODO records. Existing category names absent from that configuration are retained as neutral categories at load; rename updates matching task category strings, while delete moves them to the user-selected destination. Preserve this behavior when changing the task schema.
 - **CI is Chromium**, not real iPhone. WebKit, manual QA, multi-user sync and production availability are unproven.

@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberPath(workspaceId, uid) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/members/$(uid);
+    }
+
+    function workspacePath(workspaceId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId);
+    }
+
+    function invitationPath(inviteHash) {
+      return /databases/$(database)/documents/invitations/$(inviteHash);
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function isWorkspaceMember(workspaceId) {
+      return signedIn() && exists(memberPath(workspaceId, request.auth.uid));
+    }
+
+    function hasOpenInvite(workspaceId) {
+      let inviteHash = resource.data.activeInviteHash;
+      return inviteHash is string
+        && exists(invitationPath(inviteHash))
+        && get(invitationPath(inviteHash)).data.workspaceId == workspaceId
+        && get(invitationPath(inviteHash)).data.status == 'pending'
+        && get(invitationPath(inviteHash)).data.expiresAt > request.time;
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && uid == request.auth.uid;
+      allow list: if false;
+
+      allow create: if signedIn()
+        && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['workspaceId', 'createdAt'])
+        && request.resource.data.workspaceId is string
+        && request.resource.data.createdAt == request.time
+        && getAfter(workspacePath(request.resource.data.workspaceId)).data.memberUids.hasAny([uid])
+        && existsAfter(memberPath(request.resource.data.workspaceId, uid));
+
+      allow update, delete: if false;
+    }
+
+    match /workspaces/{workspaceId} {
+      allow get: if isWorkspaceMember(workspaceId) || (signedIn() && hasOpenInvite(workspaceId));
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'memberUids', 'activeInviteHash', 'createdAt', 'updatedAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.memberUids == [request.auth.uid]
+        && request.resource.data.activeInviteHash == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && getAfter(memberPath(workspaceId, request.auth.uid)).data.slot == 'A'
+        && getAfter(memberPath(workspaceId, request.auth.uid)).data.role == 'owner'
+        && getAfter(userPath(request.auth.uid)).data.workspaceId == workspaceId;
+
+      allow update: if signedIn() && (
+        (
+          resource.data.ownerUid == request.auth.uid
+          && resource.data.memberUids == [request.auth.uid]
+          && request.resource.data.memberUids == resource.data.memberUids
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeInviteHash', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.activeInviteHash is string
+          && request.resource.data.activeInviteHash.matches('^[a-f0-9]{64}$')
+          && getAfter(invitationPath(request.resource.data.activeInviteHash)).data.workspaceId == workspaceId
+          && getAfter(invitationPath(request.resource.data.activeInviteHash)).data.createdBy == request.auth.uid
+          && getAfter(invitationPath(request.resource.data.activeInviteHash)).data.status == 'pending'
+        )
+        ||
+        (
+          resource.data.ownerUid == request.auth.uid
+          && resource.data.memberUids == [request.auth.uid]
+          && request.resource.data.memberUids == resource.data.memberUids
+          && resource.data.activeInviteHash is string
+          && request.resource.data.activeInviteHash == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeInviteHash', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && getAfter(invitationPath(resource.data.activeInviteHash)).data.status == 'revoked'
+        )
+        ||
+        (
+          resource.data.memberUids.size() == 1
+          && resource.data.memberUids[0] == resource.data.ownerUid
+          && resource.data.activeInviteHash is string
+          && request.resource.data.memberUids.size() == 2
+          && request.resource.data.memberUids[0] == resource.data.ownerUid
+          && request.resource.data.memberUids[1] == request.auth.uid
+          && request.resource.data.activeInviteHash == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'activeInviteHash', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && getAfter(invitationPath(resource.data.activeInviteHash)).data.status == 'accepted'
+          && getAfter(invitationPath(resource.data.activeInviteHash)).data.acceptedBy == request.auth.uid
+          && getAfter(memberPath(workspaceId, request.auth.uid)).data.slot == 'B'
+          && getAfter(memberPath(workspaceId, request.auth.uid)).data.role == 'member'
+          && getAfter(userPath(request.auth.uid)).data.workspaceId == workspaceId
+        )
+      );
+
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow get, list: if isWorkspaceMember(workspaceId);
+
+        allow create: if signedIn()
+          && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'slot', 'role', 'joinedAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.joinedAt == request.time
+          && (
+            (
+              request.resource.data.slot == 'A'
+              && request.resource.data.role == 'owner'
+              && getAfter(workspacePath(workspaceId)).data.ownerUid == uid
+              && getAfter(workspacePath(workspaceId)).data.memberUids == [uid]
+            )
+            ||
+            (
+              request.resource.data.slot == 'B'
+              && request.resource.data.role == 'member'
+              && get(workspacePath(workspaceId)).data.memberUids.size() == 1
+              && get(workspacePath(workspaceId)).data.activeInviteHash is string
+              && getAfter(workspacePath(workspaceId)).data.memberUids.size() == 2
+              && getAfter(workspacePath(workspaceId)).data.memberUids[1] == uid
+              && getAfter(invitationPath(get(workspacePath(workspaceId)).data.activeInviteHash)).data.status == 'accepted'
+              && getAfter(invitationPath(get(workspacePath(workspaceId)).data.activeInviteHash)).data.acceptedBy == uid
+              && getAfter(userPath(uid)).data.workspaceId == workspaceId
+            )
+          );
+
+        allow update, delete: if false;
+      }
+    }
+
+    match /invitations/{inviteHash} {
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && inviteHash.matches('^[a-f0-9]{64}$')
+        && request.resource.data.keys().hasOnly(['workspaceId', 'createdBy', 'status', 'createdAt', 'expiresAt', 'acceptedBy'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.acceptedBy == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(24, 'h')
+        && get(workspacePath(request.resource.data.workspaceId)).data.ownerUid == request.auth.uid
+        && get(workspacePath(request.resource.data.workspaceId)).data.memberUids == [request.auth.uid]
+        && getAfter(workspacePath(request.resource.data.workspaceId)).data.activeInviteHash == inviteHash;
+
+      allow update: if signedIn() && (
+        (
+          resource.data.status == 'pending'
+          && resource.data.createdBy == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedAt'])
+          && request.resource.data.status == 'revoked'
+          && request.resource.data.revokedAt == request.time
+          && get(workspacePath(resource.data.workspaceId)).data.activeInviteHash == inviteHash
+          && getAfter(workspacePath(resource.data.workspaceId)).data.ownerUid == request.auth.uid
+          && getAfter(workspacePath(resource.data.workspaceId)).data.activeInviteHash != inviteHash
+        )
+        ||
+        (
+          resource.data.status == 'pending'
+          && resource.data.expiresAt > request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy', 'acceptedAt'])
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.acceptedBy == request.auth.uid
+          && request.resource.data.acceptedAt == request.time
+          && get(workspacePath(resource.data.workspaceId)).data.activeInviteHash == inviteHash
+          && getAfter(workspacePath(resource.data.workspaceId)).data.activeInviteHash == null
+          && getAfter(workspacePath(resource.data.workspaceId)).data.memberUids.size() == 2
+          && getAfter(memberPath(resource.data.workspaceId, request.auth.uid)).data.slot == 'B'
+          && getAfter(userPath(request.auth.uid)).data.workspaceId == resource.data.workspaceId
+        )
+      );
+
+      allow delete: if false;
+    }
+  }
+}

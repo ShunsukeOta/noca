@@ -6,10 +6,10 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 
 **プレビュー:** https://noca-delta.vercel.app  
 **ソース:** https://github.com/ShunsukeOta/noca  
-**開発状況:** TODO・カレンダーの端末内機能とUIを実装済み。メモタブは残し、現在は「メモ機能は開発中です」と案内するプレースホルダーです。
+**開発状況:** TODO・カレンダーは端末内機能を実装済み。Googleログインと2人のメンバー参加を実装中です。メモタブは残し、「メモ機能は開発中です」と案内するプレースホルダーです。
 
 > [!IMPORTANT]
-> **これは「2人で共有できる完成版」ではありません。** 現在は同一ブラウザの `localStorage` を使うUIプレビューで、初期状態は「自分」1人です。TODOと予定はこの端末で追加・編集・削除できます。相手の招待は未実装のため、Bの表示・担当選択・2人比較画面は初期状態では出ません。メモ機能は開発中で、ログイン、招待、実際の2端末間同期、Firebase、通知も未実装です。設定からJSONバックアップを書き出して復元できますが、復元は現在のTODO・カテゴリ・予定を置き換えます。ブラウザの保存データを消すと端末内の編集内容も消えます。
+> **まだTODO・予定を2人で共有する完成版ではありません。** Firebaseの環境変数がない状態では、同一ブラウザの `localStorage` を使う1人用プレビューです。Firebaseを設定するとGoogleログイン、共有スペース作成、招待リンク参加が使えますが、TODO・予定は引き続き端末内保存で、クラウド同期・既存データ移行は未実装です。初期状態ではBの表示・担当選択・2人比較画面は出ません。メモ機能は開発中で、通知も未実装です。設定からJSONバックアップを書き出して復元できますが、復元は現在のTODO・カテゴリ・予定を置き換えます。ブラウザの保存データを消すと端末内の編集内容も消えます。Firebaseの設定は[セットアップ手順](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## Codex / AIエージェントへの引き継ぎ
 
@@ -27,10 +27,10 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 | 画面・機能 | 現状 | 主な操作・特徴 |
 | --- | --- | --- |
 | **TODO** | **動作**・端末内に保存 | 作成・編集・完了/解除・削除/Undo。カテゴリは設定から追加・名前変更・色変更・並び替え・削除ができ、削除時はTODOを別カテゴリへ移動。 |
-| **カレンダー** | **動作**・端末内に保存 | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了、期限付きTODOの参照。初期状態は担当表示のない1人用タイムライン。2人目の参加後にA/B比較表示へ切り替える設計ですが、招待・参加機能は未実装です |
+| **カレンダー** | **動作**・端末内に保存 | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了、期限付きTODOの参照。初期状態は担当表示のない1人用タイムライン。実メンバーが2人参加するとA/B比較表示になりますが、予定自体の共有同期は未実装です |
 | **メモ** | **開発中** | メモタブを開くと「メモ機能は開発中です」と表示。入力や保存の操作はありません。 |
-| **設定** | プレビュー上のメンバー数表示・テーマ・TODOカテゴリ・端末内バックアップが動作 | 初期状態は「自分」1人と表示。ライト／ダークの切替、TODOカテゴリの管理、TODO・カテゴリ・予定のJSON書き出しと復元。招待・通知・クラウド同期は未実装 |
-| **PWA** | 基本構成あり | manifest / service workerの自動更新設定。iPhone Safari・ホーム画面standalone実機QAやオフライン同期は未完了 |
+| **設定** | テーマ・TODOカテゴリ・端末内バックアップ、Firebase設定時は認証とメンバー参加 | 初期状態は「自分」1人。Googleログイン、共有スペース作成、24時間有効の招待リンクを実装。TODO・予定の共有同期は未実装 |
+| **PWA** | 基本構成あり | manifest / service workerの自動更新設定。メンテナーからiPhone Safari・ホーム画面standalone実機QA完了の報告あり（端末と個別結果は未記録）。オフライン同期は未実装 |
 
 ### UIで守るべき重要な決定
 
@@ -42,7 +42,7 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 - **動き：** Motionによる自然なアニメーション。`prefers-reduced-motion` を尊重。ライト・ダーク両テーマ対応。
 - **共通UI：** 入力・ラベル・ボタン・チェック・スイッチ・担当/カテゴリ選択・破棄確認・Undo通知をローカルの共通部品で管理。色と角丸は `src/styles/globals.css` のテーマ変数を基準にします。
 
-A・B・`both` は**デモ用の予定所有者ラベル**です。現段階では本人認証・閲覧権限・共有相手との同期を意味しません。
+A・B・`both` は予定の表示レーンです。Firebaseで実メンバーが参加するとA/Bはメンバー枠に対応しますが、TODO・予定レコードの担当情報はまだ実ユーザーIDに結び付かず、他端末との共有同期もありません。
 
 ## 技術スタック
 
@@ -54,11 +54,12 @@ A・B・`both` は**デモ用の予定所有者ラベル**です。現段階で�
 | アイコン / モーション | Lucide React / Motion |
 | 日付 | date-fns |
 | 状態・保存 | React Context + `localStorage`（TODO / 予定 / TODOカテゴリ） |
+| 認証・メンバー | Firebase Authentication + Cloud Firestore（環境設定がある場合。TODO/予定保存には未使用） |
 | PWA | vite-plugin-pwa（manifest と service worker） |
 | 自動テスト | Playwright + Chromium |
 | CI / プレビュー | GitHub Actions / Vercel |
 
-**未導入:** Firebase Authentication、Firestore、実運用の共有スペース、プッシュ通知。将来の技術方針は [仕様書](docs/SPECIFICATION.md) にありますが、未実装のものと混同しないでください。
+**未完了:** Firebaseプロジェクトとの接続、TODO/予定のFirestore CRUD・同期、ローカルからのデータ移行、プッシュ通知。本番データベースや認証プロバイダーの設定手順は[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## 開発環境と起動
 
@@ -72,6 +73,8 @@ npm run dev
 ```
 
 Viteの開発サーバーが起動します（通常は `http://localhost:5173`）。初期表示は `/todo` です。
+
+Firebase Auth／Firestoreを使う場合は、`.env.example` を `.env.local` にコピーしてFirebase Web appの値を設定し、Firestore Security Rulesをデプロイしてください。詳しくは[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。値が未設定ならローカルプレビューとして起動します。
 
 ### よく使うコマンド
 
@@ -92,11 +95,11 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 
 ### テスト状況
 
-今回の変更で、ローカルの `npm run build`、`npm run check:bundle`、`npm run test:e2e`（Playwright Chromium **49/49件**）と `npm run test:pwa`（**4/4件**）が成功しました。500 kB超のチャンク警告は解消しています。最新の記録済みGitHub Actionsは [#38532471385](https://github.com/ShunsukeOta/noca/actions/runs/38532471385)（変更前の43/43件）です。今回の変更を含むCIランはまだ確認していません。
+現在のPhase 2ソースは `npm run build`、`npm run check:bundle`、Playwright Chromium **50/50件**、production PWA **4/4件**を通過しています。ローカルテストはFirebase未設定のプレビュー動作です。Firebaseプロジェクト側ではGoogle Auth、Firestore、Rules、Vercel Production/Previewのクライアント設定を準備済みで、デプロイ後のログイン・招待フロー確認が残っています。過去のGitHub Actions記録は [#38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) です。
 
-初回に同期読み込みするJavaScriptは **571.82 kB / gzip 182.96 kB → 425.59 kB / gzip 136.01 kB** になりました。カレンダー、編集シート、カテゴリ管理とMotionのレイアウト機能を必要時に読み込みます。設定ページの見出しとテーマはカテゴリ管理の読み込みを待たずに表示されます。PWAはオフラインで全画面を使えるよう全チャンクを事前保存するため、保存総量は約638 KiBです。容量の予算は `scripts/check-bundle.mjs` でCIでも確認します。
+初回JavaScriptは **436.08 kB / gzip 139.45 kB**、最大チャンクは **458.21 kB**です。カレンダー、編集シート、カテゴリ管理、Firebaseの認証ブリッジとMotionのレイアウト機能を必要時に読み込みます。ネットワークが必要なFirebase SDK/サービスと招待ルートはPWA事前キャッシュから除外し、TODO・カレンダーと編集画面のオフライン動作を維持します。PWA事前保存量は **650.71 KiB / 652 KiB予算**です。容量の予算は `scripts/check-bundle.mjs` でCIでも確認します。
 
-320 / 375 / 390 / 430pxのモバイル幅や一部のreduced-motion、ダークモードのテストを含みます。**Chromiumのモバイルエミュレーション ≠ iPhone Safari実機/standaloneの合格**です。実機確認は [UIテスト計画](docs/UI_QA.md) に沿って別途行います。
+320 / 375 / 390 / 430pxのモバイル幅や一部のreduced-motion、ダークモードのテストを含みます。ChromiumはiPhone Safariの証拠にはなりません。メンテナーから実機Safari/standalone QA完了の報告を受けていますが、端末・iOS版・ケース別結果はリポジトリに記録されていません。
 
 ## リポジトリ構成
 
@@ -106,6 +109,7 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 ├── README.md                          # プロジェクトの入口（このファイル）
 ├── docs/
 │   ├── CODEX_HANDOFF.md               # 最新の引き継ぎ・次の作業
+│   ├── FIREBASE_SETUP.md               # 認証・招待の接続手順と制約
 │   ├── ARCHITECTURE.md                # 実装・保存・コード地図
 │   ├── DESIGN_SYSTEM.md               # UI設計の決定事項
 │   ├── ROADMAP.md                     # フェーズ計画
@@ -118,7 +122,7 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 │   ├── features/
 │   │   ├── todos/todo-store.tsx       # TODO CRUD
 │   │   ├── calendar/calendar-store.tsx # 予定 CRUD
-│   │   ├── workspace/workspace-membership.tsx # 初期1人のメンバー状態
+│   │   ├── workspace/workspace-membership.tsx # ローカル表示とFirebaseメンバー状態
 │   │   └── data/local-backup.ts       # ローカルデータの書き出し・復元
 │   ├── components/
 │   │   ├── app-shell.tsx              # ヘッダー、Dock、設定、編集シート
@@ -166,19 +170,19 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 | Phase | 目的 | 状態 |
 | --- | --- | --- |
 | 0 | コンセプト・仕様・計画 | 完了 |
-| 1A | UIシェル、テーマ、ナビゲーション | **実装済み**（実機未確認） |
-| 1B | TODO CRUD とUI改善 | **実装済み**（実機未確認） |
-| 1C | カレンダー CRUD、初期1人・2人状態に応じたタイムライン | **実装済み**（実機未確認） |
+| 1A | UIシェル、テーマ、ナビゲーション | **実装済み**（Phase 1E実機QA完了報告あり） |
+| 1B | TODO CRUD とUI改善 | **実装済み**（Phase 1E実機QA完了報告あり） |
+| 1C | カレンダー CRUD、初期1人・2人状態に応じたタイムライン | **実装済み**（Phase 1E実機QA完了報告あり） |
 | **1D** | **メモ機能** | **保留**。メモタブと「開発中です」の案内のみ。作成・編集・保存はなし |
-| 1E | iPhone Safari / Home Screen PWAでの実機レビュー | 未完了 |
-| 2 | Googleログイン、2人の共有スペース・招待 | 未実装 |
+| 1E | iPhone Safari / Home Screen PWAでの実機レビュー | メンテナーから完了報告あり（詳細未記録） |
+| 2 | Googleログイン、2人の共有スペース・招待 | 実装中。Firebase接続と2アカウント確認が必要 |
 | 3 | Firestoreによる共有CRUD・同期・競合対策 | 未実装 |
 | 4 | PWAオフライン挙動・通知など | 未完了 |
 | 5 | 本番QA・リリース | 未完了 |
 
 以前のプレビューが書き込んだ `noca.notes.v1` がある場合も、この版では読み書きせず、削除もしません。
 
-**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) を必ず参照**し、Phase 1Dは保留、端末内データの復元設計とPhase 1Eの実機QAが残っていることを確認してください。
+**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) と [FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) を参照**し、Firebase接続と招待フローの受け入れ確認を進めてください。TODO・予定の共有CRUDと既存データ移行はPhase 3です。
 
 ## ドキュメント一覧
 
@@ -196,4 +200,4 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 旧 [realtime-todos](https://github.com/ShunsukeOta/realtime-todos) は参照用であり、**nocaの作業で旧コード・DB・デプロイ先を変更しません**。独自チャット、AI機能、習慣トラッカー、分析ダッシュボード、複数ワークスペース切替は当面の対象外です。
 
 ---
-**Last reviewed against implementation:** 2026-10-15 · **Status:** Local UI preview / memo feature deferred; Phase 1E QA next.
+**Last reviewed against implementation:** 2026-10-15 · **Status:** Local data preview with Firebase Auth/workspace membership in progress; memo feature deferred.

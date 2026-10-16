@@ -1,8 +1,8 @@
 # noca — iPhone UI表示・操作テスト計画
 
 - Version: 0.1
-- Updated: 2026-10-14
-- Status: **Chromium E2E実施中・iPhone実機QAは未実施**。2026-10-14の全体CIは[43/43 PASS](https://github.com/ShunsukeOta/noca/actions/runs/38532471385)（ドキュメント更新前）
+- Updated: 2026-10-15
+- Status: **Phase 1EについてメンテナーからiPhone Safari/ホーム画面PWA QA完了の報告あり**。端末・iOS版・ケース別結果はリポジトリに未記録。後から追加したPhase 2アカウント／招待画面はこの確認に含まれていない。
 - Scope: Phase 1A–1E の **ダミーデータによるUI検証**
 - Related: [ROADMAP.md](ROADMAP.md) / [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 
@@ -154,11 +154,11 @@ Phase 1では **Firebaseの接続、通知、複数端末同期を合格条件�
 | 段階 | 状態 |
 | --- | --- |
 | QA計画の文書化 | 完了 |
-| TODO/カレンダー/メモUI実装 | TODO/カレンダーはローカルCRUD、メモは開発中プレースホルダー。今回変更後の自動回帰・iPhone実機QAは未確認 |
-| Chromiumブラウザの自動表示/操作 | **43テスト合格**（GitHub Actions、実機でない） |
-| iPhone Safari実機テスト | 未実施 |
-| ホーム画面PWAテスト | 未実施 |
-| UI最終承認 | 未実施 |
+| TODO/カレンダー/メモUI実装 | TODO/カレンダーはローカルCRUD、メモは開発中プレースホルダー。Phase 2アカウント／招待画面を追加。現在の自動回帰テストは合格、Firebase実アカウントでの招待確認は未実施 |
+| Chromiumブラウザの自動表示/操作 | 現在のツリーでPlaywright **50/50合格**、production PWA **4/4合格**。GitHub Actions #38695136243はPhase 2前の記録 |
+| iPhone Safari実機テスト | Phase 1Eはメンテナーから完了報告あり（機種・iOS版・ケース別結果は未記録）。Phase 2画面は未確認 |
+| ホーム画面PWAテスト | Phase 1Eはメンテナーから完了報告あり（機種・iOS版・ケース別結果は未記録）。Phase 2画面は未確認 |
+| UI最終承認 | Phase 1の既存画面はメンテナー確認済み。Phase 2画面は未確認 |
 
 ---
 **重要:** 本書は「実施済み報告」ではなく、Phase 1のテスト仕様と受け入れ条件を定義するためのドキュメント。

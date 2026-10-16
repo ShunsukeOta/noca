@@ -1,6 +1,6 @@
 # AGENTS.md — noca development instructions
 
-This file is for Codex and other coding agents working inside this repository. **Read the actual code before implementing.** The app is a local-first **UI preview**, not a functioning multi-user service.
+This file is for Codex and other coding agents working inside this repository. **Read the actual code before implementing.** The app remains a local-first preview: optional Firebase sign-in/workspace membership source is present, but Phase 2 is not complete until connected to a project and verified. TODO/calendar records are not shared.
 
 ## Read in this order
 
@@ -21,9 +21,9 @@ Earlier `docs/PHASE1*_REPORT.md` files are **historical snapshots**. If a histor
 - Bottom navigation: **a floating rounded box containing only three tabs**, a **16px gap**, and a **separate dark raised + button** on TODO/calendar. Hide the + on the memo development-placeholder route. Preserve iPhone safe-area spacing.
 - TODO filtering uses **square-rounded, two-line colored category tiles** with **remaining open counts**; there is **no** “残りのタスク” overview box or “これからすること” heading.
 - Calendar has a monthly grid plus a **transparent, two-column A/B daily timeline**. All-day `both` events stretch across the A+B width **below** the individual all-day row; there is **no third header/column**. Timed `both` events span both lanes. Nested overlaps keep the longer appointment's title visible; short appointments prioritize readable titles.
-- A and B and `both` are **placeholder ownership labels**, **not** actual authenticated users or sharing permission checks.
+- Local TODO/calendar `by` values A/B/`both` remain display slots, not authenticated ownership or permission checks. When Firebase is configured, accepted workspace accounts supply the real A/B membership slots; cloud data access beyond membership is not implemented.
 - TODO and calendar editors are real local CRUD persisted in this browser's `localStorage`; memo is a development placeholder with no editor or persistence. Settings persist the theme and TODO category configuration.
-- Do **not** claim that Firebase, authentication, invitations, 2-device sync, real notifications, native iOS verification or memo persistence are implemented.
+- Do **not** claim Phase 2 is complete or deployed: Firebase sign-in/workspace/invite source and Firestore Rules are present locally, but project connection and acceptance/security verification remain. Do not claim 2-device TODO/calendar sync, real notifications, native iOS verification beyond the maintainer's report, or memo persistence.
 - Do **not** modify the separate `ShunsukeOta/realtime-todos` repository, its database or deployment.
 
 ## Technical conventions
@@ -51,7 +51,7 @@ Earlier `docs/PHASE1*_REPORT.md` files are **historical snapshots**. If a histor
 - Reply to the maintainer in Japanese. Clarify only genuinely blocking ambiguities; otherwise use existing design decisions.
 - Do not add Firebase, paid external services, unrelated dependencies or backend architecture without an explicit task.
 - Prefer scoped commits/PRs and avoid force-pushing; honor the maintainer's requested branch/workflow.
-- `package-lock.json` is currently **not committed**. Use `npm install` in this repository as CI does; consider adding a lockfile in a *separate, explicitly reviewed* dependency-hygiene change.
+- `package-lock.json` is committed. Use `npm install` in this repository as CI does; consider changing CI to `npm ci` only as a separate dependency-hygiene change.
 - Leave existing local preview data intact. Back up test/dev data before any destructive changes.
 
-**Starting the next planned feature?** Read [docs/CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md). Memo CRUD is deferred; proceed with **Phase 1E (iPhone Safari/PWA QA)** unless the maintainer requests otherwise.
+**Starting the next planned feature?** Read [docs/CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md). Memo CRUD is deferred. Phase 1E is reported complete by the maintainer; Phase 2 auth/invite source is in progress and still needs Firebase setup and acceptance verification before Phase 3.
