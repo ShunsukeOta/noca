@@ -1,14 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, type SetStateAction } from "react"
 import { mockTasks, type Task, type TaskCategory, type TodoCategory } from "@/app/mock-data"
+import { DEFAULT_TODO_CATEGORIES } from "@/features/todos/todo-category-defaults"
+import { useWorkspaceDataSync } from "@/features/workspace/workspace-data-sync-context"
 
 export const TODO_STORAGE_KEY = "noca.todos.v1"
 export const TODO_CATEGORY_STORAGE_KEY = "noca.todo.categories.v1"
-export const DEFAULT_TODO_CATEGORIES: TodoCategory[] = [
-  { id: "default-outing", name: "おでかけ", tone: "peach" },
-  { id: "default-life", name: "暮らし", tone: "green" },
-  { id: "default-couple", name: "ふたり", tone: "lavender" },
-  { id: "default-other", name: "その他", tone: "neutral" }
-]
+export { DEFAULT_TODO_CATEGORIES }
 const validTones = new Set(["peach", "green", "lavender", "blue", "mint", "yellow", "rose", "neutral", "life", "outing", "couple"])
 const legacyToneMap: Partial<Record<string, TodoCategory["tone"]>> = {
   outing: "peach",
@@ -31,6 +28,8 @@ type TodoEditorTarget = { mode: "create" } | { mode: "edit"; id: string }
 type TodoContextValue = {
   todos: Task[]
   categories: TodoCategory[]
+  deviceTodos: Task[]
+  deviceCategories: TodoCategory[]
   storageError: boolean
   editor: TodoEditorTarget | null
   deleted: DeletedTodo | null
@@ -102,13 +101,24 @@ function loadTodos(): Task[] {
 }
 
 export function TodoProvider({ children }: { children: ReactNode }) {
+  const sharedData = useWorkspaceDataSync()
   const [initial] = useState(() => ({ todos: loadTodos(), categories: loadCategories() }))
-  const [todos, setTodos] = useState<Task[]>(initial.todos)
-  const [categories, setCategories] = useState<TodoCategory[]>(() => {
+  const [deviceTodos, setDeviceTodos] = useState<Task[]>(initial.todos)
+  const [deviceCategories, setDeviceCategories] = useState<TodoCategory[]>(() => {
     const configured = initial.categories
     const missing = initial.todos.map(task => task.category).filter(name => !configured.some(category => category.name === name))
     return [...configured, ...[...new Set(missing)].map(name => ({ id: crypto.randomUUID(), name, tone: "neutral" as const }))]
   })
+  const todos = sharedData.isActive ? sharedData.todos : deviceTodos
+  const categories = sharedData.isActive ? sharedData.categories : deviceCategories
+  const setTodos = useCallback((updater: SetStateAction<Task[]>) => {
+    if (sharedData.isActive) sharedData.updateTodos(updater)
+    else setDeviceTodos(updater)
+  }, [sharedData.isActive, sharedData.updateTodos])
+  const setCategories = useCallback((updater: SetStateAction<TodoCategory[]>) => {
+    if (sharedData.isActive) sharedData.updateCategories(updater)
+    else setDeviceCategories(updater)
+  }, [sharedData.isActive, sharedData.updateCategories])
   const [todosStorageError, setTodosStorageError] = useState(false)
   const [categoriesStorageError, setCategoriesStorageError] = useState(false)
   const [editor, setEditor] = useState<TodoEditorTarget | null>(null)
@@ -116,34 +126,35 @@ export function TodoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos))
+      localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(deviceTodos))
       setTodosStorageError(false)
     } catch {
       setTodosStorageError(true)
     }
-  }, [todos])
+  }, [deviceTodos])
 
   useEffect(() => {
     try {
-      localStorage.setItem(TODO_CATEGORY_STORAGE_KEY, JSON.stringify(categories))
+      localStorage.setItem(TODO_CATEGORY_STORAGE_KEY, JSON.stringify(deviceCategories))
       setCategoriesStorageError(false)
     } catch {
       setCategoriesStorageError(true)
     }
-  }, [categories])
+  }, [deviceCategories])
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
+      if (sharedData.isActive) return
       if (event.key !== TODO_STORAGE_KEY && event.key !== TODO_CATEGORY_STORAGE_KEY) return
       const nextTodos = loadTodos()
       const nextCategories = loadCategories()
       const missing = nextTodos.map(task => task.category).filter(name => !nextCategories.some(category => category.name === name))
-      setTodos(nextTodos)
-      setCategories([...nextCategories, ...[...new Set(missing)].map(name => ({ id: crypto.randomUUID(), name, tone: "neutral" as const }))])
+      setDeviceTodos(nextTodos)
+      setDeviceCategories([...nextCategories, ...[...new Set(missing)].map(name => ({ id: crypto.randomUUID(), name, tone: "neutral" as const }))])
     }
     window.addEventListener("storage", sync)
     return () => window.removeEventListener("storage", sync)
-  }, [])
+  }, [sharedData.isActive])
 
   useEffect(() => {
     if (!deleted) return
@@ -158,22 +169,22 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   const addTodo = useCallback((draft: TodoDraft) => {
     const task: Task = { ...draft, id: crypto.randomUUID(), done: false, by: "A" }
     setTodos(previous => [task, ...previous])
-  }, [])
+  }, [setTodos])
 
   const updateTodo = useCallback((id: string, draft: TodoDraft) => {
     setTodos(previous => previous.map(task => task.id === id ? { ...task, ...draft } : task))
-  }, [])
+  }, [setTodos])
 
   const toggleTodo = useCallback((id: string) => {
     setTodos(previous => previous.map(task => task.id === id ? { ...task, done: !task.done } : task))
-  }, [])
+  }, [setTodos])
 
   const deleteTodo = useCallback((id: string) => {
     const index = todos.findIndex(task => task.id === id)
     if (index === -1) return
     setDeleted({ task: todos[index], index })
     setTodos(previous => previous.filter(task => task.id !== id))
-  }, [todos])
+  }, [todos, setTodos])
 
   const undoDelete = useCallback(() => {
     if (!deleted) return
@@ -184,13 +195,13 @@ export function TodoProvider({ children }: { children: ReactNode }) {
       return result
     })
     setDeleted(null)
-  }, [deleted])
+  }, [deleted, setTodos])
 
   const dismissDeleted = useCallback(() => setDeleted(null), [])
 
   const addCategory = useCallback((category: Omit<TodoCategory, "id">) => {
     setCategories(previous => previous.some(item => item.name === category.name) || previous.length >= 12 ? previous : [...previous, { ...category, id: crypto.randomUUID() }])
-  }, [])
+  }, [setCategories])
 
   const updateCategory = useCallback((id: string, category: TodoCategory) => {
     const current = categories.find(item => item.id === id)
@@ -199,11 +210,11 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     if (current.name !== category.name) {
       setTodos(previous => previous.map(task => task.category === current.name ? { ...task, category: category.name } : task))
     }
-  }, [categories])
+  }, [categories, setCategories, setTodos])
 
   const updateCategoryTone = useCallback((id: string, tone: TodoCategory["tone"]) => {
     setCategories(previous => previous.map(item => item.id === id ? { ...item, tone } : item))
-  }, [])
+  }, [setCategories])
 
   const deleteCategory = useCallback((id: string, moveToId?: string) => {
     const category = categories.find(item => item.id === id)
@@ -215,7 +226,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
       setTodos(previous => previous.map(task => task.category === category.name ? { ...task, category: destination.name } : task))
     }
     setCategories(previous => previous.length <= 1 ? previous : previous.filter(item => item.id !== id))
-  }, [categories, todos])
+  }, [categories, todos, setCategories, setTodos])
 
   const setCategoryOrder = useCallback((ids: string[]) => {
     setCategories(previous => {
@@ -228,21 +239,21 @@ export function TodoProvider({ children }: { children: ReactNode }) {
       })
       return [...ordered, ...byId.values()]
     })
-  }, [])
+  }, [setCategories])
 
   const restoreLocalData = useCallback((nextTodos: Task[], nextCategories: TodoCategory[]) => {
     setTodos(nextTodos)
     setCategories(nextCategories)
     setEditor(null)
     setDeleted(null)
-  }, [])
+  }, [setTodos, setCategories])
 
   const storageError = todosStorageError || categoriesStorageError
   const value = useMemo<TodoContextValue>(() => ({
-    todos, categories, storageError, editor, deleted,
+    todos, categories, deviceTodos, deviceCategories, storageError, editor, deleted,
     openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted,
     addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData
-  }), [todos, categories, storageError, editor, deleted, openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted, addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData])
+  }), [todos, categories, deviceTodos, deviceCategories, storageError, editor, deleted, openCreate, openEdit, closeEditor, addTodo, updateTodo, toggleTodo, deleteTodo, undoDelete, dismissDeleted, addCategory, updateCategory, updateCategoryTone, deleteCategory, setCategoryOrder, restoreLocalData])
 
   return <TodoContext.Provider value={value}>{children}</TodoContext.Provider>
 }

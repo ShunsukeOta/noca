@@ -4,6 +4,52 @@ import { workspaceErrorMessage } from "@/features/workspace/workspace-errors"
 import { WorkspaceMembershipRemoteProvider, useWorkspaceMembers, type WorkspaceMembershipRemoteValue } from "@/features/workspace/workspace-membership"
 import type { CreatedInvite, RemoteWorkspace, SignedInProfile } from "@/features/workspace/firebase-workspace"
 
+const workspaceCacheKey = (uid: string) => `noca.firebase.workspace.v1:${uid}`
+
+function readWorkspaceCache(uid: string): RemoteWorkspace | null {
+  try {
+    const raw = localStorage.getItem(workspaceCacheKey(uid))
+    if (!raw) return null
+    const value: unknown = JSON.parse(raw)
+    if (!value || typeof value !== "object") return null
+    const workspace = value as Partial<RemoteWorkspace>
+    if (typeof workspace.id !== "string" || typeof workspace.ownerUid !== "string" ||
+      !(workspace.activeInviteHash === null || typeof workspace.activeInviteHash === "string") ||
+      !Array.isArray(workspace.members) || workspace.members.length < 1 || workspace.members.length > 2) return null
+    const members = workspace.members as Partial<RemoteWorkspace["members"][number]>[]
+    if (!members.every(member =>
+      (member.id === "A" || member.id === "B") &&
+      typeof member.uid === "string" && typeof member.displayName === "string" && member.displayName.trim().length > 0 &&
+      (member.role === "owner" || member.role === "member") &&
+      (member.email === null || typeof member.email === "string") &&
+      (member.photoURL === null || typeof member.photoURL === "string")
+    )) return null
+    const memberIds = members.map(member => member.id)
+    const owner = members.find(member => member.id === "A")
+    if (!owner || owner.uid !== workspace.ownerUid || owner.role !== "owner" ||
+      !memberIds.includes("A") || new Set(memberIds).size !== memberIds.length ||
+      members.some(member => member.id === "B" && member.role !== "member")) return null
+    return workspace as RemoteWorkspace
+  } catch {
+    return null
+  }
+}
+
+function writeWorkspaceCache(uid: string, workspace: RemoteWorkspace | null) {
+  try {
+    const key = workspaceCacheKey(uid)
+    if (workspace) localStorage.setItem(key, JSON.stringify(workspace))
+    else localStorage.removeItem(key)
+  } catch {
+    // Current membership remains usable even when this browser cannot persist a cache.
+  }
+}
+
+function isOfflineError(error: unknown) {
+  const code = error && typeof error === "object" && "code" in error ? String(error.code) : ""
+  return !navigator.onLine || code.includes("unavailable")
+}
+
 type AuthStatus = WorkspaceMembershipRemoteValue["authStatus"]
 type WorkspaceStatus = WorkspaceMembershipRemoteValue["workspaceStatus"]
 
@@ -47,6 +93,7 @@ export function FirebaseWorkspaceMembershipProvider({ children }: { children: Re
           redirectError = null
 
           if (!user) {
+            setAuthError(redirectError)
             setAuthStatus("signed-out")
             setWorkspaceStatus("none")
             setWorkspace(null)
@@ -54,22 +101,45 @@ export function FirebaseWorkspaceMembershipProvider({ children }: { children: Re
             return
           }
 
+          const cachedWorkspace = readWorkspaceCache(user.uid)
           setAuthStatus("signed-in")
-          setWorkspaceStatus("loading")
+          setWorkspace(cachedWorkspace)
+          setWorkspaceStatus(cachedWorkspace ? "ready" : "loading")
           setMembers([{ id: "A", displayName: user.displayName, uid: user.uid, email: user.email, photoURL: user.photoURL }])
-          unsubscribeWorkspace = service.observeWorkspace(user.uid, nextWorkspace => {
+          if (cachedWorkspace?.members.length) setMembers(cachedWorkspace.members)
+          unsubscribeWorkspace = service.observeWorkspace(user.uid, (nextWorkspace, fromCache) => {
             if (disposed) return
+            if (fromCache && !nextWorkspace) {
+              const fallback = readWorkspaceCache(user.uid)
+              if (fallback) {
+                setWorkspace(fallback)
+                setWorkspaceStatus("ready")
+                setMembers(fallback.members)
+              }
+              return
+            }
             setWorkspace(nextWorkspace)
             setWorkspaceStatus(nextWorkspace ? "ready" : "none")
+            writeWorkspaceCache(user.uid, nextWorkspace)
             if (nextWorkspace?.members.length) setMembers(nextWorkspace.members)
             else if (!nextWorkspace) {
               setMembers([{ id: "A", displayName: user.displayName, uid: user.uid, email: user.email, photoURL: user.photoURL }])
             }
           }, error => {
             if (disposed) return
-            setWorkspaceStatus("error")
-            setWorkspace(null)
-            setAuthError(workspaceErrorMessage(error))
+            const fallback = isOfflineError(error) ? readWorkspaceCache(user.uid) : null
+            if (fallback) {
+              setWorkspace(fallback)
+              setWorkspaceStatus("ready")
+              setMembers(fallback.members)
+              setAuthError(null)
+            } else {
+              setWorkspaceStatus("error")
+              setWorkspace(null)
+              writeWorkspaceCache(user.uid, null)
+              setMembers([{ id: "A", displayName: user.displayName, uid: user.uid, email: user.email, photoURL: user.photoURL }])
+              setAuthError(isOfflineError(error) ? "オフラインのため共有スペースを確認できません。接続後に再試行してください。" : workspaceErrorMessage(error))
+            }
           })
         }, error => {
           if (disposed) return

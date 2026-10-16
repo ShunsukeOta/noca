@@ -90,7 +90,7 @@ export async function signOut() {
 
 export function observeWorkspace(
   uid: string,
-  onWorkspace: (workspace: RemoteWorkspace | null) => void,
+  onWorkspace: (workspace: RemoteWorkspace | null, fromCache: boolean) => void,
   onError: (error: Error) => void
 ): () => void {
   const { db } = getServices()
@@ -99,32 +99,39 @@ export function observeWorkspace(
   const unsubscribeUser = onSnapshot(doc(db, "users", uid), userSnapshot => {
     unsubscribeWorkspace?.()
     unsubscribeWorkspace = undefined
+    let userFromCache = userSnapshot.metadata.fromCache
 
     const workspaceId = userSnapshot.data()?.workspaceId
     if (typeof workspaceId !== "string" || workspaceId.length === 0) {
-      onWorkspace(null)
+      onWorkspace(null, userSnapshot.metadata.fromCache)
       return
     }
 
     const workspaceRef = doc(db, "workspaces", workspaceId)
     let currentWorkspace: DocumentData | undefined
-    let currentMembers: RemoteWorkspaceMember[] = []
+    let currentMembers: RemoteWorkspaceMember[] | null = null
+    let workspaceFromCache = true
+    let membersFromCache = true
     const emit = () => {
-      if (!currentWorkspace) return
+      if (!currentWorkspace || !currentMembers) return
       onWorkspace({
         id: workspaceId,
         ownerUid: currentWorkspace.ownerUid,
         activeInviteHash: typeof currentWorkspace.activeInviteHash === "string" ? currentWorkspace.activeInviteHash : null,
         members: currentMembers
-      })
+      }, userFromCache || workspaceFromCache || membersFromCache)
     }
 
     const unsubscribeWorkspaceDoc = onSnapshot(workspaceRef, snapshot => {
       if (!snapshot.exists()) {
-        onError(new Error("共有スペースが見つかりません。"))
+        currentWorkspace = undefined
+        workspaceFromCache = snapshot.metadata.fromCache
+        if (userFromCache || workspaceFromCache) onWorkspace(null, true)
+        else onError(new Error("共有スペースが見つかりません。"))
         return
       }
       currentWorkspace = snapshot.data()
+      workspaceFromCache = snapshot.metadata.fromCache
       emit()
     }, onError)
 
@@ -133,6 +140,7 @@ export function observeWorkspace(
         .map(memberSnapshot => toWorkspaceMember(memberSnapshot.id, memberSnapshot.data()))
         .filter((member): member is RemoteWorkspaceMember => member !== null)
         .sort((left, right) => left.id.localeCompare(right.id))
+      membersFromCache = snapshot.metadata.fromCache
       emit()
     }, onError)
 

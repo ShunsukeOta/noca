@@ -1,9 +1,9 @@
 # noca — フェーズ別開発計画
 
 - Version: 0.1
-- Updated: 2026-10-15
-- Current: **Phase 2（Google認証・workspace・招待）実装中**。Phase 1Eはメンテナーから完了報告あり。メモ機能は保留
-- Current local verification: build + bundle check pass, Playwright **50/50**, production PWA **4/4**. Firebase Google Auth, Firestore/Rules and Vercel Production/Preview client config are prepared; deployed Preview and live account/invite checks remain. Earlier CI baseline: [GitHub Actions #38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243).
+- Updated: 2026-10-16
+- Current: **Phase 3の主要コードを実装済み、受け入れ確認は未完了**。Phase 2のFirebase実環境確認も未完了。Phase 1Eはメンテナーから完了報告あり。メモ機能は保留
+- Current local verification: `npm run typecheck`・`npm run build`・`npm run check:bundle` は成功。Playwright E2E/PWA、Firestore Rules emulator/deploy、Firebase実環境と二端末の確認は未実施。Phase 2の過去基準はPlaywright **50/50**、production PWA **4/4**。Earlier CI baseline: [GitHub Actions #38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243).
 - Product spec: [SPECIFICATION.md](SPECIFICATION.md)
 - UI tokens: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 - UI verification: [UI_QA.md](UI_QA.md)
@@ -28,8 +28,8 @@
 | **1C** | カレンダーCRUD・メンバー数に応じた時間表示 | 1B | **実装済み**。初期1人状態は1列、2人状態はA/B比較UI。Safari/PWA実機は1E |
 | **1D** | メモ機能 | 1C | **保留**。メモタブは残すが、一覧・作成・保存などは実装しない。用途とTODO/予定との役割を再検討してから再開 |
 | **1E** | iPhone実機・Safari/PWA表示確認、UI最終調整 | 1C | **完了（メンテナー報告）**。端末・ケース別記録は未掲載 |
-| **2** | Firebase Auth・workspace・メンバーシップ・招待 | 1E | 実装中。Firebase設定後、1人利用→招待→2人参加とサーバー側権限制限を実機確認 |
-| **3** | FirestoreのCRUD・共有同期・競合対策 | 2 | TODO/予定/メモが2端末で安全に同期される |
+| **2** | Firebase Auth・workspace・メンバーシップ・招待 | 1E | ソース実装済み。Firebase設定後、1人利用→招待→2人参加とサーバー側権限制限を実機確認 |
+| **3** | FirestoreのCRUD・共有同期・競合対策 | 2 | TODO/予定/カテゴリの共有CRUD・移行・競合・オフライン動作を実装中。Rulesデプロイと実機受け入れが必要 |
 | **4** | PWA実運用最適化、オフライン、通知検討 | 3 | ホーム画面PWA・再接続・更新・通知（採用時）を検証 |
 | **5** | 本番QA・リリース・運用 | 4 | リリースチェック合格、データ保護確認 |
 
@@ -150,15 +150,28 @@
 
 **DoD:** 2人だけがworkspaceに参加でき、第三者はアクセス不可。招待が失効・重複使用・3人目参加を拒否する。Firebase接続とセキュリティケースの確認を記録する。
 
-## Phase 3 — リアルタイムデータ連携
+## Phase 3 — TODO・予定の共有データ連携（主要実装済み・受け入れ未完了）
 
-- TODO / event / noteそれぞれFirestore CRUD
-- 2端末同時更新、競合時の扱い、通信断と復帰
-- バックエンド保存状態（保存中/同期中/失敗）の正確な表示
-- 削除Undo/復元期間の要件確定
-- メモの保存頻度と同時編集ポリシー確定
+- TODO・TODOカテゴリ・予定をworkspace別Firestoreコレクションへ保存。メモCRUDは保留。
+- 設定で同期開始を選択：この端末の既存データを共有へ追加するか、端末内データを残して共有データから始める。
+- カテゴリは正規化した名前、TODO・予定は元ID由来の安定IDで再試行と同一データ移行を重複防止。別々に作られた別IDの記録は別項目として保持。
+- リアルタイム監視、workspace別の端末キャッシュ、永続オフラインキュー、再接続／手動再同期。
+- リビジョン付きtransactionで同時編集を検知し、未解決競合では端末側か共有側を選択。削除はtombstoneで保持し、既存Undoから復元。
+- レコード形式、workspaceメンバー、競合解決、端末移行マーカーを制限するRulesを追加。利用前にFirebaseへデプロイが必要。
+- バックアップは現在選択中のデータを出力し、共有モード復元は同期キューを通し、元のlocalStorageデータを上書きしない。
+- Firebase SDK/サービスは初回ダウンロードには含めず、オンライン利用時にランタイムキャッシュへ保存。認証UIDにひもづくメンバー情報キャッシュと共有データキューを使い、Firebaseコードの取得後にオフライン再起動を想定。
 
-**DoD:** 2台のiPhoneで正しい内容が同期され、競合/再接続時のデータ欠損が起きない。
+**Source acceptance checklist:**
+- [x] Typecheck、本番ビルド、bundle予算を通過。
+- [ ] 既存localStorageは共有読み書きで変化せず、ログアウト後に端末内データとして再表示。
+- [ ] 途中失敗後の再試行と、同じ元IDを2端末から移行した場合の重複防止。別IDは別項目として保持。
+- [ ] サインイン済みの2人がTODO・カテゴリ・予定の追加／編集／削除／Undoを両端末で確認。
+- [ ] オフライン編集は再読み込み後も保留表示され、再接続時に共有へ送信。共有側の変更を無言で上書きしない。
+- [ ] 競合解決が最新共有リビジョンを確認し、デプロイ済みRulesが非メンバーの読み書きを拒否。
+- [ ] iPhone Safari/PWAでログアウト、移行、オフライン、復元を確認。
+- [ ] E2E/PWAブラウザスイートをPhase 3のコードで実行。
+
+Phase 2 remains in progress until the two-account invite and access-control checks are recorded. Phase 3 remains in progress until the revised Rules are deployed and the checklist is verified against a Firebase project and two devices.
 
 ## Phase 4 — PWA品質
 

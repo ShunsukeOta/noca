@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, type SetStateAction } from "react"
 import { format, isValid, parseISO } from "date-fns"
 import { mockEvents, type CalendarEvent, type TaskCategory } from "@/app/mock-data"
+import { useWorkspaceDataSync } from "@/features/workspace/workspace-data-sync-context"
 
 export const CALENDAR_EVENT_STORAGE_KEY = "noca.calendar.events.v1"
 export const CALENDAR_SAMPLE_MIGRATION_KEYS = {
@@ -68,6 +69,7 @@ function readEvents(): CalendarEvent[] {
 
 type CalendarContextValue = {
   events: CalendarEvent[]
+  deviceEvents: CalendarEvent[]
   selectedDate: string
   setSelectedDate: (date: string) => void
   editor: EventEditor | null
@@ -87,7 +89,13 @@ type CalendarContextValue = {
 const CalendarContext = createContext<CalendarContextValue | null>(null)
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
-  const [events, setEvents] = useState<CalendarEvent[]>(readEvents)
+  const sharedData = useWorkspaceDataSync()
+  const [deviceEvents, setDeviceEvents] = useState<CalendarEvent[]>(readEvents)
+  const events = sharedData.isActive ? sharedData.events : deviceEvents
+  const setEvents = useCallback((updater: SetStateAction<CalendarEvent[]>) => {
+    if (sharedData.isActive) sharedData.updateEvents(updater)
+    else setDeviceEvents(updater)
+  }, [sharedData.isActive, sharedData.updateEvents])
   const [selectedDate, setSelectedDateState] = useState(() => format(new Date(), "yyyy-MM-dd"))
   const [editor, setEditor] = useState<EventEditor | null>(null)
   const [deleted, setDeleted] = useState<RemovedEvent | null>(null)
@@ -95,28 +103,29 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(CALENDAR_EVENT_STORAGE_KEY, JSON.stringify(events))
+      localStorage.setItem(CALENDAR_EVENT_STORAGE_KEY, JSON.stringify(deviceEvents))
       // Mark migration only after saving the added samples. React StrictMode can
       // initialize state twice before effects run, so the initializer stays pure.
-      if (events.some(event => event.id.startsWith("demo-"))) {
+      if (deviceEvents.some(event => event.id.startsWith("demo-"))) {
         localStorage.setItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v2, "done")
       }
-      if (events.some(event => event.id.startsWith("demo-v3-"))) {
+      if (deviceEvents.some(event => event.id.startsWith("demo-v3-"))) {
         localStorage.setItem(CALENDAR_SAMPLE_MIGRATION_KEYS.v3, "done")
       }
       setStorageError(false)
     } catch {
       setStorageError(true)
     }
-  }, [events])
+  }, [deviceEvents])
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
-      if (event.key === CALENDAR_EVENT_STORAGE_KEY) setEvents(readEvents())
+      if (sharedData.isActive) return
+      if (event.key === CALENDAR_EVENT_STORAGE_KEY) setDeviceEvents(readEvents())
     }
     window.addEventListener("storage", sync)
     return () => window.removeEventListener("storage", sync)
-  }, [])
+  }, [sharedData.isActive])
 
   useEffect(() => {
     if (!deleted) return
@@ -136,17 +145,17 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const addEvent = useCallback((draft: EventDraft) => {
     setEvents(previous => [{ ...draft, id: crypto.randomUUID() }, ...previous])
     setSelectedDateState(draft.date)
-  }, [])
+  }, [setEvents])
   const updateEvent = useCallback((id: string, draft: EventDraft) => {
     setEvents(previous => previous.map(event => event.id === id ? { ...event, ...draft } : event))
     setSelectedDateState(draft.date)
-  }, [])
+  }, [setEvents])
   const deleteEvent = useCallback((id: string) => {
     const index = events.findIndex(event => event.id === id)
     if (index < 0) return
     setDeleted({ event: events[index], index })
     setEvents(previous => previous.filter(event => event.id !== id))
-  }, [events])
+  }, [events, setEvents])
   const undoDelete = useCallback(() => {
     if (!deleted) return
     setEvents(previous => {
@@ -157,18 +166,18 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     })
     setSelectedDateState(deleted.event.date)
     setDeleted(null)
-  }, [deleted])
+  }, [deleted, setEvents])
   const dismissDeleted = useCallback(() => setDeleted(null), [])
   const restoreLocalData = useCallback((nextEvents: CalendarEvent[]) => {
     setEvents(nextEvents)
     setEditor(null)
     setDeleted(null)
-  }, [])
+  }, [setEvents])
 
   const value = useMemo<CalendarContextValue>(() => ({
-    events, selectedDate, setSelectedDate, editor, deleted, storageError,
+    events, deviceEvents, selectedDate, setSelectedDate, editor, deleted, storageError,
     openCreate, openEdit, closeEditor, addEvent, updateEvent, deleteEvent, undoDelete, dismissDeleted, restoreLocalData
-  }), [events, selectedDate, setSelectedDate, editor, deleted, storageError,
+  }), [events, deviceEvents, selectedDate, setSelectedDate, editor, deleted, storageError,
     openCreate, openEdit, closeEditor, addEvent, updateEvent, deleteEvent, undoDelete, dismissDeleted, restoreLocalData])
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>

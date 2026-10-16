@@ -13,6 +13,7 @@ export default defineConfig({
           const normalizedId = id.replace(/\\/g, "/")
           if (normalizedId.includes("/src/features/workspace/workspace-membership.tsx")) return "workspace-membership"
           if (normalizedId.includes("/node_modules/@firebase/auth/") || normalizedId.includes("/node_modules/firebase/auth/")) return "firebase-auth-sdk"
+          if (normalizedId.includes("/node_modules/@firebase/firestore/") || normalizedId.includes("/node_modules/firebase/firestore/")) return "firebase-firestore-sdk"
         }
       }
     }
@@ -38,8 +39,18 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         globPatterns: ["**/*.{js,css,html,ico,png,webp}"],
-        // Auth, Firestore and invite acceptance require a connection; cache only the local-first app UI.
+        // Keep Firebase code out of installation precache, then retain its hashed chunks after first online use.
         globIgnores: ["**/firebase-*-sdk-*.js", "**/firebase-workspace-*.js", "**/join-workspace-page-*.js"],
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/(?:firebase-(?:auth|firestore)-sdk|firebase-workspace-)[^/]+\.js$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "noca-firebase-runtime-v1",
+              expiration: { maxEntries: 20, maxAgeSeconds: 31_536_000 }
+            }
+          }
+        ],
         cleanupOutdatedCaches: true
       },
       devOptions: { enabled: false }

@@ -21,6 +21,180 @@ service cloud.firestore {
       return /databases/$(database)/documents/users/$(uid);
     }
 
+    function validTodoRecord(record, recordId) {
+      return record is map
+        && record.keys().hasAll(['id', 'title', 'category', 'done', 'by'])
+        && record.keys().hasOnly(['id', 'title', 'category', 'dueDate', 'memo', 'url', 'address', 'done', 'by'])
+        && record.id == recordId
+        && record.title is string
+        && record.title.size() > 0
+        && record.title.size() <= 2000
+        && record.category is string
+        && record.category.size() > 0
+        && record.category.size() <= 80
+        && record.done is bool
+        && record.by in ['A', 'B']
+        && (!('dueDate' in record) || (record.dueDate is string && record.dueDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && (!('memo' in record) || (record.memo is string && record.memo.size() <= 10000))
+        && (!('url' in record) || (record.url is string && record.url.size() <= 2000))
+        && (!('address' in record) || (record.address is string && record.address.size() <= 2000));
+    }
+
+    function validTodoCategory(record, recordId) {
+      return record is map
+        && record.keys().hasAll(['id', 'name', 'tone'])
+        && record.keys().hasOnly(['id', 'name', 'tone'])
+        && record.id == recordId
+        && record.name is string
+        && record.name.size() > 0
+        && record.name.size() <= 80
+        && record.tone in ['peach', 'green', 'lavender', 'blue', 'mint', 'yellow', 'rose', 'neutral', 'life', 'outing', 'couple'];
+    }
+
+    function validCalendarEvent(record, recordId) {
+      return record is map
+        && record.keys().hasAll(['id', 'title', 'date', 'category', 'by'])
+        && record.keys().hasOnly(['id', 'title', 'date', 'time', 'endTime', 'address', 'memo', 'category', 'by'])
+        && record.id == recordId
+        && record.title is string
+        && record.title.size() > 0
+        && record.title.size() <= 2000
+        && record.date is string
+        && record.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && record.category in ['暮らし', 'おでかけ', 'ふたり', 'その他']
+        && record.by in ['A', 'B', 'both']
+        && (!('time' in record) || (record.time is string && record.time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')))
+        && (!('endTime' in record) || (record.endTime is string && record.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')))
+        && (!('address' in record) || (record.address is string && record.address.size() <= 2000))
+        && (!('memo' in record) || (record.memo is string && record.memo.size() <= 10000));
+    }
+
+    function validWorkspaceRecordPayload(data, collectionName, recordId) {
+      return data is map
+        && data.keys().hasAll(['record', 'revision', 'deleted', 'sortOrder', 'createdAt', 'updatedAt', 'updatedByUid'])
+        && data.keys().hasOnly(['record', 'revision', 'deleted', 'sortOrder', 'createdAt', 'updatedAt', 'updatedByUid', 'lastMutationId', 'sourceInstallId', 'sourceRecordId'])
+        && data.revision is int
+        && data.revision > 0
+        && data.revision <= 2147483647
+        && data.deleted is bool
+        && data.sortOrder is number
+        && data.sortOrder >= 0
+        && data.sortOrder <= 10000000000000
+        && data.updatedByUid is string
+        && data.updatedByUid == request.auth.uid
+        && (collectionName == 'todos' ? validTodoRecord(data.record, recordId)
+          : collectionName == 'todoCategories' ? validTodoCategory(data.record, recordId)
+            : collectionName == 'calendarEvents' && validCalendarEvent(data.record, recordId))
+        && (!('sourceInstallId' in data) || (data.sourceInstallId is string && data.sourceInstallId.size() <= 128))
+        && (!('sourceRecordId' in data) || (data.sourceRecordId is string && data.sourceRecordId.size() <= 256))
+        && (!('lastMutationId' in data) || (data.lastMutationId is string && data.lastMutationId.size() <= 128));
+    }
+
+    function validWorkspaceRecordCreate(data, collectionName, recordId) {
+      return validWorkspaceRecordPayload(data, collectionName, recordId)
+        && data.revision == 1
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function validWorkspaceRecordUpdate(data, collectionName, recordId) {
+      return validWorkspaceRecordPayload(data, collectionName, recordId)
+        && resource.data.revision is int
+        && data.revision == resource.data.revision + 1
+        && data.createdAt == resource.data.createdAt
+        && data.updatedAt == request.time;
+    }
+
+    function validConflictSide(kind, action, record, entityId) {
+      return action == 'delete'
+        ? (record == null || (kind == 'todos' ? validTodoRecord(record, entityId)
+          : kind == 'categories' ? validTodoCategory(record, entityId)
+            : kind == 'events' && validCalendarEvent(record, entityId)))
+        : action == 'upsert' && (kind == 'todos' ? validTodoRecord(record, entityId)
+          : kind == 'categories' ? validTodoCategory(record, entityId)
+            : kind == 'events' && validCalendarEvent(record, entityId));
+    }
+
+    function validConflictCreate(data) {
+      return data is map
+        && data.keys().hasAll(['kind', 'entityId', 'entityName', 'localAction', 'localRecord', 'remoteAction', 'remoteRecord', 'localSortOrder', 'remoteSortOrder', 'baseRevision', 'remoteRevision', 'createdByUid', 'createdAt', 'status'])
+        && data.keys().hasOnly(['kind', 'entityId', 'entityName', 'localAction', 'localRecord', 'remoteAction', 'remoteRecord', 'localSortOrder', 'remoteSortOrder', 'baseRevision', 'remoteRevision', 'createdByUid', 'createdAt', 'status'])
+        && data.kind in ['todos', 'categories', 'events']
+        && data.entityId is string
+        && data.entityId.size() > 0
+        && data.entityName is string
+        && data.entityName.size() <= 2000
+        && validConflictSide(data.kind, data.localAction, data.localRecord, data.entityId)
+        && validConflictSide(data.kind, data.remoteAction, data.remoteRecord, data.entityId)
+        && (data.localSortOrder == null || (data.localSortOrder is number && data.localSortOrder >= 0))
+        && (data.remoteSortOrder == null || (data.remoteSortOrder is number && data.remoteSortOrder >= 0))
+        && data.baseRevision is int
+        && data.baseRevision >= 0
+        && data.remoteRevision is int
+        && data.remoteRevision >= 0
+        && data.createdByUid == request.auth.uid
+        && data.createdAt == request.time
+        && data.status == 'unresolved';
+    }
+
+    function validConflictUpdate(data) {
+      return resource.data.status == 'unresolved'
+        && data.status == 'unresolved'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['entityName', 'remoteAction', 'remoteRecord', 'remoteSortOrder', 'remoteRevision', 'refreshedAt'])
+        && data.entityName is string
+        && data.entityName.size() <= 2000
+        && validConflictSide(data.kind, data.remoteAction, data.remoteRecord, data.entityId)
+        && (data.remoteSortOrder == null || (data.remoteSortOrder is number && data.remoteSortOrder >= 0))
+        && data.remoteRevision is int
+        && data.remoteRevision >= resource.data.remoteRevision
+        && data.refreshedAt == request.time;
+    }
+
+    function validConflictLocalRefresh(data) {
+      return resource.data.status == 'unresolved'
+        && resource.data.createdByUid == request.auth.uid
+        && data.status == 'unresolved'
+        && data.localUpdatedByUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['entityName', 'localAction', 'localRecord', 'localSortOrder', 'localUpdatedByUid'])
+        && data.entityName is string
+        && data.entityName.size() <= 2000
+        && validConflictSide(data.kind, data.localAction, data.localRecord, data.entityId)
+        && (data.localSortOrder == null || (data.localSortOrder is number && data.localSortOrder >= 0));
+    }
+
+    function validConflictResolution(data) {
+      return resource.data.status == 'unresolved'
+        && data.status == 'resolved'
+        && data.resolution in ['local', 'remote']
+        && data.resolvedByUid == request.auth.uid
+        && data.resolvedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolution', 'resolvedByUid', 'resolvedAt']);
+    }
+
+    function validSyncDeviceCreate(installId, data) {
+      return data is map
+        && data.keys().hasAll(['uid', 'installId', 'importedLocalData', 'activatedAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'installId', 'importedLocalData', 'activatedAt', 'updatedAt'])
+        && data.uid == request.auth.uid
+        && data.installId == installId
+        && data.importedLocalData is bool
+        && data.activatedAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function validSyncDeviceUpdate(installId, data) {
+      return resource.data.uid == request.auth.uid
+        && data is map
+        && data.keys().hasAll(['uid', 'installId', 'importedLocalData', 'activatedAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'installId', 'importedLocalData', 'activatedAt', 'updatedAt'])
+        && data.uid == request.auth.uid
+        && data.installId == installId
+        && data.importedLocalData is bool
+        && (resource.data.importedLocalData == true ? data.importedLocalData == true : true)
+        && data.activatedAt == resource.data.activatedAt
+        && data.updatedAt == request.time;
+    }
+
     function isWorkspaceMember(workspaceId) {
       return signedIn() && exists(memberPath(workspaceId, request.auth.uid));
     }
@@ -139,6 +313,33 @@ service cloud.firestore {
           );
 
         allow update, delete: if false;
+      }
+
+      match /{dataCollection}/{recordId} {
+        allow get: if isWorkspaceMember(workspaceId)
+          && dataCollection in ['todos', 'todoCategories', 'calendarEvents', 'syncConflicts', 'syncDevices'];
+        allow list: if isWorkspaceMember(workspaceId)
+          && dataCollection in ['todos', 'todoCategories', 'calendarEvents', 'syncConflicts'];
+
+        allow create: if isWorkspaceMember(workspaceId) && (
+          (dataCollection in ['todos', 'todoCategories', 'calendarEvents']
+            && validWorkspaceRecordCreate(request.resource.data, dataCollection, recordId))
+          || (dataCollection == 'syncConflicts'
+            && validConflictCreate(request.resource.data))
+          || (dataCollection == 'syncDevices'
+            && validSyncDeviceCreate(recordId, request.resource.data))
+        );
+
+        allow update: if isWorkspaceMember(workspaceId) && (
+          (dataCollection in ['todos', 'todoCategories', 'calendarEvents']
+            && validWorkspaceRecordUpdate(request.resource.data, dataCollection, recordId))
+          || (dataCollection == 'syncConflicts'
+            && (validConflictUpdate(request.resource.data) || validConflictLocalRefresh(request.resource.data) || validConflictResolution(request.resource.data)))
+          || (dataCollection == 'syncDevices'
+            && validSyncDeviceUpdate(recordId, request.resource.data))
+        );
+
+        allow delete: if false;
       }
     }
 

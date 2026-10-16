@@ -23,6 +23,9 @@ const JoinWorkspacePage = lazy(async () => ({
 const FirebaseWorkspaceMembershipProvider = lazy(async () => ({
   default: (await import("@/features/workspace/firebase-workspace-membership-provider")).FirebaseWorkspaceMembershipProvider
 }))
+const WorkspaceDataSyncProvider = lazy(async () => ({
+  default: (await import("@/features/workspace/workspace-data-sync")).WorkspaceDataSyncProvider
+}))
 
 function CalendarLoadingState() {
   return (
@@ -80,15 +83,17 @@ export default function App() {
 
   return (
     <WorkspaceMembershipProvider>
-      <TodoProvider>
-        <CalendarProvider>
-          {isFirebaseConfigured ? (
-            <Suspense fallback={routes}>
-              <FirebaseWorkspaceMembershipProvider>{routes}</FirebaseWorkspaceMembershipProvider>
-            </Suspense>
-          ) : routes}
-        </CalendarProvider>
-      </TodoProvider>
+      {isFirebaseConfigured ? (
+        <Suspense fallback={<TodoProvider><CalendarProvider>{routes}</CalendarProvider></TodoProvider>}>
+          <FirebaseWorkspaceMembershipProvider>
+            <WorkspaceDataSyncProvider>
+              <TodoProvider><CalendarProvider>{routes}</CalendarProvider></TodoProvider>
+            </WorkspaceDataSyncProvider>
+          </FirebaseWorkspaceMembershipProvider>
+        </Suspense>
+      ) : (
+        <TodoProvider><CalendarProvider>{routes}</CalendarProvider></TodoProvider>
+      )}
     </WorkspaceMembershipProvider>
   )
 }

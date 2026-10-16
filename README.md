@@ -6,10 +6,10 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 
 **プレビュー:** https://noca-delta.vercel.app  
 **ソース:** https://github.com/ShunsukeOta/noca  
-**開発状況:** TODO・カレンダーは端末内機能を実装済み。Googleログインと2人のメンバー参加を実装中です。メモタブは残し、「メモ機能は開発中です」と案内するプレースホルダーです。
+**開発状況:** TODO・カレンダーの端末内利用と、Googleログイン・共有スペースを使ったPhase 3のFirestore保存・同期・既存データ追加をローカルコードに実装しています。Firebase実環境でのRules反映と二端末受け入れ確認は未完了です。メモタブは残し、「メモ機能は開発中です」と案内するプレースホルダーです。
 
 > [!IMPORTANT]
-> **まだTODO・予定を2人で共有する完成版ではありません。** Firebaseの環境変数がない状態では、同一ブラウザの `localStorage` を使う1人用プレビューです。Firebaseを設定するとGoogleログイン、共有スペース作成、招待リンク参加が使えますが、TODO・予定は引き続き端末内保存で、クラウド同期・既存データ移行は未実装です。初期状態ではBの表示・担当選択・2人比較画面は出ません。メモ機能は開発中で、通知も未実装です。設定からJSONバックアップを書き出して復元できますが、復元は現在のTODO・カテゴリ・予定を置き換えます。ブラウザの保存データを消すと端末内の編集内容も消えます。Firebaseの設定は[セットアップ手順](docs/FIREBASE_SETUP.md)を参照してください。
+> **Phase 3のコードはありますが、共有運用の受け入れ確認は未完了です。** Firebaseの環境変数がない状態では、同一ブラウザの `localStorage` を使う1人用プレビューです。Firebaseを設定してGoogleログインし、共有スペースに参加した後、設定の「データ」から同期開始方法を選ぶとTODO・カテゴリ・予定をFirestoreへ保存し、メンバー間で同期します。移行は既存データを追加する方式で、元の端末内データは残ります。Phase 2の2アカウント確認、今回追加したFirestore Rulesのデプロイ、2端末同期・オフライン復帰・競合の受け入れ確認を終えるまでは完成扱いにしません。初期状態ではBの表示・担当選択・2人比較画面は出ません。メモ機能は開発中で、通知も未実装です。設定からJSONバックアップを書き出して復元できます。ブラウザ保存データを消すと端末内のバックアップ・同期キューも失われるため、消去前にバックアップを書き出してください。Firebaseの設定は[セットアップ手順](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## Codex / AIエージェントへの引き継ぎ
 
@@ -27,10 +27,10 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 | 画面・機能 | 現状 | 主な操作・特徴 |
 | --- | --- | --- |
 | **TODO** | **動作**・端末内に保存 | 作成・編集・完了/解除・削除/Undo。カテゴリは設定から追加・名前変更・色変更・並び替え・削除ができ、削除時はTODOを別カテゴリへ移動。 |
-| **カレンダー** | **動作**・端末内に保存 | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了、期限付きTODOの参照。初期状態は担当表示のない1人用タイムライン。実メンバーが2人参加するとA/B比較表示になりますが、予定自体の共有同期は未実装です |
+| **カレンダー** | **動作** | 月移動・日付選択、予定の作成/編集/削除/Undo、終日・開始/終了、期限付きTODOの参照。初期状態は担当表示のない1人用タイムライン。共有同期を開始するとTODOと同様にworkspaceへ保存します（実環境検証前） |
 | **メモ** | **開発中** | メモタブを開くと「メモ機能は開発中です」と表示。入力や保存の操作はありません。 |
-| **設定** | テーマ・TODOカテゴリ・端末内バックアップ、Firebase設定時は認証とメンバー参加 | 初期状態は「自分」1人。Googleログイン、共有スペース作成、24時間有効の招待リンクを実装。TODO・予定の共有同期は未実装 |
-| **PWA** | 基本構成あり | manifest / service workerの自動更新設定。メンテナーからiPhone Safari・ホーム画面standalone実機QA完了の報告あり（端末と個別結果は未記録）。オフライン同期は未実装 |
+| **設定** | テーマ・TODOカテゴリ・バックアップ・共有同期 | Googleログイン、共有スペース作成、24時間招待、TODO・カテゴリ・予定の同期開始、既存データ追加、オフライン保留、競合解決を実装。Rulesのデプロイと実環境の受け入れ確認が残る |
+| **PWA** | 基本構成あり | manifest / service workerの自動更新設定。メンテナーからiPhone Safari・ホーム画面standalone実機QA完了の報告あり（端末と個別結果は未記録）。共有同期のオフラインキューはコード実装済みですが、実機検証前です |
 
 ### UIで守るべき重要な決定
 
@@ -42,7 +42,7 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 - **動き：** Motionによる自然なアニメーション。`prefers-reduced-motion` を尊重。ライト・ダーク両テーマ対応。
 - **共通UI：** 入力・ラベル・ボタン・チェック・スイッチ・担当/カテゴリ選択・破棄確認・Undo通知をローカルの共通部品で管理。色と角丸は `src/styles/globals.css` のテーマ変数を基準にします。
 
-A・B・`both` は予定の表示レーンです。Firebaseで実メンバーが参加するとA/Bはメンバー枠に対応しますが、TODO・予定レコードの担当情報はまだ実ユーザーIDに結び付かず、他端末との共有同期もありません。
+A・B・`both` はTODO・予定の表示レーンです。Firebaseで実メンバーが参加するとA/Bはメンバー枠に対応しますが、担当値自体は実ユーザーIDではなく、アクセス権の判定にも使いません。共有同期の開始後はレコードをworkspaceのメンバー間で同期します。
 
 ## 技術スタック
 
@@ -53,13 +53,13 @@ A・B・`both` は予定の表示レーンです。Firebaseで実メンバーが
 | ルーティング | React Router 7 |
 | アイコン / モーション | Lucide React / Motion |
 | 日付 | date-fns |
-| 状態・保存 | React Context + `localStorage`（TODO / 予定 / TODOカテゴリ） |
-| 認証・メンバー | Firebase Authentication + Cloud Firestore（環境設定がある場合。TODO/予定保存には未使用） |
+| 状態・保存 | React Context + `localStorage`（端末内データ・workspace別同期キュー/共有スナップショット・メンバー情報キャッシュ） + Cloud Firestore（共有データ） |
+| 認証・メンバー | Firebase Authentication + Cloud Firestore（Googleログイン、workspace、メンバー、TODO/予定共有データ） |
 | PWA | vite-plugin-pwa（manifest と service worker） |
 | 自動テスト | Playwright + Chromium |
 | CI / プレビュー | GitHub Actions / Vercel |
 
-**未完了:** Firebaseプロジェクトとの接続、TODO/予定のFirestore CRUD・同期、ローカルからのデータ移行、プッシュ通知。本番データベースや認証プロバイダーの設定手順は[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。
+**未完了:** Phase 2の実環境受け入れ確認、Phase 3のFirestore Rulesデプロイと2端末・オフライン・競合の実地確認、プッシュ通知。本番データベースや認証プロバイダーの設定手順は[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## 開発環境と起動
 
@@ -93,11 +93,11 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 
 > **依存関係の注意:** `package-lock.json` はコミット済みですが、CIは現在 `npm install` を使っています。CIを `npm ci` に切り替える場合は別途確認してください。
 
-### テスト状況
+### 検証状況
 
-現在のPhase 2ソースは `npm run build`、`npm run check:bundle`、Playwright Chromium **50/50件**、production PWA **4/4件**を通過しています。ローカルテストはFirebase未設定のプレビュー動作です。Firebaseプロジェクト側ではGoogle Auth、Firestore、Rules、Vercel Production/Previewのクライアント設定を準備済みで、デプロイ後のログイン・招待フロー確認が残っています。過去のGitHub Actions記録は [#38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) です。
+今回のPhase 3変更では `npm run typecheck` と `npm run build` が成功し、`npm run check:bundle` も予算内です。ブラウザテスト、Firestore Rules emulator/deploy、Firebase実環境での二端末確認は未実施です。Phase 2ソースの過去の基準値はPlaywright Chromium **50/50件**、production PWA **4/4件**です（今回変更の合格結果ではありません）。新しいFirestore Rulesをデプロイしてから、二つのGoogleアカウントと別端末で受け入れ確認を行ってください。過去のGitHub Actions記録は [#38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) です。
 
-初回JavaScriptは **436.08 kB / gzip 139.45 kB**、最大チャンクは **458.21 kB**です。カレンダー、編集シート、カテゴリ管理、Firebaseの認証ブリッジとMotionのレイアウト機能を必要時に読み込みます。ネットワークが必要なFirebase SDK/サービスと招待ルートはPWA事前キャッシュから除外し、TODO・カレンダーと編集画面のオフライン動作を維持します。PWA事前保存量は **650.71 KiB / 652 KiB予算**です。容量の予算は `scripts/check-bundle.mjs` でCIでも確認します。
+以前のPhase 2基準では初回JavaScript **436.08 kB / gzip 139.45 kB**、最大チャンク **458.21 kB**、PWA事前保存量 **650.71 KiB / 652 KiB予算**でした。現在は初回JavaScript **444.50 kB / gzip 141.47 kB**、最大チャンク **455.25 kB**、PWA事前保存 **669.58 KiB / 672 KiB予算**です。オフライン同期の端末内キューを事前保存するため、PWA予算を必要な範囲だけ調整しました。Firebase SDK/サービスと招待ルートは事前キャッシュには含めず、Firebaseのコードはオンライン利用時にランタイムキャッシュへ保存します。Firebaseメンバー情報・共有スナップショット・未送信キューを端末に保存し、共有開始後に一度オンライン利用した端末でのオフライン編集を想定します。容量は `scripts/check-bundle.mjs` でCI確認します。
 
 320 / 375 / 390 / 430pxのモバイル幅や一部のreduced-motion、ダークモードのテストを含みます。ChromiumはiPhone Safariの証拠にはなりません。メンテナーから実機Safari/standalone QA完了の報告を受けていますが、端末・iOS版・ケース別結果はリポジトリに記録されていません。
 
@@ -157,13 +157,19 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 | `noca.calendar.events.v1` | 予定配列（A/B/ふたり） |
 | `noca.calendar.samples.v2` / `.v3` | 旧デモ予定からの一度きりのサンプル追加フラグ |
 | `noca.workspace.members.v1` | プレビュー上のメンバー状態。初期状態は「自分」1人。招待・実メンバー管理ではありません |
+| `noca.shared-data.v1:{workspaceId}` | 共有データの端末内読み取りキャッシュ |
+| `noca.shared-data.active.v1:{workspaceId}` | この端末で共有同期を選択した状態 |
+| `noca.shared-data.imported.v1:{workspaceId}` | この端末の既存データを共有へ追加済みか |
+| `noca.sync.pending.*.v1:{workspaceId}` | オフライン時を含む未送信変更キュー |
+| `noca.sync.install-id.v1:{workspaceId}:{uid}` | ブラウザとアカウントごとの移行端末識別子 |
+| `noca.firebase.workspace.v1:{uid}` | オフライン起動時に共有領域を特定するための最終メンバー情報 |
 | `noca.theme` | ライト/ダーク |
 
 設定から、現在のTODO・カテゴリ・予定を版番号付きJSONファイルへ書き出せます。iPhoneなどファイル共有に対応した環境では共有シートを使い、それ以外ではブラウザのファイル保存を使います。住所やメモなどの詳細と、カレンダーのサンプル移行状態も含みます。復元時は形式とデータを検証し、対象件数を確認してから現在のTODO・カテゴリ・予定を置き換えます。対応するバックアップは20MB以下の `noca.local-backup` v1です。
 
 新規端末にはサンプル予定/TODOが表示されます。以前からサンプルが残る端末にはカレンダーの追加デモを一度だけ取り込む処理があります。**有効な保存済みの空配列は空のまま**です。
 
-現在のブラウザでのみデータが保存されます。スマホとPC、異なるブラウザや別オリジン間での同期・データ共有はありません。テストや変更時にローカル保存データを破壊しないでください。
+共有同期を開始していない間は、現在のブラウザでのみデータが保存されます。開始後は同じworkspaceのFirestoreデータが他のメンバー端末へ反映されます。旧localStorageは移行時に書き換えず、ログアウト後も元の端末内データとして残します。同期キューとキャッシュもブラウザ保存領域にあるため、消去前にバックアップを書き出してください。
 
 ## 開発フェーズ
 
@@ -175,14 +181,14 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 | 1C | カレンダー CRUD、初期1人・2人状態に応じたタイムライン | **実装済み**（Phase 1E実機QA完了報告あり） |
 | **1D** | **メモ機能** | **保留**。メモタブと「開発中です」の案内のみ。作成・編集・保存はなし |
 | 1E | iPhone Safari / Home Screen PWAでの実機レビュー | メンテナーから完了報告あり（詳細未記録） |
-| 2 | Googleログイン、2人の共有スペース・招待 | 実装中。Firebase接続と2アカウント確認が必要 |
-| 3 | Firestoreによる共有CRUD・同期・競合対策 | 未実装 |
+| 2 | Googleログイン、2人の共有スペース・招待 | ソース実装済み。Firebase接続と2アカウント確認が必要 |
+| 3 | FirestoreによるTODO・予定の共有CRUD・同期・競合対策 | ソース実装中。Rulesデプロイ、2端末・オフライン・競合確認が必要 |
 | 4 | PWAオフライン挙動・通知など | 未完了 |
 | 5 | 本番QA・リリース | 未完了 |
 
 以前のプレビューが書き込んだ `noca.notes.v1` がある場合も、この版では読み書きせず、削除もしません。
 
-**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) と [FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) を参照**し、Firebase接続と招待フローの受け入れ確認を進めてください。TODO・予定の共有CRUDと既存データ移行はPhase 3です。
+**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) と [FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) を参照**し、型チェック・ビルド・ブラウザ検証、新しいFirestore Rulesのデプロイ、Phase 2/3の実環境受け入れ確認を進めてください。
 
 ## ドキュメント一覧
 
@@ -200,4 +206,4 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 で `npm install` → 
 旧 [realtime-todos](https://github.com/ShunsukeOta/realtime-todos) は参照用であり、**nocaの作業で旧コード・DB・デプロイ先を変更しません**。独自チャット、AI機能、習慣トラッカー、分析ダッシュボード、複数ワークスペース切替は当面の対象外です。
 
 ---
-**Last reviewed against implementation:** 2026-10-15 · **Status:** Local data preview with Firebase Auth/workspace membership in progress; memo feature deferred.
+**Last reviewed against implementation:** 2026-10-16 · **Status:** Phase 3 shared-data code implemented locally; Rules deployment and real Firebase/two-device acceptance remain; memo feature deferred.

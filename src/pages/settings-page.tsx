@@ -13,8 +13,10 @@ import { cn } from "@/lib/utils"
 import { useTodos } from "@/features/todos/todo-store"
 import { CALENDAR_SAMPLE_MIGRATION_KEYS, useCalendar } from "@/features/calendar/calendar-store"
 import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
+import { useWorkspaceDataSync } from "@/features/workspace/workspace-data-sync-context"
 import { isFirebaseConfigured } from "@/features/workspace/firebase-env"
 import { workspaceErrorMessage } from "@/features/workspace/workspace-errors"
+import type { WorkspaceSyncConflict } from "@/features/workspace/firebase-workspace-data"
 import { createLocalBackup, localBackupFilename, MAX_LOCAL_BACKUP_SIZE_BYTES, parseLocalBackup, restoreLocalBackup, type LocalBackup } from "@/features/data/local-backup"
 
 type Theme = "light" | "dark"
@@ -71,6 +73,23 @@ function SettingsGroup({ title, children }: { title: string; children: ReactNode
   )
 }
 
+function conflictSummary(conflict: WorkspaceSyncConflict, side: "local" | "remote") {
+  if (side === "local" && conflict.localAction === "delete") return "削除"
+  const record = side === "local" ? conflict.localRecord : conflict.remoteRecord
+  if (!record) return "削除"
+  if ("date" in record) {
+    const time = record.time ? `${record.time}${record.endTime ? `–${record.endTime}` : ""}` : "終日"
+    return `${record.title} · ${record.date} ${time} · ${record.category}`
+  }
+  if ("title" in record) {
+    const details = [record.category, record.done ? "完了" : "未完了", record.dueDate ? `期限 ${record.dueDate}` : null]
+      .filter((item): item is string => item !== null)
+    return `${record.title} · ${details.join(" · ")}`
+  }
+  const order = side === "local" ? conflict.localSortOrder : conflict.remoteSortOrder
+  return `${record.name}${typeof order === "number" ? ` · ${order + 1}番目` : ""}`
+}
+
 function IconBox({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "green" | "peach" }) {
   return (
     <span className={cn(
@@ -99,8 +118,9 @@ export function SettingsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { theme, onThemeChange } = useOutletContext<ThemeOutlet>()
-  const { todos, categories, restoreLocalData: restoreTodos } = useTodos()
-  const { events, restoreLocalData: restoreEvents } = useCalendar()
+  const { todos, categories, deviceTodos, deviceCategories, restoreLocalData: restoreTodos } = useTodos()
+  const { events, deviceEvents, restoreLocalData: restoreEvents } = useCalendar()
+  const syncData = useWorkspaceDataSync()
   const {
     members, authStatus, workspaceStatus, authUser, workspace, authError,
     signInWithGoogle, signOut, createWorkspace, createInvite
@@ -132,7 +152,7 @@ export function SettingsPage() {
       }
       if (action === "create-workspace") {
         await createWorkspace()
-        setMemberMessage("共有スペースを作成しました。TODO・予定の共有同期は次の開発段階で追加します。")
+        setMemberMessage("共有スペースを作成しました。データの同期方法は「データ」から選べます。")
       }
       if (action === "create-invite") {
         const invite = await createInvite()
@@ -142,6 +162,57 @@ export function SettingsPage() {
       }
     } catch (error) {
       setMemberMessage(workspaceErrorMessage(error))
+    } finally {
+      setMemberBusy(false)
+    }
+  }
+
+  const beginDataSync = async (includeThisDevice: boolean) => {
+    if (memberBusy) return
+    setMemberBusy(true)
+    setMemberMessage("")
+    try {
+      await syncData.startSync(includeThisDevice, {
+        todos: deviceTodos,
+        categories: deviceCategories,
+        events: deviceEvents
+      })
+      setMemberMessage(includeThisDevice
+        ? "この端末のTODO・カテゴリ・予定を共有データへ追加しました。"
+        : "共有データで開始しました。この端末のデータは端末内に残っています。")
+    } catch (error) {
+      setMemberMessage(error instanceof Error ? error.message : "共有同期を開始できませんでした。")
+    } finally {
+      setMemberBusy(false)
+    }
+  }
+
+  const importThisDeviceData = async () => {
+    if (memberBusy) return
+    setMemberBusy(true)
+    setMemberMessage("")
+    try {
+      await syncData.importLocalData({
+        todos: deviceTodos,
+        categories: deviceCategories,
+        events: deviceEvents
+      })
+      setMemberMessage("この端末のデータを共有へ追加しました。")
+    } catch (error) {
+      setMemberMessage(error instanceof Error ? error.message : "この端末のデータを追加できませんでした。")
+    } finally {
+      setMemberBusy(false)
+    }
+  }
+
+  const resolveSyncConflict = async (id: string, choice: "local" | "remote") => {
+    if (memberBusy) return
+    setMemberBusy(true)
+    setMemberMessage("")
+    try {
+      await syncData.resolveConflict(id, choice)
+    } catch (error) {
+      setMemberMessage(error instanceof Error ? error.message : "競合を解決できませんでした。")
     } finally {
       setMemberBusy(false)
     }
@@ -238,10 +309,10 @@ export function SettingsPage() {
   const applyBackup = () => {
     if (!pendingBackup) return
     try {
-      restoreLocalBackup(pendingBackup)
+      if (!syncData.isActive) restoreLocalBackup(pendingBackup)
       restoreTodos(pendingBackup.data.todos, pendingBackup.data.todoCategories)
       restoreEvents(pendingBackup.data.calendarEvents)
-      setRestoreMessage("バックアップを復元しました。")
+      setRestoreMessage(syncData.isActive ? "バックアップの内容を共有データへ反映しました。" : "バックアップを復元しました。")
       setRestoreMessageIsError(false)
       setPendingBackup(null)
     } catch (error) {
@@ -359,7 +430,7 @@ export function SettingsPage() {
                   </Button>
                 ) : (
                   <p className="rounded-xl bg-secondary/70 px-3 py-2.5 text-[12px] leading-relaxed text-muted-foreground">
-                    メンバー参加が完了しました。TODO・予定の共有同期は次の開発段階で追加します。
+                    共有スペースに参加しています。TODO・カテゴリ・予定は「データ」から同期を開始できます。
                   </p>
                 )}
                 {inviteLink && <div className="flex gap-2">
@@ -394,13 +465,101 @@ export function SettingsPage() {
 
       <SettingsGroup title="データ">
         <div className="flex min-h-[76px] items-center gap-3 border-b border-border/70 px-4 py-3">
-          <IconBox tone="green"><Database className="size-[19px]" /></IconBox>
+          <IconBox tone={syncData.isActive ? "green" : "blue"}>{syncData.isActive ? <Cloud className="size-[19px]" /> : <Database className="size-[19px]" />}</IconBox>
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold">データの保存先</p>
-            <p className="mt-1 text-[12px] text-muted-foreground">TODO・予定はこの端末内（共有同期は未対応）</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              {syncData.isActive
+                ? syncData.status === "syncing" ? "共有スペースへ同期中"
+                  : syncData.status === "offline" ? "オフライン・変更は端末に保留中"
+                    : syncData.status === "error" ? "共有データを同期できませんでした"
+                      : syncData.status === "loading" ? "共有データを読み込み中"
+                        : "共有スペースと同期済み"
+                : "この端末内に保存"}
+            </p>
           </div>
-          <ShieldCheck className="size-[19px] text-success" aria-label="端末内保存" />
+          {syncData.isActive
+            ? syncData.status === "syncing" || syncData.status === "loading"
+              ? <LoaderCircle className="size-[19px] animate-spin text-primary motion-reduce:animate-none" aria-label="同期中" />
+              : <Cloud className="size-[19px] text-success" aria-label="共有保存" />
+            : <ShieldCheck className="size-[19px] text-success" aria-label="端末内保存" />}
         </div>
+        {syncData.status === "setup-required" && workspace ? (
+          <div className="space-y-3 border-b border-border/70 px-4 py-4">
+            <div>
+              <p className="text-[13px] font-semibold">共有データの利用を開始</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                この端末にはTODO {deviceTodos.length}件・カテゴリ {deviceCategories.length}件・予定 {deviceEvents.length}件があります。追加して開始すると共有スペースへ取り込みます。端末内の元データもそのまま残ります。
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                別端末で別々に作った同じ内容の項目は、別の項目として追加されることがあります。
+              </p>
+            </div>
+            <Button type="button" className="min-h-11 w-full rounded-xl text-[13px]" disabled={memberBusy}
+              onClick={() => void beginDataSync(true)}>
+              {memberBusy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <Cloud className="size-4" />}
+              この端末のデータを追加して開始
+            </Button>
+            <Button type="button" variant="outline" className="min-h-11 w-full rounded-xl text-[13px]" disabled={memberBusy}
+              onClick={() => void beginDataSync(false)}>
+              共有データだけで開始
+            </Button>
+          </div>
+        ) : syncData.isActive ? (
+          <div className="space-y-3 border-b border-border/70 px-4 py-4">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              {syncData.pendingCount > 0 ? `${syncData.pendingCount}件の変更を同期待ちです。` : "TODO・カテゴリ・予定を共有スペースへ保存します。"}
+              {syncData.conflicts.length > 0 ? ` ${syncData.conflicts.length}件の変更で、どちらを残すか選択が必要です。` : ""}
+            </p>
+            {syncData.errorMessage && <p role="alert" className="text-[12px] leading-relaxed text-destructive">{syncData.errorMessage}</p>}
+            {(syncData.status === "offline" || syncData.status === "error") && (
+              <Button type="button" variant="outline" className="min-h-10 w-full rounded-xl text-[12px]" disabled={memberBusy}
+                onClick={() => void syncData.retrySync()}>
+                <Cloud className="size-4" /> 再同期
+              </Button>
+            )}
+            <div className="space-y-2 rounded-xl bg-secondary/70 p-3">
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                この端末に残るTODO・カテゴリ・予定をあとから追加できます。同じ元データは重複せず、共有側と内容が異なる項目は競合として確認できます。端末内の元データも保持されます。
+              </p>
+              <Button type="button" variant="outline" className="min-h-10 w-full rounded-xl text-[12px]" disabled={memberBusy}
+                onClick={() => void importThisDeviceData()}>
+                {memberBusy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <Upload className="size-4" />}
+                この端末のデータを共有へ追加
+              </Button>
+            </div>
+            {syncData.conflicts.map(conflict => (
+              <div key={conflict.id} className="space-y-2 rounded-xl border border-border bg-background/70 p-3">
+                <div>
+                  <p className="truncate text-[13px] font-semibold">{conflict.entityName}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    別端末でも変更されています。残す内容を選んでください。
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-background/70 p-2 text-[11px] leading-relaxed">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground">この端末</p>
+                    <p className="break-words text-muted-foreground">{conflictSummary(conflict, "local")}</p>
+                  </div>
+                  <div className="min-w-0 border-l border-border/70 pl-2">
+                    <p className="font-semibold text-foreground">共有側</p>
+                    <p className="break-words text-muted-foreground">{conflictSummary(conflict, "remote")}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant="outline" className="min-h-10 rounded-xl px-2 text-[11px]" disabled={memberBusy}
+                    onClick={() => void resolveSyncConflict(conflict.id, "local")}>
+                    この端末の変更
+                  </Button>
+                  <Button type="button" variant="outline" className="min-h-10 rounded-xl px-2 text-[11px]" disabled={memberBusy}
+                    onClick={() => void resolveSyncConflict(conflict.id, "remote")}>
+                    共有側の内容
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="space-y-3 border-b border-border/70 px-4 py-4">
           <div className="flex items-center gap-3">
             <IconBox tone="green"><Download className="size-[19px]" /></IconBox>
@@ -431,7 +590,6 @@ export function SettingsPage() {
             {restoreMessage}
           </p>
         </div>
-        <ComingSoonRow icon={Cloud} title="クラウド同期" description="2人のデータをリアルタイムで同期" />
       </SettingsGroup>
 
       <SettingsGroup title="アプリについて">
