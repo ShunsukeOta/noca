@@ -5,6 +5,8 @@ export function workspaceErrorMessage(error: unknown) {
   if (code === "auth/unauthorized-domain") return "このURLをFirebaseの認証許可ドメインに追加してください。"
   if (code === "auth/operation-not-allowed") return "Firebase ConsoleでGoogleログインを有効にしてください。"
   if (code === "auth/invalid-api-key") return "Firebaseの環境設定を確認してください。"
+  if (code === "auth/popup-blocked") return "Googleログイン画面がブロックされました。ブラウザのポップアップを許可して、もう一度お試しください。"
+  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return "Googleログインがキャンセルされました。もう一度お試しください。"
   if (code === "permission-denied" || code === "firestore/permission-denied") return "共有スペースへのアクセスが許可されませんでした。Firestoreルールを確認してください。"
   if (code === "unavailable" || code === "auth/network-request-failed") return "通信できませんでした。ネットワークを確認してもう一度お試しください。"
   return "操作を完了できませんでした。設定と通信を確認して、もう一度お試しください。"

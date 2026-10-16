@@ -14,7 +14,7 @@ Membership and record mutations use Firestore transactions and Security Rules in
 
 1. Create a Firebase project and register a Web app.
 2. In Authentication, enable **Google** as a sign-in provider.
-3. Add the local development hostname and each deployed app hostname to Authentication's authorized domains. Google sign-in uses a redirect so it can return to the invite route on mobile.
+3. Add the local development hostname and each deployed app hostname to Authentication's authorized domains. Google sign-in opens a popup and returns to the page where it started.
 4. Create a Cloud Firestore database. Choose its location deliberately in Firebase Console; this repository does not select or create a database region.
 5. Copy `.env.example` to `.env.local` and fill in the Web app's `apiKey`, `authDomain`, `projectId`, `appId`, and optional sender/storage values. These Web app settings are public client configuration, not server credentials. Do not put Admin SDK credentials or service-account keys in `VITE_*` variables.
 6. Sign in to Firebase CLI, then deploy the rules from the repository root:
@@ -28,7 +28,7 @@ Membership and record mutations use Firestore transactions and Security Rules in
 
 ## Current behavior
 
-- Google login and logout use Firebase Authentication.
+- Google login and logout use Firebase Authentication. Login uses `signInWithPopup` because the app is hosted on Vercel while Firebase Auth uses a separate domain; browsers that block third-party storage can otherwise fail to restore redirect sign-in state. If the browser blocks popups, allow popups for the app and retry.
 - A signed-in account can create one workspace or accept an invitation while it has no workspace.
 - Only the workspace owner can create or reissue the invite. It can be accepted once; a second concurrent acceptance or a third member is rejected by the Firestore transaction/rules.
 - An accepted member appears as B. Membership and item data are separate; shared data is not activated until the user chooses a start mode in Settings.
