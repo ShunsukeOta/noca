@@ -6,10 +6,10 @@ noca は、2人で使うことを目指す **iPhoneファーストの日本語PW
 
 **プレビュー:** https://noca-delta.vercel.app  
 **ソース:** https://github.com/ShunsukeOta/noca  
-**開発状況:** TODO・カレンダーの端末内利用と、Googleログイン・共有スペースを使ったPhase 3のFirestore保存・同期・既存データ追加をローカルコードに実装しています。Firebase実環境でのRules反映と二端末受け入れ確認は未完了です。メモタブは残し、「メモ機能は開発中です」と案内するプレースホルダーです。
+**開発状況:** TODO・カレンダーのFirestore共有同期、Web Push通知のソースを実装しています。最新Rules/indexesはFirebase `noca-df141`へ反映済みですが、認証・二端末の受け入れ確認は未完了です。メモタブは残し、「メモ機能は開発中です」と案内するプレースホルダーです。
 
 > [!IMPORTANT]
-> **共有運用と通知の実環境確認は未完了です。** Firebaseの環境変数がない状態では、同一ブラウザの `localStorage` を使う1人用プレビューです。Firebaseを設定してGoogleログインし、共有スペースに参加した後、設定の「データ」から同期開始方法を選ぶとTODO・カテゴリ・予定をFirestoreへ保存し、メンバー間で同期します。移行は既存データを追加する方式で、元の端末内データは残ります。Phase 2の2アカウント確認、Firestore Rulesのデプロイ、2端末同期・オフライン復帰・競合の受け入れ確認を終えるまでは完成扱いにしません。初期状態ではBの表示・担当選択・2人比較画面は出ません。メモ機能は開発中です。プッシュ通知のクライアントとFirebase Functionsのソースはありますが、VAPIDキー設定、Functions/Rules/indexesのデプロイ、iPhone実機確認は未完了です。Cloud FunctionsのデプロイにはFirebase Blazeプランが必要です。設定からJSONバックアップを書き出して復元できます。ブラウザ保存データを消すと端末内のバックアップ・同期キューも失われるため、消去前にバックアップを書き出してください。Firebaseの設定は[セットアップ手順](docs/FIREBASE_SETUP.md)を参照してください。
+> **共有運用と通知の実環境確認は未完了です。** Firebase未設定時は同一ブラウザの `localStorage` を使う1人用プレビューです。共有同期ではTODO・カテゴリ・予定をFirestoreへ保存し、既存データを追加移行します。Firestore Rules/indexesは2026-10-16にFirebase `noca-df141`へデプロイ済みですが、Phase 2の2アカウント確認、2端末同期・オフライン復帰・競合の受け入れ確認は未完了です。プッシュ通知のクライアントとFunctionsソースはありますが、FirebaseプロジェクトがSparkプランのためSecret Manager/Functionsをまだデプロイできていません。Blazeへの変更、VAPID鍵、Vercel公開鍵設定、iPhone実機確認が必要です。メモ機能は開発中です。設定からJSONバックアップを書き出して復元できます。Firebaseの設定は[セットアップ手順](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## Codex / AIエージェントへの引き継ぎ
 
@@ -59,7 +59,7 @@ A・B・`both` はTODO・予定の表示レーンです。Firebaseで実メン�
 | 自動テスト | Playwright + Chromium |
 | CI / プレビュー | GitHub Actions / Vercel |
 
-**未完了:** Phase 2の実環境受け入れ確認、Phase 3のFirestore Rulesデプロイと2端末・オフライン・競合の実地確認、VAPID設定・Cloud Functionsデプロイ・通知のiPhone/2端末QA。本番データベースや認証プロバイダーの設定手順は[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。
+**未完了:** Phase 2の実環境受け入れ確認、Phase 3の2端末・オフライン・競合の実地確認、VAPID設定・Cloud Functionsデプロイ・通知のiPhone/2端末QA。Firestore Rules/indexesはデプロイ済みです。Cloud FunctionsにはBlazeプランが必要です。設定手順は[Firebaseセットアップ](docs/FIREBASE_SETUP.md)を参照してください。
 
 ## 開発環境と起動
 
@@ -96,7 +96,7 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 でアプリとFunctio
 
 ### 検証状況
 
-今回の変更では `npm run typecheck`、`npm run build`、`npm run build:functions`、`npm run check:bundle` が成功しました。Playwright suites、Firestore Rules emulator/デプロイ、Firebase実環境での二端末・iPhone通知確認は未実施です。Cloud Functionsが実際に通知を送るには、VAPID設定とRules/indexes/Functionsのデプロイが必要です。Phase 2ソースの過去の基準値はPlaywright Chromium **50/50件**、production PWA **4/4件**です（今回変更の合格結果ではありません）。新しいFirestore Rulesをデプロイしてから、二つのGoogleアカウントと別端末で受け入れ確認を行ってください。過去のGitHub Actions記録は [#38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) です。
+今回の変更では `npm run typecheck`、`npm run build`、`npm run build:functions`、`npm run check:bundle` が成功しました。PlaywrightのローカルテストはwebServerが120秒以内に起動せず完了できませんでした。Firestore Rules/indexesは2026-10-16にFirebase `noca-df141`へデプロイ成功し、Rulesコンパイルも通過しました。Firebase実環境での二端末・iPhone通知確認は未実施です。Cloud Functions通知にはBlazeへの変更、VAPID設定、Functionsデプロイが必要です。実装コミット`1cb6d76`はmainへpushされ、GitHub上のVercelチェックが成功しました。過去のGitHub Actions記録は [#38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) です。
 
 以前のPhase 2基準では初回JavaScript **436.08 kB / gzip 139.45 kB**、最大チャンク **458.21 kB**、PWA事前保存量 **650.71 KiB / 652 KiB予算**でした。完了TODO削除を含む直近の基準値は初回JavaScript **447.53 kB / gzip 143.04 kB**、最大チャンク **455.25 kB**、PWA事前保存 **674.02 KiB / 676 KiB予算**でした。今回、Web Push UIと受信Service Workerを追加後は初回JavaScript **449.32 kB / gzip 143.45 kB**、最大チャンク **483.56 kB**、PWA事前保存 **677.48 KiB / 682 KiB予算**です。容量チェックは通過しています。通知設定チャンクは遅延読込し、初回オンライン利用後にService Workerのランタイムキャッシュへ保存します。Firebase SDK/サービスと招待ルートは事前キャッシュから除外し、Firebaseコードはオンライン利用時にランタイムキャッシュへ保存します。Firebaseメンバー情報・共有スナップショット・未送信キューを端末に保存し、共有開始後に一度オンライン利用した端末でのオフライン編集を想定します。容量は `scripts/check-bundle.mjs` でCI確認します。
 
@@ -189,13 +189,13 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 でアプリとFunctio
 | **1D** | **メモ機能** | **保留**。メモタブと「開発中です」の案内のみ。作成・編集・保存はなし |
 | 1E | iPhone Safari / Home Screen PWAでの実機レビュー | メンテナーから完了報告あり（詳細未記録） |
 | 2 | Googleログイン、2人の共有スペース・招待 | ソース実装済み。Firebase接続と2アカウント確認が必要 |
-| 3 | FirestoreによるTODO・予定の共有CRUD・同期・競合対策 | ソース実装中。Rulesデプロイ、2端末・オフライン・競合確認が必要 |
+| 3 | FirestoreによるTODO・予定の共有CRUD・同期・競合対策 | ソース実装済み。Rules/indexesデプロイ済み。2端末・オフライン・競合確認が必要 |
 | 4 | PWAオフライン挙動・通知など | 未完了 |
 | 5 | 本番QA・リリース | 未完了 |
 
 以前のプレビューが書き込んだ `noca.notes.v1` がある場合も、この版では読み書きせず、削除もしません。
 
-**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) と [FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) を参照**し、型チェック・ビルド・ブラウザ検証、新しいFirestore Rulesのデプロイ、Phase 2/3の実環境受け入れ確認を進めてください。
+**次に着手するエージェントは [CODEX_HANDOFF.md](docs/CODEX_HANDOFF.md) と [FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) を参照**し、ブラウザ検証、Phase 2/3の実環境受け入れ確認、Blaze設定後のVAPID/Functionsデプロイを進めてください。
 
 ## ドキュメント一覧
 
@@ -213,4 +213,4 @@ CI（`.github/workflows/ui-check.yml`）では Node.js 22 でアプリとFunctio
 旧 [realtime-todos](https://github.com/ShunsukeOta/realtime-todos) は参照用であり、**nocaの作業で旧コード・DB・デプロイ先を変更しません**。独自チャット、AI機能、習慣トラッカー、分析ダッシュボード、複数ワークスペース切替は当面の対象外です。
 
 ---
-**Last reviewed against implementation:** 2026-10-16 · **Status:** Phase 3 shared-data code implemented locally; Rules deployment and real Firebase/two-device acceptance remain; memo feature deferred.
+**Last reviewed against implementation:** 2026-10-16 · **Status:** implementation commit `1cb6d76` pushed; Vercel check and Firebase Rules/indexes deploy succeeded. Firebase account/two-device acceptance and Blaze-gated push Functions remain; memo feature deferred.

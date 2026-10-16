@@ -2,8 +2,8 @@
 
 - Version: 0.1
 - Updated: 2026-10-16
-- Current: **Phase 3の主要コードとPhase 4のWeb Push通知ソースを実装済み、実環境受け入れは未完了**。Phase 2/3のFirebase確認も未完了。Phase 1Eはメンテナーから完了報告あり。メモ機能は保留
-- Current local verification: `npm run typecheck`・`npm run build`・`npm run check:bundle`・`npm run build:functions` は成功。Playwright、Firestore Rules emulator/deploy、Functions/VAPID deployment、Firebase実環境、二端末とiPhone通知の確認は未実施。Phase 2の過去基準はPlaywright **50/50**、production PWA **4/4**。Earlier CI baseline: [GitHub Actions #38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243).
+- Current: **Phase 3の主要コードとPhase 4のWeb Push通知ソースを実装済み、実環境受け入れは未完了**。Firestore Rules/indexesは`noca-df141`へデプロイ済み。Phase 2/3のFirebase確認は未完了。Phase 1Eはメンテナーから完了報告あり。メモ機能は保留
+- Current verification: `npm run typecheck`・`npm run build`・`npm run check:bundle`・`npm run build:functions` は成功。Firestore Rulesコンパイル/Rules/indexesデプロイは成功。Playwrightはlocal webServerが120秒以内に起動せず未完了。Functions/VAPID deployment、Firebase実環境、二端末とiPhone通知の確認は未実施。main `1cb6d76`のVercelチェックは成功。Earlier CI baseline: [GitHub Actions #38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243).
 - Product spec: [SPECIFICATION.md](SPECIFICATION.md)
 - UI tokens: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)
 - UI verification: [UI_QA.md](UI_QA.md)
@@ -29,8 +29,8 @@
 | **1D** | メモ機能 | 1C | **保留**。メモタブは残すが、一覧・作成・保存などは実装しない。用途とTODO/予定との役割を再検討してから再開 |
 | **1E** | iPhone実機・Safari/PWA表示確認、UI最終調整 | 1C | **完了（メンテナー報告）**。端末・ケース別記録は未掲載 |
 | **2** | Firebase Auth・workspace・メンバーシップ・招待 | 1E | ソース実装済み。Firebase設定後、1人利用→招待→2人参加とサーバー側権限制限を実機確認 |
-| **3** | FirestoreのCRUD・共有同期・競合対策 | 2 | TODO/予定/カテゴリの共有CRUD・移行・競合・オフライン動作を実装中。Rulesデプロイと実機受け入れが必要 |
-| **4** | PWA実運用最適化、オフライン、Web Push通知 | 3 | 通知ソース実装済み。VAPID/Functions/RulesのデプロイとiPhone・二端末受け入れが必要 |
+| **3** | FirestoreのCRUD・共有同期・競合対策 | 2 | TODO/予定/カテゴリの共有CRUD・移行・競合・オフライン動作を実装中。Rules/indexesはデプロイ済み。実機受け入れが必要 |
+| **4** | PWA実運用最適化、オフライン、Web Push通知 | 3 | 通知ソース実装済み。VAPID/FunctionsのデプロイとiPhone・二端末受け入れが必要。FunctionsにはBlazeが必要 |
 | **5** | 本番QA・リリース・運用 | 4 | リリースチェック合格、データ保護確認 |
 
 ## Phase 0 — 設計ドキュメント
@@ -171,7 +171,7 @@
 - [ ] iPhone Safari/PWAでログアウト、移行、オフライン、復元を確認。
 - [ ] E2E/PWAブラウザスイートをPhase 3のコードで実行。
 
-Phase 2 remains in progress until the two-account invite and access-control checks are recorded. Phase 3 remains in progress until the revised Rules are deployed and the checklist is verified against a Firebase project and two devices.
+Phase 2 remains in progress until the two-account invite and access-control checks are recorded. Revised Rules/indexes are deployed to `noca-df141`; Phase 3 remains in progress until access, sync, offline and conflict checklists pass against Firebase and two devices.
 
 ## Phase 4 — PWA品質
 
@@ -179,7 +179,7 @@ Phase 2 remains in progress until the two-account invite and access-control chec
 - [x] ホーム画面ショートカットからTODO追加・今日の予定へ移動
 - [x] 招待リンクをWeb Share APIでOS共有（既存のコピー操作を維持）
 - Web Push通知のクライアント設定・Service Worker受信・Firebase Functions送信ソースを実装済み
-- [ ] VAPID公開/秘密鍵を設定し、Firestore Rules/indexesとFunctionsをデプロイ
+- [ ] FirebaseをBlazeへ変更後、VAPID公開/秘密鍵を設定し、Functionsをデプロイ（Rules/indexesはデプロイ済み）
 - [ ] ホーム画面PWAで権限取得、予定30分前、TODO期限当日9:00、相手の新規追加通知、通知タップ遷移を2端末で確認
 - Service Workerのアップデート/キャッシュ戦略
 - オフライン読書き・再接続後の同期検証

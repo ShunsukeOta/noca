@@ -21,7 +21,7 @@ Design decisions established with the maintainer:
 
 ## 2. Current verified state
 
-The previous Phase 2 baseline passed `npm run build`, `npm run check:bundle`, **50/50 Playwright Chromium tests**, and **4/4 production PWA tests**. This working tree passes `npm run typecheck`, `npm run build`, `npm run check:bundle`, and `npm run build:functions`; current bundle measurements are listed below. Playwright suites, Firestore Rules emulator/deployment, Firebase/two-device acceptance and iPhone delivery have not been run for the current notification changes. E2E coverage in the old baseline was local-preview mode because `.env.local` had no Firebase values. Older per-phase reports contain stale counts.
+The previous Phase 2 baseline passed `npm run build`, `npm run check:bundle`, **50/50 Playwright Chromium tests**, and **4/4 production PWA tests**. This release passed `npm run typecheck`, `npm run build`, `npm run check:bundle`, and `npm run build:functions`. Current Playwright could not complete locally: its webServer did not become available within the configured 120 seconds. Firestore Rules compiled and Rules/indexes deployed to Firebase `noca-df141` on 2026-10-16. Implementation commit `1cb6d76` was pushed to `main`; GitHub's Vercel check succeeded. Firebase/two-device acceptance and iPhone delivery remain unverified. Older per-phase reports contain stale counts.
 
 | Area | Status on this baseline |
 | --- | --- |
@@ -33,12 +33,12 @@ The previous Phase 2 baseline passed `npm run build`, `npm run check:bundle`, **
 | Memo tab | Retained in global navigation; displays only **「メモ機能は開発中です」** |
 | Memo list/editor/storage | Deferred and removed from the active app; the memo tab has no + action |
 | PWA app shortcuts and invite sharing | Source implemented: manifest offers “TODOを追加” and “今日の予定” shortcuts on platforms that expose manifest shortcuts; Settings offers OS sharing for invite URLs when Web Share API is available and retains copy. iPhone Home Screen shortcut visibility and native share target behavior need manual device verification. |
-| Push notifications | Client switches, Web Push service-worker handling, owner-only Firestore subscription Rules, indexes and Firebase Functions are implemented in source. Reminders are scheduled 30 minutes before timed events and at 09:00 local time on TODO due dates; new TODO/event documents notify the other member. VAPID setup, Blaze billing, Rules/indexes/functions deployment, Vercel public-key configuration and real iPhone/two-device delivery checks remain. |
+| Push notifications | Client switches, Web Push service-worker handling, owner-only Firestore subscription Rules, indexes and Firebase Functions are implemented in source. Reminders are scheduled 30 minutes before timed events and at 09:00 local time on TODO due dates; new TODO/event documents notify the other member. Rules/indexes are deployed. Firebase `noca-df141` is on Spark, which blocks Secret Manager and Functions until upgraded to Blaze. VAPID setup, Functions deployment, Vercel public-key configuration and real iPhone/two-device delivery checks remain. |
 | Membership display | Starts with 「自分」 in local preview. With Firebase configured, Google-authenticated Firestore members drive the actual A/B count; the header shows each available Google profile photo and falls back to the display-name initial. |
 | Shared UI foundation (theme tokens, fields, buttons, checkbox/switch, owner/category controls, confirm/Undo) | Implemented; settings manage TODO categories |
 | Local data backup | **Implemented:** Settings exports and restores TODOs, TODO categories, calendar events and sample-migration flags as versioned JSON. Restore validates the file, previews counts, requires explicit replacement confirmation and rolls back storage writes on failure. |
-| Google login, workspace creation, invite link and acceptance | Source implemented. Firebase Web app, Google Auth, Firestore and Vercel client configuration were prepared per maintainer; Phase 2 live sign-in/invite/Rules checks remain. The previous Firestore Rules deployment predates the new data paths. |
-| TODO/category/calendar sharing, local-to-cloud migration, offline queue, conflicts | Implemented in the current source; user explicitly activates it in Settings. Existing localStorage is not overwritten. New Rules deploy and real two-device acceptance remain. |
+| Google login, workspace creation, invite link and acceptance | Source implemented. Firebase Web app, Google Auth, Firestore and Vercel client configuration were prepared per maintainer; Phase 2 live sign-in/invite/access checks remain. Current Rules are deployed. |
+| TODO/category/calendar sharing, local-to-cloud migration, offline queue, conflicts | Implemented in the current source; user explicitly activates it in Settings. Existing localStorage is not overwritten. Current Rules are deployed; real two-device acceptance remains. |
 | iPhone Safari/standalone QA | Maintainer reports Phase 1E complete; device and case details are not in the repository. New Phase 2 screens have not been checked on iPhone. |
 
 The earlier optimization commit `ffc8b7e` passed build, bundle, E2E (**49/49**) and production PWA (**4/4**) checks; GitHub Actions run [38695136243](https://github.com/ShunsukeOta/noca/actions/runs/38695136243) is recorded. The prior Phase 2 baseline also passed build, bundle, **50/50 E2E**, and **4/4 PWA**, but that result predates the current Phase 3 work. The maintainer reports Phase 1 iPhone Safari/standalone QA complete; Phase 2/3 screens remain unverified on-device.
@@ -49,19 +49,19 @@ The earlier performance pass deferred `/calendar`, both editor sheets, Settings'
 
 ## 3. NEXT: complete Phase 3 implementation validation and Firebase acceptance
 
-The source now has workspace-scoped Firestore CRUD for TODOs, TODO categories and calendar events, Settings activation choices, deterministic additive migration, live listeners, a durable offline outbox, revision conflicts and conflict resolution. Memo remains deferred. This is **not complete for real use** until the changed Rules are deployed and both Phase 2 and Phase 3 are accepted against Firebase.
+The source now has workspace-scoped Firestore CRUD for TODOs, TODO categories and calendar events, Settings activation choices, deterministic additive migration, live listeners, a durable offline outbox, revision conflicts and conflict resolution. Memo remains deferred. This is **not complete for real use** until both Phase 2 and Phase 3 are accepted against Firebase.
 
 Current order:
-1. Run `npm run test:e2e` and `npm run test:pwa` against the current build. Add focused regression coverage for provider wiring, migration idempotency, localStorage preservation, offline retry and conflict resolution, then run it.
-2. Validate `firestore.rules` with the Firebase emulator/rules tests and deploy the current rules to the intended Firebase project. The previously deployed Phase 2-only Rules do not authorize the new data collections.
-3. Deploy a Preview with current source and configured Firebase values; add that exact hostname to Firebase Auth authorized domains if required.
+1. Run `npm run test:e2e` and `npm run test:pwa` against the current build in an environment where Playwright's local webServer can bind. The local E2E attempt timed out at the 120-second webServer startup limit.
+2. Validate `firestore.rules` with emulator/rules tests and verify access cases against the deployed rules. Rules and indexes deployed successfully to `noca-df141` on 2026-10-16.
+3. Verify Firebase sign-in and workspace flows against the deployed `main` source; add the exact deployment hostname to Firebase Auth authorized domains if required.
 4. Verify Phase 2 with two distinct accounts: sign-in, workspace create, invite, reissue/expiry, one-use, third-member rejection and non-member data access denial.
 5. Verify Phase 3 on two devices/browsers: both activation modes, same-ID migration idempotency, distinct record handling, live CRUD and Undo, local data preservation/logout, offline edit/reload/reconnect, same-item conflict with both resolution choices, and backup restore.
 6. Check Settings/invite/sync screens in Safari and installed PWA. The maintainer's Phase 1E check predates these flows.
-7. Configure a VAPID pair, the public Vercel variable and the Firebase private secret; deploy current Firestore Rules, indexes and Functions on a billing-enabled Firebase project. See [FIREBASE_SETUP.md](FIREBASE_SETUP.md).
+7. Upgrade Firebase project `noca-df141` from Spark to Blaze (link a billing account), then configure a VAPID pair, the public Vercel variable and the Firebase private secret, and deploy Functions. Current Rules/indexes are already deployed. The Vercel connector returned 403 for the project team and the local CLI token is invalid, so Vercel env configuration needs working team access. See [FIREBASE_SETUP.md](FIREBASE_SETUP.md).
 8. Test notifications from two real devices: permission flow from the installed iPhone app, 30-minute timed-event reminder, TODO reminder at 09:00 local time, other-member new TODO/event notification, notification tap navigation and disabling/removing a device subscription. Imported records should not generate a burst of shared-update alerts.
 
-Do not mark Phase 2/3 done until remote Rules and account/device acceptance are recorded. Notification source compiles, but it is not operational until VAPID keys, Rules/indexes and Firebase Functions are deployed and the iPhone/two-device checks pass. Typecheck/build do not prove live sync, server delivery or push behavior.
+Do not mark Phase 2/3 done until remote Rules and account/device acceptance are recorded. Notification source compiles, but it is not operational until VAPID keys and Functions are deployed and the iPhone/two-device checks pass. Typecheck/build do not prove live sync, server delivery or push behavior.
 
 Memo CRUD remains deferred until its user workflow is specified.
 
@@ -71,7 +71,7 @@ The maintainer reports the original Phase 1E device QA complete. Device, OS vers
 
 If an earlier app version wrote `noca.notes.v1`, leave the key untouched. The current app neither reads nor removes that local data.
 
-Do not silently mark Phase 2 or 3 done. Firebase environment configuration was prepared by the maintainer, but the new data Rules need deployment, and the current source needs Preview plus live account/invitation and shared-data verification.
+Do not silently mark Phase 2 or 3 done. Current Firestore Rules/indexes are deployed to `noca-df141`; live account/invitation and shared-data verification remain. The current `main` commit passed Vercel's deployment check.
 
 ## 5. Later phases
 
