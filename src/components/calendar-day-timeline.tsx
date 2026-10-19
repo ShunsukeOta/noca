@@ -10,10 +10,7 @@ import { preloadCalendarEditor, preloadTodoEditor } from "@/components/editor-lo
 import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
 
 type EventOwner = CalendarEvent["by"]
-const PEOPLE = [
-  { id: "A", label: "Aの予定" },
-  { id: "B", label: "Bの予定" }
-] as const
+const PEOPLE = ["A", "B"] as const
 
 const HOUR_HEIGHT = 54
 const MINUTE_HEIGHT = HOUR_HEIGHT / 60
@@ -110,7 +107,7 @@ type DayTimelineProps = {
 
 export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, onCreate }: DayTimelineProps) {
   const reduceMotion = useReducedMotion()
-  const { isPaired } = useWorkspaceMembership()
+  const { isPaired, members } = useWorkspaceMembership()
   const [selectedOverlap, setSelectedOverlap] = useState<OverlapSummary | null>(null)
   const timed = events.filter(event => Boolean(event.time))
   const timeRange = useMemo(() => {
@@ -133,6 +130,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
     solo: layoutBlocks(events.filter(event => event.time))
   }), [events])
   const ownerTone = (owner: EventOwner) => ownerSurfaceTone[isPaired ? owner : "A"]
+  const ownerMember = (owner: "A" | "B") => members.find(member => member.id === owner)
   const selectedOverlapEvents = selectedOverlap
     ? [selectedOverlap.primary, ...selectedOverlap.events].sort((a, b) => a.start - b.start || a.event.title.localeCompare(b.event.title, "ja"))
     : []
@@ -249,15 +247,17 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
         {isPaired && (
           <div className={cn("grid border-b border-border/75", pairedGrid)}>
             <div aria-hidden="true" className="flex items-center justify-center text-[10px] font-medium text-muted-foreground">予定</div>
-            {PEOPLE.map(person => (
-              <div key={person.id} data-testid={"person-header-" + person.id}
+            {PEOPLE.map(owner => {
+              const member = ownerMember(owner)
+              const name = member?.displayName ?? owner
+              return <div key={owner} data-testid={"person-header-" + owner}
                 className="flex min-h-[53px] min-w-0 flex-col items-center justify-center gap-0.5 border-l border-border/50 px-0.5">
                 <span className="flex min-w-0 items-center justify-center gap-1">
-                  <OwnerAvatar owner={person.id} size="xs" decorative />
-                  <span className="truncate text-[10px] font-bold">{person.label}</span>
+                  <OwnerAvatar owner={owner} size="xs" decorative label={name} photoURL={member?.photoURL} />
+                  <span className="truncate text-[10px] font-bold">{name}の予定</span>
                 </span>
               </div>
-            ))}
+            })}
           </div>
         )}
 
@@ -266,14 +266,14 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
             <span className="self-start pt-3 text-center text-[10px] font-semibold text-muted-foreground">終日</span>
             {isPaired ? (
               <>
-                {PEOPLE.map(person => {
-                  const personalEvents = eventsFor(person.id)
+                {PEOPLE.map(owner => {
+                  const personalEvents = eventsFor(owner)
                   return (
-                    <div key={person.id} data-testid={"all-day-" + person.id}
+                    <div key={owner} data-testid={"all-day-" + owner}
                       className="flex min-h-[56px] min-w-0 flex-col gap-1 border-l border-border/50 px-1 py-1.5">
                       {personalEvents.length === 0 ? (
                         <span className="m-auto text-[9px] text-muted-foreground/55">—</span>
-                      ) : personalEvents.map(event => allDayButton(event, person.id))}
+                      ) : personalEvents.map(event => allDayButton(event, owner))}
                     </div>
                   )
                 })}
@@ -367,7 +367,10 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
                 animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.12 }}
                 className={cn(buttonVariants({ variant: "ghost", size: "sm", className: "h-auto whitespace-normal" }), "flex min-h-[58px] w-full items-center justify-start gap-3 rounded-none border-b border-border/70 px-3 py-3 text-left last:border-0 hover:bg-accent/50")}>
-                {isPaired && <OwnerAvatar owner={task.by} size="sm" decorative />}
+                {isPaired && (() => {
+                  const member = ownerMember(task.by)
+                  return <OwnerAvatar owner={task.by} size="sm" decorative label={member?.displayName ?? task.by} photoURL={member?.photoURL} />
+                })()}
                 <span className="min-w-0 flex-1 break-words text-[12px] font-semibold">{task.title}</span>
                 <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-[10px] font-semibold text-primary">TODO</span>
               </m.button>
@@ -388,7 +391,7 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
             {selectedOverlapEvents.map(block => {
               const event = block.event
               const time = `${event.time ?? "時間未定"}${event.endTime ? `–${event.endTime}` : ""}`
-              const owner = event.by === "both" ? "ふたり" : event.by
+              const owner = event.by === "both" ? "ふたり" : ownerMember(event.by)?.displayName ?? event.by
               return (
                 <Button
                   key={event.id}
@@ -398,7 +401,10 @@ export function CalendarDayTimeline({ events, todos, onEditEvent, onEditTodo, on
                   onClick={() => editOverlapEvent(event.id)}
                   className="h-auto min-h-[60px] w-full justify-start gap-3 whitespace-normal rounded-xl px-3 py-3 text-left"
                 >
-                  {isPaired && <OwnerAvatar owner={event.by} size="sm" decorative />}
+                  {isPaired && (() => {
+                    const member = event.by === "both" ? undefined : ownerMember(event.by)
+                    return <OwnerAvatar owner={event.by} size="sm" decorative label={member?.displayName} photoURL={member?.photoURL} />
+                  })()}
                   <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
                     <span className="block w-full break-words text-[13px] font-bold leading-snug">{event.title}</span>
                     <span className="block text-[11px] font-medium text-muted-foreground">

@@ -15,7 +15,7 @@ import { useWorkspaceMembership } from "@/features/workspace/workspace-membershi
 
 export function CalendarEditorSheet() {
   const { events, editor, closeEditor, addEvent, updateEvent, deleteEvent } = useCalendar()
-  const { isPaired } = useWorkspaceMembership()
+  const { isPaired, members } = useWorkspaceMembership()
   const original = editor?.mode === "edit" ? events.find(event => event.id === editor.id) : undefined
   const initialDate = editor?.mode === "create" ? editor.date : original?.date ?? ""
   const [title, setTitle] = useState(original?.title ?? "")
@@ -97,7 +97,7 @@ export function CalendarEditorSheet() {
             {isPaired && (
               <div className="mt-5">
                 <p className="mb-2 text-[13px] font-semibold">誰の予定？</p>
-                <OwnerSelector value={by} onChange={setBy} />
+                <OwnerSelector value={by} onChange={setBy} members={members} />
               </div>
             )}
 

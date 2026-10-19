@@ -3,6 +3,7 @@ import { type Task, type TaskCategory, type TodoCategory } from "@/app/mock-data
 import { DEFAULT_TODO_CATEGORIES } from "@/features/todos/todo-category-defaults"
 import { removeLegacyDemoTasks } from "@/features/data/legacy-demo-data"
 import { useWorkspaceDataSync } from "@/features/workspace/workspace-data-sync-context"
+import { useWorkspaceMembership } from "@/features/workspace/workspace-membership"
 
 export const TODO_STORAGE_KEY = "noca.todos.v1"
 export const TODO_CATEGORY_STORAGE_KEY = "noca.todo.categories.v1"
@@ -109,6 +110,7 @@ function loadTodos(): { records: Task[]; shouldPersist: boolean } {
 
 export function TodoProvider({ children }: { children: ReactNode }) {
   const sharedData = useWorkspaceDataSync()
+  const { authUser, members } = useWorkspaceMembership()
   const [initial] = useState(() => ({ todos: loadTodos(), categories: loadCategories() }))
   const [deviceTodos, setDeviceTodos] = useState<Task[]>(initial.todos.records)
   const [shouldPersistTodos, setShouldPersistTodos] = useState(initial.todos.shouldPersist)
@@ -180,9 +182,10 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   const closeEditor = useCallback(() => setEditor(null), [])
 
   const addTodo = useCallback((draft: TodoDraft) => {
-    const task: Task = { ...draft, id: crypto.randomUUID(), done: false, by: "A" }
+    const creator = authUser ? members.find(member => member.uid === authUser.uid) : undefined
+    const task: Task = { ...draft, id: crypto.randomUUID(), done: false, by: creator?.id ?? "A" }
     setTodos(previous => [task, ...previous])
-  }, [setTodos])
+  }, [authUser, members, setTodos])
 
   const updateTodo = useCallback((id: string, draft: TodoDraft) => {
     setTodos(previous => previous.map(task => task.id === id ? { ...task, ...draft } : task))

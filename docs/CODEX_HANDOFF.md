@@ -1,6 +1,6 @@
 # Codex handoff — noca
 
-**As of:** 2026-10-16 (Japan time). **Repository:** [ShunsukeOta/noca](https://github.com/ShunsukeOta/noca), current task working tree (do not infer branch/push state from this note). **Preview:** [noca-delta.vercel.app](https://noca-delta.vercel.app).
+**As of:** 2026-10-19 (Japan time). **Repository:** [ShunsukeOta/noca](https://github.com/ShunsukeOta/noca), current task working tree (do not infer branch/push state from this note). **Preview:** [noca-delta.vercel.app](https://noca-delta.vercel.app).
 
 > **First read:** [../AGENTS.md](../AGENTS.md), [../README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md). This handoff is the *current development status*, not a request to implement everything in the roadmap.
 
@@ -34,7 +34,7 @@ The previous Phase 2 baseline passed `npm run build`, `npm run check:bundle`, **
 | Memo list/editor/storage | Deferred and removed from the active app; the memo tab has no + action |
 | PWA app shortcuts and invite sharing | Source implemented: manifest offers “TODOを追加” and “今日の予定” shortcuts on platforms that expose manifest shortcuts; Settings offers OS sharing for invite URLs when Web Share API is available and retains copy. iPhone Home Screen shortcut visibility and native share target behavior need manual device verification. |
 | Push notifications | Client switches, Web Push service-worker handling, owner-only Firestore subscription Rules, indexes and Firebase Functions are implemented in source. Reminders are scheduled 30 minutes before timed events and at 09:00 local time on TODO due dates; new TODO/event documents notify the other member. Rules/indexes are deployed. Firebase `noca-df141` is on Spark, which blocks Secret Manager and Functions until upgraded to Blaze. VAPID setup, Functions deployment, Vercel public-key configuration and real iPhone/two-device delivery checks remain. |
-| Membership display | Starts with 「自分」 in local preview. With Firebase configured, Google-authenticated Firestore members drive the actual A/B count; the header shows each available Google profile photo and falls back to the display-name initial. |
+| Membership display | Starts with 「自分」 in local preview. With Firebase configured, Google-authenticated Firestore members drive the actual A/B slots; the header, TODO creator markers and calendar identity surfaces use member Google profile photos and display names, falling back to the name initial if an image is unavailable. New TODOs use the signed-in member's current slot; the record still stores only A/B, not an auth UID. |
 | Shared UI foundation (theme tokens, fields, buttons, checkbox/switch, owner/category controls, confirm/Undo) | Implemented; settings manage TODO categories |
 | Local data backup | **Implemented:** Settings exports and restores TODOs, TODO categories, calendar events and sample-migration flags as versioned JSON. Restore validates the file, previews counts, requires explicit replacement confirmation and rolls back storage writes on failure. |
 | Google login, workspace creation, invite link and acceptance | Source implemented. Firebase Web app, Google Auth, Firestore and Vercel client configuration were prepared per maintainer; Phase 2 live sign-in/invite/access checks remain. Current Rules are deployed. |

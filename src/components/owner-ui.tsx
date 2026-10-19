@@ -1,4 +1,5 @@
 import { useState } from "react"
+import type { WorkspaceMember } from "@/features/workspace/workspace-membership"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -56,29 +57,36 @@ function OwnerAvatar({ owner, size = "sm", decorative = false, className, label,
   )
 }
 
-function OwnerSelector({ value, onChange, className }: {
+function OwnerSelector({ value, onChange, members, className }: {
   value: Owner
   onChange: (owner: Owner) => void
+  members: WorkspaceMember[]
   className?: string
 }) {
   return (
     <div data-slot="owner-selector" role="group" aria-label="予定の担当" className={cn("grid grid-cols-3 gap-2", className)}>
       {(["A", "B", "both"] as const).map(owner => (
-        <Button
-          key={owner}
-          type="button"
-          variant="outline"
-          aria-label={`${ownerLabel[owner]}の予定`}
-          aria-pressed={value === owner}
-          onClick={() => onChange(owner)}
-          className={cn(
-            "min-h-11 h-auto min-w-0 flex-col items-center justify-center gap-1 whitespace-normal rounded-md px-1 py-2 text-[11px] leading-tight",
-            value === owner ? ownerSurfaceTone[owner] : "border-border bg-card text-muted-foreground"
-          )}
-        >
-          <OwnerAvatar owner={owner} size="sm" decorative />
-          <span className="max-w-full whitespace-normal break-words text-center">{ownerLabel[owner]}</span>
-        </Button>
+        (() => {
+          const member = owner === "both" ? undefined : members.find(item => item.id === owner)
+          const label = member?.displayName ?? ownerLabel[owner]
+          return (
+            <Button
+              key={owner}
+              type="button"
+              variant="outline"
+              aria-label={`${label}の予定`}
+              aria-pressed={value === owner}
+              onClick={() => onChange(owner)}
+              className={cn(
+                "min-h-11 h-auto min-w-0 flex-col items-center justify-center gap-1 whitespace-normal rounded-md px-1 py-2 text-[11px] leading-tight",
+                value === owner ? ownerSurfaceTone[owner] : "border-border bg-card text-muted-foreground"
+              )}
+            >
+              <OwnerAvatar owner={owner} size="sm" decorative label={member?.displayName} photoURL={member?.photoURL} />
+              <span className="max-w-full whitespace-normal break-words text-center">{label}</span>
+            </Button>
+          )
+        })()
       ))}
     </div>
   )

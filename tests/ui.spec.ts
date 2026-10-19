@@ -1089,6 +1089,36 @@ test("header member avatar uses the available Google profile photo", async ({ pa
   await expect(avatar).toHaveAttribute("aria-hidden", "true")
 })
 
+test("TODO and calendar identify paired members with their profile photos and names", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  const photoA = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+  const photoB = `${photoA}#member-b`
+  await page.addInitScript(members => {
+    localStorage.setItem("noca.workspace.members.v1", JSON.stringify(members))
+  }, [
+    { id: "A", displayName: "Aoi Yamamoto", photoURL: photoA },
+    { id: "B", displayName: "Yui Tanaka", photoURL: photoB }
+  ])
+  await page.goto("/todo")
+
+  await expect(page.locator('[data-todo-row="test-t1"] [data-slot="owner-avatar"] img')).toHaveAttribute("src", photoA)
+  await expect(page.locator('[data-todo-row="test-t2"] [data-slot="owner-avatar"] img')).toHaveAttribute("src", photoB)
+
+  await page.getByRole("navigation", { name: "メインメニュー" }).getByRole("link", { name: "カレンダー" }).click()
+  const memberA = page.getByTestId("person-header-A")
+  const memberB = page.getByTestId("person-header-B")
+  await expect(memberA).toContainText("Aoi Yamamotoの予定")
+  await expect(memberA.locator('[data-slot="owner-avatar"] img')).toHaveAttribute("src", photoA)
+  await expect(memberB).toContainText("Yui Tanakaの予定")
+  await expect(memberB.locator('[data-slot="owner-avatar"] img')).toHaveAttribute("src", photoB)
+
+  await page.getByRole("button", { name: "夜ごはんを編集" }).click()
+  const ownerSelector = page.getByRole("group", { name: "予定の担当" })
+  await expect(ownerSelector.getByRole("button", { name: "Aoi Yamamotoの予定" }).locator("img")).toHaveAttribute("src", photoA)
+  await expect(ownerSelector.getByRole("button", { name: "Yui Tanakaの予定" }).locator("img")).toHaveAttribute("src", photoB)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+})
+
 test("header member avatar falls back to the display-name initial when the photo fails to load", async ({ page }) => {
   await page.route("https://example.invalid/**", route => route.abort())
   await page.addInitScript(members => {

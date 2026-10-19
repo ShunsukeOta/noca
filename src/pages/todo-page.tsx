@@ -16,7 +16,7 @@ import { preloadTodoEditor } from "@/components/editor-loaders"
 export function TodoPage() {
   const [filter, setFilter] = useState("すべて")
   const { todos: tasks, categories, toggleTodo, permanentlyDeleteTodo, openEdit, openCreate } = useTodos()
-  const { isPaired } = useWorkspaceMembership()
+  const { isPaired, members } = useWorkspaceMembership()
   const [showCompleted, setShowCompleted] = useState(false)
   const reduceMotion = useReducedMotion()
   const filters = ["すべて", ...categories.map(category => category.name)]
@@ -81,7 +81,10 @@ export function TodoPage() {
                   </div>
                 )}
               </Button>
-              {isPaired && <OwnerAvatar owner={task.by} size="md" />}
+              {isPaired && (() => {
+                const member = members.find(item => item.id === task.by)
+                return <OwnerAvatar owner={task.by} size="md" label={member?.displayName ?? task.by} photoURL={member?.photoURL} />
+              })()}
               <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
             </div>
             </m.div>
