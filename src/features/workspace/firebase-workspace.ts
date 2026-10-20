@@ -14,12 +14,18 @@ import {
   getDoc,
   getFirestore,
   onSnapshot,
+  setDoc,
   runTransaction,
   serverTimestamp,
   Timestamp,
   type DocumentData
 } from "firebase/firestore"
 import { getFirebaseConfig } from "@/features/workspace/firebase-env"
+import { getWorkspaceInstallId } from "@/features/workspace/workspace-install-id"
+import { getWorkspacePresenceStatuses, type WorkspacePresenceRecord, type WorkspacePresenceStatus } from "@/features/workspace/workspace-presence-state"
+
+const PRESENCE_HEARTBEAT_MS = 30_000
+const PRESENCE_REFRESH_MS = 10_000
 
 export type SignedInProfile = {
   uid: string
@@ -41,6 +47,8 @@ export type RemoteWorkspace = {
 }
 
 export type CreatedInvite = { url: string; expiresAt: Date }
+
+export type WorkspacePresenceByUid = Record<string, WorkspacePresenceStatus>
 
 export type WorkspaceActionErrorCode =
   | "not-authenticated"
@@ -153,6 +161,93 @@ export function observeWorkspace(
   return () => {
     unsubscribeUser()
     unsubscribeWorkspace?.()
+  }
+}
+
+export function observeWorkspacePresence(
+  workspaceId: string,
+  uid: string,
+  memberUids: string[],
+  onNext: (presence: WorkspacePresenceByUid) => void,
+  onError: (error: Error) => void
+) {
+  const { db } = getServices()
+  const installId = getWorkspaceInstallId(workspaceId, uid)
+  const presenceCollection = collection(db, "workspaces", workspaceId, "presence")
+  const ownPresence = doc(presenceCollection, installId)
+  const relevantMemberUids = [...new Set([uid, ...memberUids])]
+  let records: WorkspacePresenceRecord[] = []
+  let serverConfirmed = false
+  let stopped = false
+  let writeInFlight = false
+  let pendingOnlineState: boolean | null = null
+
+  const emit = () => {
+    if (stopped) return
+    const presence = getWorkspacePresenceStatuses(relevantMemberUids, records, Date.now(), serverConfirmed)
+    presence[uid] = navigator.onLine && document.visibilityState === "visible" ? "online" : "offline"
+    onNext(presence)
+  }
+
+  const flushPresenceWrite = () => {
+    if (stopped || writeInFlight || pendingOnlineState === null || !navigator.onLine) return
+    const online = pendingOnlineState
+    pendingOnlineState = null
+    writeInFlight = true
+    void setDoc(ownPresence, { uid, installId, online, lastSeenAt: serverTimestamp() })
+      .catch(() => undefined)
+      .finally(() => {
+        writeInFlight = false
+        flushPresenceWrite()
+      })
+  }
+
+  const writePresence = (online: boolean) => {
+    if (!navigator.onLine) return
+    pendingOnlineState = online
+    flushPresenceWrite()
+  }
+
+  const unsubscribe = onSnapshot(presenceCollection, snapshot => {
+    records = snapshot.docs.flatMap(item => {
+      const data = item.data()
+      return typeof data.uid === "string" && typeof data.online === "boolean" && data.lastSeenAt instanceof Timestamp
+        ? [{ uid: data.uid, online: data.online, lastSeenAt: data.lastSeenAt.toMillis() }]
+        : []
+    })
+    serverConfirmed = !snapshot.metadata.fromCache
+    emit()
+  }, error => {
+    onError(error)
+  })
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "visible") writePresence(true)
+    emit()
+  }
+  const onOnline = () => {
+    if (document.visibilityState === "visible") writePresence(true)
+    emit()
+  }
+  const onOffline = () => emit()
+
+  if (document.visibilityState === "visible") writePresence(true)
+  document.addEventListener("visibilitychange", onVisibilityChange)
+  window.addEventListener("online", onOnline)
+  window.addEventListener("offline", onOffline)
+  const heartbeat = window.setInterval(() => {
+    if (document.visibilityState === "visible") writePresence(true)
+  }, PRESENCE_HEARTBEAT_MS)
+  const freshnessCheck = window.setInterval(emit, PRESENCE_REFRESH_MS)
+
+  return () => {
+    stopped = true
+    window.clearInterval(heartbeat)
+    window.clearInterval(freshnessCheck)
+    document.removeEventListener("visibilitychange", onVisibilityChange)
+    window.removeEventListener("online", onOnline)
+    window.removeEventListener("offline", onOffline)
+    unsubscribe()
   }
 }
 

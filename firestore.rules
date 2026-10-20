@@ -432,6 +432,30 @@ service cloud.firestore {
         allow delete: if isWorkspaceMember(workspaceId) && resource.data.uid == request.auth.uid;
       }
 
+      match /presence/{installId} {
+        function validPresence(data) {
+          return data is map
+            && data.keys().hasAll(['uid', 'installId', 'online', 'lastSeenAt'])
+            && data.keys().hasOnly(['uid', 'installId', 'online', 'lastSeenAt'])
+            && data.uid == request.auth.uid
+            && data.installId == installId
+            && data.online is bool
+            && data.lastSeenAt == request.time;
+        }
+
+        allow get, list: if isWorkspaceMember(workspaceId);
+
+        allow create: if isWorkspaceMember(workspaceId)
+          && validPresence(request.resource.data);
+
+        allow update: if isWorkspaceMember(workspaceId)
+          && resource.data.uid == request.auth.uid
+          && validPresence(request.resource.data);
+
+        allow delete: if isWorkspaceMember(workspaceId)
+          && resource.data.uid == request.auth.uid;
+      }
+
       match /{dataCollection}/{recordId} {
         allow get: if isWorkspaceMember(workspaceId)
           && dataCollection in ['todos', 'todoCategories', 'calendarEvents', 'syncConflicts', 'syncDevices', 'todoPurgeMarkers'];

@@ -59,9 +59,18 @@ export function AppShell() {
   const settingsReturnTo = tabs.find(tab => tab.to === requestedSettingsReturn)?.to ?? "/todo"
   const reduceMotion = useReducedMotion()
   const [today, setToday] = useState(() => new Date())
+  const [isBrowserActive, setIsBrowserActive] = useState(() => navigator.onLine && document.visibilityState === "visible")
   const { editor, deleted, storageError, openCreate, closeEditor, undoDelete, dismissDeleted } = useTodos()
   const calendar = useCalendar()
-  const { members } = useWorkspaceMembership()
+  const { members, authStatus, authUser, presenceByUid } = useWorkspaceMembership()
+  const membersWithPresence = members.map(member => {
+    const isSignedInUser = member.uid === authUser?.uid && authStatus === "signed-in"
+    const presenceStatus = (member.uid ? presenceByUid?.[member.uid] : undefined) ?? (isSignedInUser
+      ? isBrowserActive ? "online" : "offline"
+      : "unknown")
+    const presenceLabel = presenceStatus === "online" ? "オンライン" : presenceStatus === "offline" ? "オフライン" : "状態を確認中"
+    return { member, presenceStatus, presenceLabel }
+  })
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     typeof localStorage !== "undefined" && localStorage.getItem("noca.theme") === "dark" ? "dark" : "light"
   )
@@ -87,6 +96,18 @@ export function AppShell() {
       window.clearTimeout(rolloverTimer)
       window.removeEventListener("focus", onResume)
       document.removeEventListener("visibilitychange", onResume)
+    }
+  }, [])
+
+  useEffect(() => {
+    const refreshActivity = () => setIsBrowserActive(navigator.onLine && document.visibilityState === "visible")
+    window.addEventListener("online", refreshActivity)
+    window.addEventListener("offline", refreshActivity)
+    document.addEventListener("visibilitychange", refreshActivity)
+    return () => {
+      window.removeEventListener("online", refreshActivity)
+      window.removeEventListener("offline", refreshActivity)
+      document.removeEventListener("visibilitychange", refreshActivity)
     }
   }, [])
 
@@ -138,10 +159,10 @@ export function AppShell() {
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <div className={cn("mr-1 flex items-center", members.length > 1 ? "-space-x-2" : "")} role="group"
-              aria-label={`利用中のメンバー: ${members.map(member => member.displayName).join("、")}`}>
-              {members.map(member => (
+              aria-label={`利用中のメンバー: ${membersWithPresence.map(({ member, presenceLabel }) => `${member.displayName}（${presenceLabel}）`).join("、")}`}>
+              {membersWithPresence.map(({ member, presenceStatus }) => (
                 <OwnerAvatar key={member.id} owner={member.id} label={member.displayName}
-                  photoURL={member.photoURL} size="lg" decorative className="border-[3px] border-background" />
+                  photoURL={member.photoURL} size="lg" decorative presenceStatus={presenceStatus} className="border-[3px] border-background" />
               ))}
             </div>
             <Link to={isSettings ? settingsReturnTo : "/settings"} state={isSettings ? undefined : { from: active?.to ?? "/todo" }}

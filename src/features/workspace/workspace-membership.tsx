@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react"
 import { isFirebaseConfigured } from "@/features/workspace/firebase-env"
 import type { CreatedInvite, RemoteWorkspace, SignedInProfile } from "@/features/workspace/firebase-workspace"
+import type { WorkspacePresenceStatus } from "@/features/workspace/workspace-presence-state"
 
 export const WORKSPACE_MEMBERS_STORAGE_KEY = "noca.workspace.members.v1"
 
@@ -14,6 +15,7 @@ export type WorkspaceMembershipRemoteValue = {
   workspaceStatus: WorkspaceStatus
   authUser: SignedInProfile | null
   workspace: RemoteWorkspace | null
+  presenceByUid: Record<string, WorkspacePresenceStatus> | null
   authError: string | null
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
@@ -46,6 +48,7 @@ const LOCAL_PREVIEW: WorkspaceMembershipRemoteValue = {
   workspaceStatus: "none",
   authUser: null,
   workspace: null,
+  presenceByUid: null,
   authError: null,
   signInWithGoogle: missingFirebase,
   signOut: missingFirebase,

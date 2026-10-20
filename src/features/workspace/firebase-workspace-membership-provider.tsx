@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { isFirebaseConfigured } from "@/features/workspace/firebase-env"
 import { workspaceErrorMessage } from "@/features/workspace/workspace-errors"
 import { WorkspaceMembershipRemoteProvider, useWorkspaceMembers, type WorkspaceMembershipRemoteValue } from "@/features/workspace/workspace-membership"
+import type { WorkspacePresenceStatus } from "@/features/workspace/workspace-presence-state"
 import type { CreatedInvite, RemoteWorkspace, SignedInProfile } from "@/features/workspace/firebase-workspace"
 
 const workspaceCacheKey = (uid: string) => `noca.firebase.workspace.v1:${uid}`
@@ -60,6 +61,7 @@ export function FirebaseWorkspaceMembershipProvider({ children }: { children: Re
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>(isFirebaseConfigured ? "loading" : "none")
   const [authUser, setAuthUser] = useState<SignedInProfile | null>(null)
   const [workspace, setWorkspace] = useState<RemoteWorkspace | null>(null)
+  const [presenceByUid, setPresenceByUid] = useState<Record<string, WorkspacePresenceStatus> | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -163,6 +165,41 @@ export function FirebaseWorkspaceMembershipProvider({ children }: { children: Re
     }
   }, [setMembers])
 
+  const presenceWorkspaceId = workspaceStatus === "ready" ? workspace?.id ?? null : null
+  const presenceMemberKey = JSON.stringify(workspace?.members.map(member => member.uid) ?? [])
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || authStatus !== "signed-in" || workspaceStatus !== "ready" || !presenceWorkspaceId || !authUser) {
+      setPresenceByUid(null)
+      return
+    }
+
+    let disposed = false
+    let unsubscribePresence: (() => void) | undefined
+    const memberUids = JSON.parse(presenceMemberKey) as string[]
+    setPresenceByUid(null)
+
+    void import("@/features/workspace/firebase-workspace").then(service => {
+      if (disposed) return
+      unsubscribePresence = service.observeWorkspacePresence(
+        presenceWorkspaceId,
+        authUser.uid,
+        memberUids,
+        nextPresence => setPresenceByUid(previous => {
+          if (previous && Object.keys(nextPresence).length === Object.keys(previous).length &&
+            Object.entries(nextPresence).every(([uid, status]) => previous[uid] === status)) return previous
+          return nextPresence
+        }),
+        () => setPresenceByUid(null)
+      )
+    }).catch(() => setPresenceByUid(null))
+
+    return () => {
+      disposed = true
+      unsubscribePresence?.()
+    }
+  }, [authStatus, authUser, presenceMemberKey, presenceWorkspaceId, workspaceStatus])
+
   const runService = useCallback(async (method: "signInWithGoogle" | "signOut" | "createWorkspace" | "acceptInvite", token?: string) => {
     if (!isFirebaseConfigured) throw new Error("Firebaseの環境設定がありません。")
     const service = await import("@/features/workspace/firebase-workspace")
@@ -187,13 +224,14 @@ export function FirebaseWorkspaceMembershipProvider({ children }: { children: Re
     workspaceStatus,
     authUser,
     workspace,
+    presenceByUid,
     authError,
     signInWithGoogle,
     signOut,
     createWorkspace,
     createInvite,
     acceptInvite
-  }), [authStatus, workspaceStatus, authUser, workspace, authError, signInWithGoogle, signOut, createWorkspace, createInvite, acceptInvite])
+  }), [authStatus, workspaceStatus, authUser, workspace, presenceByUid, authError, signInWithGoogle, signOut, createWorkspace, createInvite, acceptInvite])
 
   return <WorkspaceMembershipRemoteProvider value={value}>{children}</WorkspaceMembershipRemoteProvider>
 }

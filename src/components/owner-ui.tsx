@@ -1,5 +1,6 @@
 import { useState } from "react"
 import type { WorkspaceMember } from "@/features/workspace/workspace-membership"
+import type { WorkspacePresenceStatus } from "@/features/workspace/workspace-presence-state"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -30,26 +31,37 @@ const avatarSize = {
   lg: "size-8 text-[10px]"
 } as const
 
-function OwnerAvatar({ owner, size = "sm", decorative = false, className, label, photoURL }: {
+function OwnerAvatar({ owner, size = "sm", decorative = false, className, label, photoURL, presenceStatus }: {
   owner: Owner
   size?: keyof typeof avatarSize
   decorative?: boolean
   className?: string
   label?: string
   photoURL?: string | null
+  presenceStatus?: WorkspacePresenceStatus
 }) {
   const content = label ? [...label][0] : owner === "both" ? "2" : owner
   const accessibleLabel = label ?? (owner === "both" ? "ふたり" : `担当 ${owner}`)
   const [failedPhotoURL, setFailedPhotoURL] = useState<string | null>(null)
   const activePhotoURL = photoURL && failedPhotoURL !== photoURL ? photoURL : null
+  const presenceLabel = presenceStatus === "online" ? "オンライン" : presenceStatus === "offline" ? "オフライン" : "状態を確認中"
   return (
     <span
       data-slot="owner-avatar"
       data-owner={owner}
+      data-presence-status={presenceStatus}
       role={decorative ? undefined : "img"}
-      aria-label={decorative ? undefined : accessibleLabel}
+      aria-label={decorative ? undefined : presenceStatus ? `${accessibleLabel}、${presenceLabel}` : accessibleLabel}
       aria-hidden={decorative ? true : undefined}
-      className={cn("relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold", avatarSize[size], ownerAvatarTone[owner], className)}
+      title={presenceStatus ? `${accessibleLabel}: ${presenceLabel}` : undefined}
+      className={cn(
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold",
+        avatarSize[size],
+        ownerAvatarTone[owner],
+        presenceStatus === "online" && "ring-2 ring-success ring-offset-1 ring-offset-background",
+        presenceStatus === "offline" && "ring-2 ring-border ring-offset-1 ring-offset-background",
+        className
+      )}
     >
       {activePhotoURL && <img src={activePhotoURL} alt="" aria-hidden="true" className="absolute inset-0 size-full object-cover" onError={() => setFailedPhotoURL(activePhotoURL)} />}
       <span className={activePhotoURL ? "sr-only" : undefined}>{content}</span>
