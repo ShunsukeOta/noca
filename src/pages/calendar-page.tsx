@@ -8,6 +8,7 @@ import { CalendarDayTimeline } from "@/components/calendar-day-timeline"
 import { Button } from "@/components/ui/button"
 import { useTodos } from "@/features/todos/todo-store"
 import { useCalendar } from "@/features/calendar/calendar-store"
+import { getJapaneseHolidays } from "@/features/calendar/japanese-holidays"
 import { cn } from "@/lib/utils"
 
 const daysOfWeek = ["日", "月", "火", "水", "木", "金", "土"]
@@ -29,6 +30,10 @@ export function CalendarPage() {
       end: endOfWeek(endOfMonth(firstDay), { weekStartsOn: 0 })
     })
   }, [monthKey])
+  const holidays = useMemo(() => {
+    const years = new Set(dates.map(date => date.getFullYear()))
+    return new Map([...years].flatMap(year => [...getJapaneseHolidays(year)]))
+  }, [dates])
 
   const counts = useMemo(() => {
     const result = new Map<string, { events: number; tasks: number }>()
@@ -86,9 +91,12 @@ export function CalendarPage() {
               const count = dayCount.events + dayCount.tasks
               const selected = isSameDay(date, selectedDay)
               const isToday = isSameDay(date, today)
+              const holidayName = holidays.get(dateKey)
+              const isHoliday = holidayName !== undefined
               return (
                 <Button key={dateKey} type="button" variant="ghost" size="sm" data-calendar-date={dateKey}
-                  aria-label={format(date, "M月d日", { locale: ja }) + (count ? "、予定" + count + "件" : "")}
+                  aria-label={format(date, "M月d日", { locale: ja }) + (holidayName ? `、${holidayName}` : "") + (count ? "、予定" + count + "件" : "")}
+                  title={holidayName}
                   aria-pressed={selected}
                   onClick={() => {
                     if (!isSameMonth(date, month)) setDirection(date < month ? -1 : 1)
@@ -97,6 +105,7 @@ export function CalendarPage() {
                   className="tap-target flex w-full flex-col items-center justify-center gap-1 rounded-xl px-0 py-1">
                   <span className={cn("relative flex size-[34px] items-center justify-center rounded-full text-[13px] font-semibold",
                     !isSameMonth(date, month) && "text-muted-foreground/40",
+                    isHoliday && isSameMonth(date, month) && !selected && "text-weekend-sunday",
                     isToday && !selected && "ring-1 ring-primary text-primary",
                     selected && "text-primary-foreground")}>
                     {selected && <m.span layoutId="calendar-selected-day" aria-hidden="true"
@@ -118,7 +127,10 @@ export function CalendarPage() {
 
       <section aria-label="選択日の予定">
         <div className="mb-3 flex items-center justify-between px-0.5">
-          <h2 className="text-[18px] font-bold">{format(selectedDay, "M月d日（E）", { locale: ja })}</h2>
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2 className="shrink-0 text-[18px] font-bold">{format(selectedDay, "M月d日（E）", { locale: ja })}</h2>
+            {holidays.get(selectedDate) && <span className="truncate text-[11px] font-semibold text-weekend-sunday">{holidays.get(selectedDate)}</span>}
+          </div>
           <span className="rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold tabular-nums text-secondary-foreground">
             予定 {dayEvents.length}件
           </span>

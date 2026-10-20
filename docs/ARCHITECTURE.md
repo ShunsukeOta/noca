@@ -153,6 +153,7 @@ Time semantics:
 
 ### Calendar
 - Month UI: `src/pages/calendar-page.tsx`
+- Japanese public holidays: `src/features/calendar/japanese-holidays.ts` calculates statutory, substitute and citizens’ holidays from 2019–2099 offline; month dates mark holidays and the selected date shows the holiday name.
 - Membership-aware time grid: `src/components/calendar-day-timeline.tsx`
 - Store/editor: `src/features/calendar/calendar-store.tsx`, `src/components/calendar-editor-sheet.tsx`
 
